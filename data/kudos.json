@@ -1,0 +1,18 @@
+{
+  "702718762670882827": {
+    "received": 1,
+    "lastGivenDate": null,
+    "history": [
+      {
+        "fromUserId": "201896413444046849",
+        "reason": "Marketing efforts",
+        "timestamp": "2026-02-23T04:06:49.414Z"
+      }
+    ]
+  },
+  "201896413444046849": {
+    "received": 0,
+    "lastGivenDate": "2026-02-23",
+    "history": []
+  }
+}
