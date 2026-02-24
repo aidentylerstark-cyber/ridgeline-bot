@@ -36,7 +36,7 @@ export async function postTriggerReference(client: Client) {
     new TextDisplayBuilder().setContent(
       `## :peach: Peaches — Command & Trigger Reference\n` +
       `> *Everything you need to know about gettin' Peaches to talk back.*\n\n` +
-      `Peaches responds when a message **starts with** or **contains** one of her trigger words, or when she's **@mentioned**.`
+      `Peaches responds when a message **starts with** one of her trigger words, or when she's **@mentioned**.`
     )
   );
 
@@ -55,11 +55,9 @@ export async function postTriggerReference(client: Client) {
       `Start your message with any of these:\n` +
       `- \`hey peaches\`\n` +
       `- \`yo peaches\`\n` +
-      `- \`peaches\` (just her name works)\n` +
-      `- \`hey bot\`\n` +
-      `- \`yo bot\`\n\n` +
-      `Or include \`ridgeline bot\` anywhere in your message.\n` +
-      `Or just **@mention** her.`
+      `- \`peaches\` (just her name works)\n\n` +
+      `Or just **@mention** her.\n\n` +
+      `> :warning: Peaches will **not** respond in ticket channels.`
     )
   );
 
@@ -154,8 +152,9 @@ export async function postTriggerReference(client: Client) {
     new TextDisplayBuilder().setContent(
       `### :gear: Automatic Features (No Trigger Needed)\n\n` +
       `**Welcome Messages** — New members get auto-role + welcome + DM\n` +
-      `**Birthday Announcements** — Daily at 8 AM EST in <#${CHANNELS.birthdays}>\n` +
+      `**Birthday Announcements** — Daily at 8 AM EST in <#${CHANNELS.celebrationCorner}>\n` +
       `**Milestone Celebrations** — Daily at 9 AM EST in <#${CHANNELS.celebrationCorner}>\n` +
+      `**XP Level-ups** — Posted in <#${CHANNELS.celebrationCorner}>\n` +
       `**Conversation Starters** — Daily at 10 AM EST in <#${CHANNELS.generalChat}>\n` +
       `**Photo of the Week** — Sundays at 12 PM EST in <#${CHANNELS.generalChat}>\n` +
       `**Food Topics** — Mondays at 11 AM EST in <#${CHANNELS.foodLovers}>`

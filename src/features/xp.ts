@@ -14,7 +14,7 @@ import { awardXp, getXp, getXpLeaderboard, calculateLevel, xpForNextLevel } from
 // Per-user in-memory cooldown — userId → last XP award timestamp
 const xpCooldowns = new Map<string, number>();
 
-export async function handleMessageXp(message: Message, _client: Client): Promise<void> {
+export async function handleMessageXp(message: Message, client: Client): Promise<void> {
   if (!message.guild || !message.member) return;
 
   // In-memory cooldown check
@@ -48,7 +48,10 @@ export async function handleMessageXp(message: Message, _client: Client): Promis
     }
   }
 
-  // Post level-up message in the channel
+  // Post level-up message in #celebration-corner
+  const celebChannel = message.guild.channels.cache.get(CHANNELS.celebrationCorner) as TextChannel | undefined;
+  if (!celebChannel) return;
+
   const displayName = message.member.displayName ?? message.author.username;
   let levelUpMsg = `✨ **${displayName}** leveled up to **Level ${newLevel}**!`;
   if (gotNewRole && applicableRole) {
@@ -59,7 +62,7 @@ export async function handleMessageXp(message: Message, _client: Client): Promis
   }
   levelUpMsg += ' 🍑';
 
-  await (message.channel as TextChannel).send(levelUpMsg).catch(() => {});
+  await celebChannel.send(levelUpMsg).catch(() => {});
   console.log(`[Peaches] XP level-up: ${displayName} → Level ${newLevel} (was ${oldLevel})`);
 }
 
