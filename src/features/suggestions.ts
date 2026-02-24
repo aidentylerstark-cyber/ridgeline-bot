@@ -3,8 +3,10 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelType,
   type Client,
   type TextChannel,
+  type ForumChannel,
   type ChatInputCommandInteraction,
   type ButtonInteraction,
   type GuildMember,
@@ -31,7 +33,7 @@ export async function handleSuggestCommand(interaction: ChatInputCommandInteract
 
   await interaction.deferReply({ flags: 64 });
 
-  const suggestChannel = interaction.guild?.channels.cache.get(CHANNELS.suggestions) as TextChannel | undefined;
+  const suggestChannel = interaction.guild?.channels.cache.get(CHANNELS.suggestions);
   if (!suggestChannel) {
     await interaction.editReply({ content: "Can't find the suggestions channel right now, sugar. Try again later! 🍑" });
     return;
@@ -60,10 +62,25 @@ export async function handleSuggestCommand(interaction: ChatInputCommandInteract
     new ButtonBuilder().setCustomId(`suggestion_reviewing_${suggestion.id}`).setLabel('Under Review').setStyle(ButtonStyle.Secondary).setEmoji('🔍'),
   );
 
-  const msg = await suggestChannel.send({ embeds: [embed], components: [actionRow] });
+  let postedId: string | undefined;
 
-  // Update suggestion with the message ID
-  await updateSuggestionMessageId(suggestion.id, msg.id);
+  if (suggestChannel.type === ChannelType.GuildForum) {
+    // Forum channel — create a thread instead of sending a message
+    const thread = await (suggestChannel as ForumChannel).threads.create({
+      name: `💡 Suggestion #${suggestion.id}`,
+      message: { embeds: [embed], components: [actionRow] },
+    });
+    postedId = thread.id;
+  } else if (suggestChannel.isTextBased() && 'send' in suggestChannel) {
+    const msg = await (suggestChannel as TextChannel).send({ embeds: [embed], components: [actionRow] });
+    postedId = msg.id;
+  } else {
+    await interaction.editReply({ content: "The suggestions channel isn't set up correctly, sugar. Let a staff member know! 🍑" });
+    return;
+  }
+
+  // Update suggestion with the posted message/thread ID
+  if (postedId) await updateSuggestionMessageId(suggestion.id, postedId);
 
   await interaction.editReply({ content: `✅ Your suggestion has been submitted to <#${CHANNELS.suggestions}>! Thanks for helping make Ridgeline better, sugar! 🍑` });
   console.log(`[Peaches] Suggestion #${suggestion.id} submitted by ${interaction.user.username}`);

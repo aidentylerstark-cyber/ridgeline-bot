@@ -63,8 +63,8 @@ export async function handleRankCommand(interaction: ChatInputCommandInteraction
   const level = xpData?.level ?? 0;
   const messageCount = xpData?.messageCount ?? 0;
   const nextLevelXp = xpForNextLevel(level);
-  const currentLevelXp = totalXp - calculateLevelThreshold(level);
-  const progressPct = Math.min(100, Math.floor((currentLevelXp / nextLevelXp) * 100));
+  const currentLevelXp = Math.max(0, totalXp - calculateLevelThreshold(level));
+  const progressPct = nextLevelXp > 0 ? Math.min(100, Math.max(0, Math.floor((currentLevelXp / nextLevelXp) * 100))) : 0;
 
   const progressBar = buildProgressBar(progressPct);
 
@@ -129,6 +129,7 @@ function calculateLevelThreshold(level: number): number {
 }
 
 function buildProgressBar(pct: number): string {
-  const filled = Math.round(pct / 10);
+  const safePct = isNaN(pct) || pct < 0 ? 0 : Math.min(100, pct);
+  const filled = Math.round(safePct / 10);
   return '█'.repeat(filled) + '░'.repeat(10 - filled);
 }
