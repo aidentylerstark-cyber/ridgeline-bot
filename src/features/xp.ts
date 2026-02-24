@@ -10,17 +10,21 @@ import {
 } from 'discord.js';
 import { CHANNELS, XP_PER_MESSAGE, XP_COOLDOWN_MS, XP_ROLES } from '../config.js';
 import { awardXp, getXp, getXpLeaderboard, calculateLevel, xpForNextLevel } from '../storage.js';
+import { CooldownManager } from '../utilities/cooldowns.js';
 
-// Per-user in-memory cooldown — userId → last XP award timestamp
-const xpCooldowns = new Map<string, number>();
+// Per-user cooldown with automatic cleanup (prevents unbounded memory growth)
+const xpCooldowns = new CooldownManager(XP_COOLDOWN_MS);
+
+export function destroyXpCooldowns(): void {
+  xpCooldowns.destroy();
+}
 
 export async function handleMessageXp(message: Message, client: Client): Promise<void> {
   if (!message.guild || !message.member) return;
 
-  // In-memory cooldown check
-  const lastAward = xpCooldowns.get(message.author.id);
-  if (lastAward && Date.now() - lastAward < XP_COOLDOWN_MS) return;
-  xpCooldowns.set(message.author.id, Date.now());
+  // Cooldown check (auto-cleaned by CooldownManager)
+  if (xpCooldowns.isOnCooldown(message.author.id)) return;
+  xpCooldowns.set(message.author.id);
 
   const { oldLevel, newLevel, leveledUp, streak } = await awardXp(message.author.id, XP_PER_MESSAGE);
 

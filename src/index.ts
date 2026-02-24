@@ -7,6 +7,7 @@ import { setupReadyHandler } from './events/ready.js';
 import { setupMemberJoinHandler } from './events/member-join.js';
 import { setupInteractionHandler } from './events/interaction.js';
 import { setupMessageHandler, destroyMessageCooldowns } from './events/message.js';
+import { destroyXpCooldowns } from './features/xp.js';
 import { stopInstanceHeartbeat } from './utilities/instance-lock.js';
 import { scheduleBirthdayCheck } from './scheduled/birthday-check.js';
 import { scheduleConversationStarter } from './scheduled/conversation-starter.js';
@@ -104,6 +105,7 @@ async function main() {
     destroyMemory();
     ticketCooldowns.destroy();
     destroyMessageCooldowns();
+    destroyXpCooldowns();
     client.destroy();
     process.exit(0);
   };

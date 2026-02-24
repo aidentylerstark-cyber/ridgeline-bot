@@ -14,6 +14,7 @@ import {
   ThumbnailBuilder,
 } from '@discordjs/builders';
 import { CHANNELS, CITIZEN_ROLE, NEW_ARRIVAL_ROLE } from '../config.js';
+import { scheduleRoleRemoval } from '../storage.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 
 export function setupMemberJoinHandler(client: Client) {
@@ -27,23 +28,13 @@ export function setupMemberJoinHandler(client: Client) {
         console.log(`[Discord Bot] Assigned ${CITIZEN_ROLE} to ${member.displayName}`);
       }
 
-      // 1b. Auto-assign New Arrival role (removed after 7 days)
+      // 1b. Auto-assign New Arrival role (scheduled for removal after 7 days via DB)
       const newArrivalRole = member.guild.roles.cache.find(r => r.name === NEW_ARRIVAL_ROLE);
       if (newArrivalRole) {
         await member.roles.add(newArrivalRole);
-        console.log(`[Discord Bot] Assigned ${NEW_ARRIVAL_ROLE} to ${member.displayName}`);
-        setTimeout(async () => {
-          try {
-            // Re-fetch to ensure member is still in guild and still has the role
-            const freshMember = await member.guild.members.fetch(member.id).catch(() => null);
-            if (freshMember && freshMember.roles.cache.has(newArrivalRole.id)) {
-              await freshMember.roles.remove(newArrivalRole);
-              console.log(`[Discord Bot] Removed ${NEW_ARRIVAL_ROLE} from ${freshMember.displayName} (7 days elapsed)`);
-            }
-          } catch (err) {
-            console.error(`[Discord Bot] Failed to remove ${NEW_ARRIVAL_ROLE} from ${member.displayName}:`, err);
-          }
-        }, 7 * 24 * 60 * 60 * 1000);
+        const removeAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await scheduleRoleRemoval(member.id, NEW_ARRIVAL_ROLE, removeAt);
+        console.log(`[Discord Bot] Assigned ${NEW_ARRIVAL_ROLE} to ${member.displayName} (removal scheduled for ${removeAt.toISOString()})`);
       }
 
       // 2. Post welcome message in #welcome channel

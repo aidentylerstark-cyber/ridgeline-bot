@@ -9,7 +9,10 @@ export async function handleRoleButton(interaction: ButtonInteraction, client: C
   const roleName = interaction.customId.replace('role_', '').replace(/_/g, ' ');
   const member = interaction.member as GuildMember;
   const guild = interaction.guild;
-  if (!guild || !member) return;
+  if (!guild || !member) {
+    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    return;
+  }
 
   const role = guild.roles.cache.find(r => r.name === roleName)
     ?? guild.roles.cache.find(r => r.name.endsWith(roleName))

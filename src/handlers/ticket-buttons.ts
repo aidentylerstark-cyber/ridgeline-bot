@@ -34,7 +34,10 @@ export async function handleTicketOpen(
   ticketCooldowns: CooldownManager,
 ) {
   const member = interaction.member as GuildMember;
-  if (!member) return;
+  if (!member) {
+    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    return;
+  }
 
   // Rate limit check
   if (ticketCooldowns.isOnCooldown(member.id)) {
@@ -46,6 +49,9 @@ export async function handleTicketOpen(
     });
     return;
   }
+
+  // Set cooldown immediately to prevent TOCTOU race (user spamming the button)
+  ticketCooldowns.set(member.id);
 
   // Build available department list (single pass — bypass users see all, others filtered by limit)
   const bypassLimit = hasTicketLimitBypass(member);
@@ -202,7 +208,10 @@ export async function handleTicketClose(interaction: ButtonInteraction, client: 
 
   const member = interaction.member as GuildMember;
   const guild = interaction.guild;
-  if (!guild) return;
+  if (!guild || !member) {
+    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    return;
+  }
 
   if (!isValidDepartment(ticket.department)) return;
   const isStaff = isStaffForTicket(member, ticket.department);

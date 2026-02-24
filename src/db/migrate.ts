@@ -284,6 +284,23 @@ export async function runMigrations(): Promise<void> {
       )
     `);
 
+    // Scheduled role removals — persistent timers for role expiry
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_scheduled_role_removals (
+        id SERIAL PRIMARY KEY,
+        discord_user_id VARCHAR(30) NOT NULL,
+        role_name VARCHAR(100) NOT NULL,
+        remove_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE (discord_user_id, role_name)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_scheduled_role_removals_due
+        ON discord_scheduled_role_removals (remove_at)
+    `);
+
     // Seed ticket counter in site_content if not present
     await client.query(`
       INSERT INTO site_content (key, value) VALUES ('discord_bot_state', '{"nextTicketNumber": 1}')

@@ -182,9 +182,10 @@ export async function setCharacterName(discordUserId: string, characterName: str
 // ============================================
 
 export function calculateLevel(totalXp: number): number {
+  if (!Number.isFinite(totalXp) || totalXp < 0) return 0;
   let level = 0;
   let xpRequired = 0;
-  while (true) {
+  while (level < 1000) { // Hard cap to prevent infinite loops on corrupted data
     const nextLevelXp = Math.floor(XP_LEVEL_BASE * Math.pow(level + 1, 1.5));
     if (totalXp < xpRequired + nextLevelXp) break;
     xpRequired += nextLevelXp;
@@ -410,6 +411,25 @@ export async function getWarningCount(discordUserId: string): Promise<number> {
 export async function clearWarning(id: number): Promise<boolean> {
   const result = await db.delete(discordWarnings).where(eq(discordWarnings.id, id)).returning();
   return result.length > 0;
+}
+
+// ============================================
+// Scheduled Role Removals
+// ============================================
+
+export async function scheduleRoleRemoval(discordUserId: string, roleName: string, removeAt: Date): Promise<void> {
+  await pool.query(
+    `INSERT INTO discord_scheduled_role_removals (discord_user_id, role_name, remove_at)
+     VALUES ($1, $2, $3) ON CONFLICT (discord_user_id, role_name) DO UPDATE SET remove_at = $3`,
+    [discordUserId, roleName, removeAt]
+  );
+}
+
+export async function getDueRoleRemovals(): Promise<Array<{ discordUserId: string; roleName: string }>> {
+  const { rows } = await pool.query<{ discord_user_id: string; role_name: string }>(
+    `DELETE FROM discord_scheduled_role_removals WHERE remove_at <= NOW() RETURNING discord_user_id, role_name`
+  );
+  return rows.map(r => ({ discordUserId: r.discord_user_id, roleName: r.role_name }));
 }
 
 // ============================================

@@ -186,7 +186,10 @@ export async function handleTicketModalSubmit(
   }
   const member = interaction.member as GuildMember;
   const guild = interaction.guild;
-  if (!member || !guild) return;
+  if (!member || !guild) {
+    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    return;
+  }
 
   const slName = interaction.fields.getTextInputValue('ticket_sl_name');
   const subject = interaction.fields.getTextInputValue('ticket_subject');
@@ -227,7 +230,7 @@ export async function handleTicketModalSubmit(
 
   await interaction.deferReply({ flags: 64 });
 
-  // Set cooldown
+  // Cooldown already set in handleTicketOpen — refresh it now that ticket is confirmed
   ticketCooldowns.set(member.id);
 
   // Create the ticket channel

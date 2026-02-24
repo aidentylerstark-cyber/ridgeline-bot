@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS, BIRTHDAY_ROLE } from '../config.js';
 import { getTodaysBirthdays, formatBirthdayDate } from '../features/birthdays.js';
-import { hasBirthdayPosted, recordBirthdayPost } from '../storage.js';
+import { hasBirthdayPosted, recordBirthdayPost, scheduleRoleRemoval } from '../storage.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 
 export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
@@ -26,10 +26,15 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
         for (const bp of birthdayPeople) {
           const alreadyPosted = await hasBirthdayPosted(bp.discordUserId, currentYear);
           if (alreadyPosted) continue;
-          await recordBirthdayPost(bp.discordUserId, currentYear);
 
+          // Check member exists BEFORE recording the post (so left members can retry next year)
           const member = members.get(bp.discordUserId);
-          if (!member) continue;
+          if (!member) {
+            console.log(`[Peaches] Birthday user ${bp.discordUserId} not found in guild — skipping`);
+            continue;
+          }
+
+          await recordBirthdayPost(bp.discordUserId, currentYear);
 
           const charName = bp.characterName ?? member.displayName;
           const embed = new EmbedBuilder()
@@ -52,16 +57,12 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
           await birthdayChannel.send({ content: `\uD83C\uDF82 Happy Birthday <@${bp.discordUserId}>!`, embeds: [embed] });
           console.log(`[Peaches] Birthday posted for ${member.displayName} (${charName})`);
 
-          // Assign birthday role for 24 hours
+          // Assign birthday role — schedule removal via DB (survives restarts)
           const birthdayRole = member.guild.roles.cache.find(r => r.name === BIRTHDAY_ROLE);
           if (birthdayRole && !member.roles.cache.has(birthdayRole.id)) {
             await member.roles.add(birthdayRole).catch(() => {});
-            setTimeout(async () => {
-              const fresh = await member.guild.members.fetch(member.id).catch(() => null);
-              if (fresh && fresh.roles.cache.has(birthdayRole.id)) {
-                await fresh.roles.remove(birthdayRole).catch(() => {});
-              }
-            }, 24 * 60 * 60 * 1000);
+            const removeAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            await scheduleRoleRemoval(member.id, BIRTHDAY_ROLE, removeAt);
           }
 
           await new Promise(r => setTimeout(r, 2000));

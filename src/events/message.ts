@@ -76,6 +76,7 @@ const messageCooldowns = new CooldownManager(3000);
 
 export function destroyMessageCooldowns(): void {
   messageCooldowns.destroy();
+  recentlyProcessed.clear();
 }
 
 // Message ID dedup — prevents double-processing if handler fires twice
@@ -151,7 +152,7 @@ export function setupMessageHandler(client: Client) {
     try {
       // 1. FAQ fast-path
       for (const faq of FAQ_RESPONSES) {
-        if (faq.triggers.some(t => new RegExp(`\\b${t}\\b`, 'i').test(query))) {
+        if (faq.triggers.some(t => new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(query))) {
           console.log(`[Peaches] FAQ response to ${message.author.displayName} in #${(message.channel as TextChannel).name}: "${query}" \u2192 matched "${faq.triggers[0]}"`);
           await message.reply(faq.response);
           return;
