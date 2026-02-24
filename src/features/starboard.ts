@@ -1,6 +1,6 @@
 import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS, STARBOARD_THRESHOLD } from '../config.js';
-import { hasStarboardEntry, createStarboardEntry } from '../storage.js';
+import { getStarboardEntry, createStarboardEntry } from '../storage.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 
 export function setupReactionHandler(client: Client): void {
@@ -17,20 +17,12 @@ export function setupReactionHandler(client: Client): void {
       return;
     }
 
-    // Only track ⭐ in the configured guild
     if (reaction.emoji.name !== '⭐') return;
     if (!reaction.message.guild || reaction.message.guild.id !== GUILD_ID) return;
 
     const starCount = reaction.count ?? 0;
     if (starCount < STARBOARD_THRESHOLD) return;
 
-    const sourceId = reaction.message.id;
-
-    // Check if already in starboard (dedup)
-    const alreadyPosted = await hasStarboardEntry(sourceId).catch(() => true);
-    if (alreadyPosted) return;
-
-    // Need a destination channel
     if (!CHANNELS.hallOfFame) return;
     const hallOfFame = reaction.message.guild.channels.cache.get(CHANNELS.hallOfFame) as TextChannel | undefined;
     if (!hallOfFame) return;
@@ -51,11 +43,8 @@ export function setupReactionHandler(client: Client): void {
       )
       .setTimestamp(msg.createdAt);
 
-    if (msg.content) {
-      embed.setDescription(msg.content.slice(0, 2048));
-    }
+    if (msg.content) embed.setDescription(msg.content.slice(0, 2048));
 
-    // Attach first image if available
     const imageAttachment = msg.attachments.find(a => a.contentType?.startsWith('image/'));
     if (imageAttachment) {
       embed.setImage(imageAttachment.url);
@@ -63,6 +52,26 @@ export function setupReactionHandler(client: Client): void {
       embed.setImage(msg.embeds[0].image.url);
     }
 
+    const sourceId = reaction.message.id;
+    const existing = await getStarboardEntry(sourceId).catch(() => null);
+
+    if (existing) {
+      // Already posted — update the star count on the existing starboard message
+      if (!existing.starboardMessageId) return;
+      try {
+        const starboardMsg = await hallOfFame.messages.fetch(existing.starboardMessageId);
+        await starboardMsg.edit({
+          content: `⭐ **${starCount}** | <#${msg.channel.id}>`,
+          embeds: [embed],
+        });
+        console.log(`[Peaches] Starboard: updated ${sourceId} to ${starCount} stars`);
+      } catch {
+        // Starboard message deleted or inaccessible — ignore
+      }
+      return;
+    }
+
+    // First time reaching threshold — create new starboard entry
     const starboardMsg = await hallOfFame.send({
       content: `⭐ **${starCount}** | <#${msg.channel.id}>`,
       embeds: [embed],

@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
-import { GUILD_ID, CHANNELS } from '../config.js';
+import { GUILD_ID, CHANNELS, BIRTHDAY_ROLE } from '../config.js';
 import { getTodaysBirthdays, formatBirthdayDate } from '../features/birthdays.js';
 import { hasBirthdayPosted, recordBirthdayPost } from '../storage.js';
 import { isBotActive } from '../utilities/instance-lock.js';
@@ -51,6 +51,19 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
 
           await birthdayChannel.send({ content: `\uD83C\uDF82 Happy Birthday <@${bp.discordUserId}>!`, embeds: [embed] });
           console.log(`[Peaches] Birthday posted for ${member.displayName} (${charName})`);
+
+          // Assign birthday role for 24 hours
+          const birthdayRole = member.guild.roles.cache.find(r => r.name === BIRTHDAY_ROLE);
+          if (birthdayRole && !member.roles.cache.has(birthdayRole.id)) {
+            await member.roles.add(birthdayRole).catch(() => {});
+            setTimeout(async () => {
+              const fresh = await member.guild.members.fetch(member.id).catch(() => null);
+              if (fresh && fresh.roles.cache.has(birthdayRole.id)) {
+                await fresh.roles.remove(birthdayRole).catch(() => {});
+              }
+            }, 24 * 60 * 60 * 1000);
+          }
+
           await new Promise(r => setTimeout(r, 2000));
         }
       }

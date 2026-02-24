@@ -247,6 +247,22 @@ export async function runMigrations(): Promise<void> {
       )
     `);
 
+    // Warnings table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_warnings (
+        id SERIAL PRIMARY KEY,
+        discord_user_id VARCHAR(30) NOT NULL,
+        giver_discord_id VARCHAR(30) NOT NULL,
+        reason TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_warnings_user
+        ON discord_warnings (discord_user_id)
+    `);
+
     // Dedup tables — prevent double milestone/birthday posts after restarts
     await client.query(`
       CREATE TABLE IF NOT EXISTS discord_milestone_posts (

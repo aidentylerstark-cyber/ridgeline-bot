@@ -88,6 +88,18 @@ export const discordStarboard = pgTable('discord_starboard', {
 });
 
 // ============================================
+// Warnings table
+// ============================================
+
+export const discordWarnings = pgTable('discord_warnings', {
+  id: serial('id').primaryKey(),
+  discordUserId: varchar('discord_user_id', { length: 30 }).notNull(),
+  giverDiscordId: varchar('giver_discord_id', { length: 30 }).notNull(),
+  reason: text('reason').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ============================================
 // Dedup tables — prevent double-posts after restarts
 // ============================================
 
@@ -112,3 +124,4 @@ export type DiscordKudo = typeof discordKudos.$inferSelect;
 export type DiscordMemberXp = typeof discordMemberXp.$inferSelect;
 export type DiscordSuggestion = typeof discordSuggestions.$inferSelect;
 export type DiscordStarboard = typeof discordStarboard.$inferSelect;
+export type DiscordWarning = typeof discordWarnings.$inferSelect;

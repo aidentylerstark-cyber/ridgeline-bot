@@ -11,6 +11,7 @@ import {
   type ButtonInteraction,
   type GuildMember,
 } from 'discord.js';
+
 import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
 import { createSuggestion, getSuggestion, updateSuggestionStatus, updateSuggestionMessageId } from '../storage.js';
 
@@ -108,6 +109,19 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   }
 
   await updateSuggestionStatus(suggestionId, status, interaction.user.id);
+
+  // DM the suggester with the outcome
+  try {
+    const suggester = await interaction.client.users.fetch(suggestion.discordUserId);
+    const dmMessages = {
+      approved: `✅ **Your suggestion was approved!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nThanks for helping make Ridgeline better, sugar! 🍑`,
+      denied: `❌ **Your suggestion was not approved this time.**\n\n> *${suggestion.content.slice(0, 500)}*\n\nDon't let that stop you — keep those ideas coming! 🍑`,
+      reviewing: `🔍 **Your suggestion is under review!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nStaff are looking into it — we'll keep you posted! 🍑`,
+    };
+    await suggester.send(dmMessages[status]).catch(() => {});
+  } catch {
+    // User may have DMs disabled — silently skip
+  }
 
   const statusConfig = {
     approved:  { color: 0x57F287, label: '✅ Approved',    emoji: '✅' },

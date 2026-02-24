@@ -2,9 +2,9 @@ import { eq, and } from "drizzle-orm";
 import { db, pool } from "./db/index.js";
 import {
   siteContent, discordTickets, discordBirthdays, discordKudos, discordMemberXp,
-  discordSuggestions, discordStarboard,
+  discordSuggestions, discordStarboard, discordWarnings,
   type SiteContent, type DiscordTicket, type DiscordBirthday,
-  type DiscordSuggestion,
+  type DiscordSuggestion, type DiscordWarning,
 } from "./db/schema.js";
 import { XP_LEVEL_BASE } from "./config.js";
 
@@ -333,4 +333,39 @@ export async function createStarboardEntry(sourceMessageId: string, starboardMes
     `INSERT INTO discord_starboard (source_message_id, starboard_message_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
     [sourceMessageId, starboardMessageId]
   );
+}
+
+export async function getStarboardEntry(sourceMessageId: string): Promise<{ starboardMessageId: string | null } | null> {
+  const { rows } = await pool.query<{ starboard_message_id: string | null }>(
+    `SELECT starboard_message_id FROM discord_starboard WHERE source_message_id = $1`,
+    [sourceMessageId]
+  );
+  if (!rows[0]) return null;
+  return { starboardMessageId: rows[0].starboard_message_id };
+}
+
+// ============================================
+// Warnings
+// ============================================
+
+export async function addWarning(discordUserId: string, giverId: string, reason: string): Promise<DiscordWarning> {
+  const [row] = await db.insert(discordWarnings).values({ discordUserId, giverDiscordId: giverId, reason }).returning();
+  return row;
+}
+
+export async function getWarnings(discordUserId: string): Promise<DiscordWarning[]> {
+  return db.select().from(discordWarnings).where(eq(discordWarnings.discordUserId, discordUserId));
+}
+
+export async function getWarningCount(discordUserId: string): Promise<number> {
+  const { rows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) FROM discord_warnings WHERE discord_user_id = $1`,
+    [discordUserId]
+  );
+  return parseInt(rows[0]?.count ?? '0', 10);
+}
+
+export async function clearWarning(id: number): Promise<boolean> {
+  const result = await db.delete(discordWarnings).where(eq(discordWarnings.id, id)).returning();
+  return result.length > 0;
 }

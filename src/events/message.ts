@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { type Client, type TextChannel } from 'discord.js';
+import { ChannelType, ThreadAutoArchiveDuration, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 import { FAQ_RESPONSES } from '../chatbot/faq.js';
 import { PEACHES_PATTERNS, PEACHES_GREETINGS, PEACHES_FALLBACK, pick } from '../chatbot/keywords.js';
@@ -90,6 +90,20 @@ export function setupMessageHandler(client: Client) {
 
     // Award XP for all non-bot guild messages (fire-and-forget, never blocks chatbot)
     handleMessageXp(message, client).catch(err => console.error('[Peaches] XP award error:', err));
+
+    // Auto-thread every post in #character-intros (keep channel tidy)
+    if (
+      message.channel.id === CHANNELS.characterIntros &&
+      message.channel.type === ChannelType.GuildText &&
+      !message.hasThread
+    ) {
+      const threadName = `${message.member?.displayName ?? message.author.username}'s Introduction`.slice(0, 100);
+      message.startThread({
+        name: threadName,
+        autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
+        reason: 'Auto-thread for character introduction',
+      }).catch(() => {});
+    }
 
     const content = message.content.toLowerCase().trim();
     const originalContent = message.content.trim();
@@ -241,7 +255,16 @@ export function setupMessageHandler(client: Client) {
           if (reply) {
             addToMemory(message.channel.id, 'assistant', reply);
             console.log(`[Peaches] AI response to ${message.author.displayName}: "${cleanMessage?.slice(0, 80)}..."`);
-            await message.reply(reply);
+            // Split responses exceeding Discord's 2000-char limit
+            if (reply.length <= 2000) {
+              await message.reply(reply);
+            } else {
+              const chunks = reply.match(/[\s\S]{1,1990}/g) ?? [reply];
+              for (let i = 0; i < chunks.length; i++) {
+                if (i === 0) await message.reply(chunks[i]!);
+                else await (message.channel as TextChannel).send(chunks[i]!);
+              }
+            }
             return;
           }
         } catch (err) {

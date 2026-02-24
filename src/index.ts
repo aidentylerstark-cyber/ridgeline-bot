@@ -44,10 +44,10 @@ async function main() {
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildMessageReactions, // Required for starboard
+      GatewayIntentBits.GuildPresences,        // Required for online count in stats VCs (privileged — enable in Dev Portal)
     ],
     makeCache: Options.cacheWithLimits({
       MessageManager: 50,
-      PresenceManager: 0,
       GuildEmojiManager: 0,
       GuildStickerManager: 0,
       VoiceStateManager: 0,

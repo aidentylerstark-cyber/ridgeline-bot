@@ -39,6 +39,7 @@ export const CHANNELS = {
 
 export const CITIZEN_ROLE = 'Ridgeline Citizen';
 export const NEW_ARRIVAL_ROLE = 'New Arrival'; // Temporary role removed after 7 days
+export const BIRTHDAY_ROLE = 'Birthday';        // Temporary role assigned for 24h on birthday
 
 export const SELF_ASSIGN_ROLES: Record<string, string[]> = {
   '\uD83D\uDD14 Notifications': [
