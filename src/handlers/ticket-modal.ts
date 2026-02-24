@@ -23,8 +23,8 @@ import type { CooldownManager } from '../utilities/cooldowns.js';
 // ─────────────────────────────────────────
 
 export async function handleTicketDepartmentSelect(interaction: StringSelectMenuInteraction, _client: Client) {
-  const department = interaction.values[0];
-  if (!isValidDepartment(department)) {
+  const department = interaction.values[0] as string | undefined;
+  if (!department || !isValidDepartment(department)) {
     await interaction.reply({ content: 'Invalid department selection, sugar. Try again!', flags: 64 });
     return;
   }

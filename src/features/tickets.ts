@@ -256,8 +256,14 @@ export async function closeTicket(
     console.error('[Peaches] Transcript generation failed:', err);
   }
 
-  // Mark as closed in database
-  await storage.closeDiscordTicket(channel.id, closedBy.id);
+  // Mark as closed in database — if this fails, do NOT delete the channel (prevents phantom open tickets)
+  try {
+    await storage.closeDiscordTicket(channel.id, closedBy.id);
+  } catch (err) {
+    console.error('[Peaches] Failed to mark ticket as closed in DB — channel will NOT be deleted:', err);
+    await channel.send('⚠️ There was a database error closing this ticket. Please try again or contact a developer.').catch(() => {});
+    return;
+  }
 
   // Delete channel immediately after transcript send resolves (no artificial delay)
   try {

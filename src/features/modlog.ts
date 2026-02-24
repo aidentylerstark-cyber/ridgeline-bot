@@ -67,11 +67,24 @@ export function setupModLog(client: Client): void {
       raidModeTimer = setTimeout(async () => {
         raidModeActive = false;
         raidModeTimer = null;
+        recentJoins.length = 0; // Clear stale join timestamps
         console.log('[Peaches] Anti-raid: raid mode cleared after 10 minutes');
         try {
           await member.guild.setVerificationLevel(GuildVerificationLevel.Low);
+          const resetEmbed = new EmbedBuilder()
+            .setColor(0x57F287)
+            .setTitle('✅ Raid Mode Deactivated')
+            .setDescription('Server verification level has been restored to **Low** automatically after 10 minutes.')
+            .setTimestamp();
+          logChannel.send({ embeds: [resetEmbed] }).catch(() => {});
         } catch (err) {
           console.error('[Peaches] Anti-raid: FAILED to lower verification level — it may still be High! Manual reset needed:', err);
+          const failEmbed = new EmbedBuilder()
+            .setColor(0xFF0000)
+            .setTitle('⚠️ Raid Mode Reset FAILED')
+            .setDescription('**Could not lower verification level automatically.** A moderator must manually set it back to Low in Server Settings → Safety Setup.')
+            .setTimestamp();
+          logChannel.send({ content: '@here', embeds: [failEmbed] }).catch(() => {});
         }
       }, 10 * 60 * 1000);
     }

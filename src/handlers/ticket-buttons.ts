@@ -118,7 +118,10 @@ export async function handleTicketClaim(interaction: ButtonInteraction, client: 
     return;
   }
 
-  if (!isValidDepartment(ticket.department)) return;
+  if (!isValidDepartment(ticket.department)) {
+    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    return;
+  }
   const member = interaction.member as GuildMember;
 
   // Only staff roles (department-specific or global) can claim
@@ -168,7 +171,10 @@ export async function handleTicketUnclaim(interaction: ButtonInteraction, client
     return;
   }
 
-  if (!isValidDepartment(ticket.department)) return;
+  if (!isValidDepartment(ticket.department)) {
+    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    return;
+  }
   const member = interaction.member as GuildMember;
 
   // Only the claimer or staff can unclaim
@@ -213,7 +219,10 @@ export async function handleTicketClose(interaction: ButtonInteraction, client: 
     return;
   }
 
-  if (!isValidDepartment(ticket.department)) return;
+  if (!isValidDepartment(ticket.department)) {
+    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    return;
+  }
   const isStaff = isStaffForTicket(member, ticket.department);
 
   if (isStaff) {
@@ -269,8 +278,12 @@ export async function handleTicketOwnerRequestClose(interaction: ButtonInteracti
   const channel = interaction.channel as TextChannel;
 
   const guild = interaction.guild;
-  if (!guild) return;
-  if (!isValidDepartment(ticket.department)) return;
+  if (!guild || !isValidDepartment(ticket.department)) {
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    }
+    return;
+  }
   const staffMentions = getStaffMentions(guild, ticket.department);
 
   const staffConfirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -308,9 +321,13 @@ export async function handleTicketConfirmClose(interaction: ButtonInteraction, c
 
   const member = interaction.member as GuildMember;
   const guild = interaction.guild;
-  if (!guild) return;
+  if (!guild || !isValidDepartment(ticket.department)) {
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    }
+    return;
+  }
 
-  if (!isValidDepartment(ticket.department)) return;
   if (!isStaffForTicket(member, ticket.department)) {
     await interaction.reply({
       content: `Only staff can approve closing a ticket, sugar. \uD83C\uDF51`,
@@ -339,7 +356,10 @@ export async function handleTicketDenyClose(interaction: ButtonInteraction, _cli
 
   const member = interaction.member as GuildMember;
 
-  if (!isValidDepartment(ticket.department)) return;
+  if (!isValidDepartment(ticket.department)) {
+    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    return;
+  }
   // Only staff can deny a close request
   if (!isStaffForTicket(member, ticket.department)) {
     await interaction.reply({
@@ -379,7 +399,10 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
   }
 
   const member = interaction.member as GuildMember;
-  if (!isValidDepartment(ticket.department)) return;
+  if (!isValidDepartment(ticket.department)) {
+    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    return;
+  }
 
   if (!isStaffForTicket(member, ticket.department)) {
     await interaction.reply({
@@ -418,7 +441,10 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
   }
 
   const member = interaction.member as GuildMember;
-  if (!isValidDepartment(ticket.department)) return;
+  if (!isValidDepartment(ticket.department)) {
+    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    return;
+  }
 
   if (!isStaffForTicket(member, ticket.department)) {
     await interaction.reply({ content: `Only staff can add users to a ticket, sugar. \uD83C\uDF51`, flags: 64 });
@@ -438,9 +464,27 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
   }
 
   const channel = interaction.channel as TextChannel;
+  const guild = interaction.guild;
+
+  // Verify the user actually exists in the guild before modifying permissions
+  if (!guild) {
+    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    return;
+  }
+
+  let targetMember;
+  try {
+    targetMember = await guild.members.fetch(userId);
+  } catch {
+    await interaction.reply({
+      content: `Couldn't find a member with that ID in this server, sugar. Double-check the ID and try again! \uD83C\uDF51`,
+      flags: 64,
+    });
+    return;
+  }
 
   try {
-    await channel.permissionOverwrites.edit(userId, {
+    await channel.permissionOverwrites.edit(targetMember.id, {
       ViewChannel: true,
       SendMessages: true,
       ReadMessageHistory: true,
@@ -448,13 +492,13 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
       EmbedLinks: true,
     });
 
-    await interaction.reply({ content: `\uD83C\uDF51 <@${userId}> has been added to this ticket!`, flags: 64 });
-    await channel.send(`\uD83C\uDF51 <@${userId}> was added to this ticket by ${interaction.user}.`);
-    console.log(`[Peaches] Ticket #${ticket.ticketNumber}: <@${userId}> added by ${interaction.user.displayName}`);
+    await interaction.reply({ content: `\uD83C\uDF51 ${targetMember} has been added to this ticket!`, flags: 64 });
+    await channel.send(`\uD83C\uDF51 ${targetMember} was added to this ticket by ${interaction.user}.`);
+    console.log(`[Peaches] Ticket #${ticket.ticketNumber}: ${targetMember.displayName} added by ${interaction.user.displayName}`);
   } catch (err) {
     console.error('[Peaches] Failed to add user to ticket:', err);
     await interaction.reply({
-      content: `Couldn't find that user, sugar. Double-check the ID and try again! \uD83C\uDF51`,
+      content: `Something went wrong adding that user, sugar. Try again or check bot permissions! \uD83C\uDF51`,
       flags: 64,
     });
   }

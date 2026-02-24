@@ -73,7 +73,7 @@ export function setupReadyHandler(client: Client) {
     }
 
     // Start stats channel update interval (every 10 minutes)
-    updateStatsChannels(client).catch(() => {});
-    setInterval(() => updateStatsChannels(client).catch(() => {}), 10 * 60 * 1000);
+    updateStatsChannels(client).catch(err => console.error('[Peaches] Stats channel update failed:', err));
+    setInterval(() => updateStatsChannels(client).catch(err => console.error('[Peaches] Stats channel update failed:', err)), 10 * 60 * 1000);
   });
 }
