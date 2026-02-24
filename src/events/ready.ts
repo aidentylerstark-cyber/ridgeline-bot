@@ -5,7 +5,7 @@ import { registerSlashCommands } from '../commands/index.js';
 import { updateStatsChannels } from '../features/stats-channels.js';
 
 export function setupReadyHandler(client: Client) {
-  client.on('ready', async () => {
+  client.on('clientReady', async () => {
     console.log(`[Discord Bot] Logged in as ${client.user?.tag}`);
     console.log(`[Discord Bot] Serving guild: ${GUILD_ID}`);
 
