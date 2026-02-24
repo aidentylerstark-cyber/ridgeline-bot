@@ -12,6 +12,8 @@ import type { Client } from 'discord.js';
 const INSTANCE_ID = crypto.randomUUID();
 let active = true;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let consecutiveFailures = 0;
+const MAX_HEARTBEAT_FAILURES = 3;
 
 /** Create the lock table if needed, then claim ownership. */
 export async function claimInstanceLock(): Promise<void> {
@@ -44,6 +46,7 @@ export function startInstanceHeartbeat(client: Client): void {
       const { rows } = await pool.query(
         'SELECT instance_id FROM bot_instance_lock WHERE id = 1'
       );
+      consecutiveFailures = 0; // Reset on success
       if (rows[0]?.instance_id !== INSTANCE_ID) {
         console.log('[Peaches] Another instance took over — shutting down old bot');
         active = false;
@@ -53,7 +56,15 @@ export function startInstanceHeartbeat(client: Client): void {
         setTimeout(() => process.exit(0), 1000);
       }
     } catch (err) {
-      console.error('[Peaches] Instance heartbeat check failed:', err);
+      consecutiveFailures++;
+      console.error(`[Peaches] Instance heartbeat check failed (${consecutiveFailures}/${MAX_HEARTBEAT_FAILURES}):`, err);
+      if (consecutiveFailures >= MAX_HEARTBEAT_FAILURES) {
+        console.error('[Peaches] Too many consecutive heartbeat failures — DB may be down. Exiting to allow restart.');
+        active = false;
+        stopInstanceHeartbeat();
+        client.destroy();
+        setTimeout(() => process.exit(1), 1000);
+      }
     }
   }, 5000);
 }

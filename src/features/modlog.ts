@@ -70,7 +70,9 @@ export function setupModLog(client: Client): void {
         console.log('[Peaches] Anti-raid: raid mode cleared after 10 minutes');
         try {
           await member.guild.setVerificationLevel(GuildVerificationLevel.Low);
-        } catch {}
+        } catch (err) {
+          console.error('[Peaches] Anti-raid: FAILED to lower verification level — it may still be High! Manual reset needed:', err);
+        }
       }, 10 * 60 * 1000);
     }
   });

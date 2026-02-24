@@ -114,6 +114,16 @@ async function main() {
   process.on('SIGINT', shutdown);
 }
 
+// Global error handlers — prevent silent crashes without cleanup
+process.on('unhandledRejection', (reason) => {
+  console.error('[Peaches] Unhandled promise rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Peaches] Uncaught exception — shutting down:', err);
+  process.exit(1);
+});
+
 main().catch((err) => {
   console.error('[Peaches] Fatal startup error:', err);
   process.exit(1);
