@@ -1,5 +1,5 @@
-import { ActivityType, type Client } from 'discord.js';
-import { GUILD_ID } from '../config.js';
+import { ActivityType, ChannelType, REST, Routes, type Client } from 'discord.js';
+import { GUILD_ID, CHANNELS } from '../config.js';
 import { claimInstanceLock, startInstanceHeartbeat } from '../utilities/instance-lock.js';
 import { registerSlashCommands } from '../commands/index.js';
 import { updateStatsChannels } from '../features/stats-channels.js';
@@ -41,6 +41,36 @@ export function setupReadyHandler(client: Client) {
       activities: [{ name: 'the town gossip', type: ActivityType.Listening }],
       status: 'online',
     });
+
+    // Pin stats category to the top of the channel list
+    try {
+      const guild = client.guilds.cache.get(GUILD_ID);
+      const token = process.env.DISCORD_BOT_TOKEN;
+      if (guild && token && CHANNELS.statsMembersVC) {
+        await guild.channels.fetch();
+        const statsVC = guild.channels.cache.get(CHANNELS.statsMembersVC);
+        const statsCategoryId = statsVC?.parentId;
+        if (statsCategoryId) {
+          const categories = guild.channels.cache
+            .filter(c => c.type === ChannelType.GuildCategory)
+            .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+          const positionUpdates: { id: string; position: number }[] = [
+            { id: statsCategoryId, position: 0 },
+          ];
+          let pos = 1;
+          for (const cat of categories.values()) {
+            if (cat.id !== statsCategoryId) positionUpdates.push({ id: cat.id, position: pos++ });
+          }
+
+          const rest = new REST({ version: '10' }).setToken(token);
+          await rest.patch(Routes.guildChannels(GUILD_ID), { body: positionUpdates });
+          console.log('[Discord Bot] Stats category pinned to position 0');
+        }
+      }
+    } catch (err) {
+      console.error('[Discord Bot] Could not pin stats category (non-fatal):', err);
+    }
 
     // Start stats channel update interval (every 10 minutes)
     updateStatsChannels(client).catch(() => {});
