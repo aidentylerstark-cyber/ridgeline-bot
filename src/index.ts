@@ -13,6 +13,7 @@ import { scheduleConversationStarter } from './scheduled/conversation-starter.js
 import { scheduleFoodTopic } from './scheduled/food-topic.js';
 import { scheduleMilestoneCheck } from './scheduled/milestone-check.js';
 import { schedulePhotoOfTheWeek } from './scheduled/photo-of-week.js';
+import { scheduleCleanup } from './scheduled/cleanup.js';
 import { postRoleButtons } from './panels/role-panel.js';
 import { postTicketPanel } from './panels/ticket-panel.js';
 import { postCommunityPoll, postPhotoOfTheWeekPoll } from './panels/polls.js';
@@ -92,6 +93,7 @@ async function main() {
     scheduleConversationStarter(client),
     scheduleFoodTopic(client),
     schedulePhotoOfTheWeek(client),
+    scheduleCleanup(client),
   ];
 
   // Graceful shutdown

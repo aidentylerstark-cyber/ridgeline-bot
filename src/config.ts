@@ -146,6 +146,8 @@ export const GLOBAL_STAFF_ROLES = ['Ridgeline Owner', 'First Lady', 'Ridgeline M
 export const XP_PER_MESSAGE = 15;           // Base XP awarded per qualifying message
 export const XP_COOLDOWN_MS = 60_000;       // 1 min between XP awards per user
 export const XP_LEVEL_BASE = 100;           // XP needed for level n = XP_LEVEL_BASE * n^1.5
+export const STREAK_BONUS_XP = 5;           // Extra XP per streak day
+export const STREAK_BONUS_CAP = 50;          // Max bonus (reached at 10-day streak)
 
 export const XP_ROLES = [
   { level: 1,  name: 'Chatterbox' },

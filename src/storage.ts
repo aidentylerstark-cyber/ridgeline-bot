@@ -6,7 +6,7 @@ import {
   type SiteContent, type DiscordTicket, type DiscordBirthday,
   type DiscordSuggestion, type DiscordWarning,
 } from "./db/schema.js";
-import { XP_LEVEL_BASE } from "./config.js";
+import { XP_LEVEL_BASE, STREAK_BONUS_XP, STREAK_BONUS_CAP } from "./config.js";
 
 // ============================================
 // Site Content (key-value JSON store — shared with web app)
@@ -197,43 +197,84 @@ export function xpForNextLevel(level: number): number {
   return Math.floor(XP_LEVEL_BASE * Math.pow(level + 1, 1.5));
 }
 
-export async function getXp(discordUserId: string): Promise<{ totalXp: number; level: number; messageCount: number } | null> {
-  const { rows } = await pool.query<{ total_xp: number; level: number; message_count: number }>(
-    `SELECT total_xp, level, message_count FROM discord_member_xp WHERE discord_user_id = $1`,
+function getTodayET(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
+
+function isNextDay(a: string, b: string): boolean {
+  return new Date(b + 'T00:00:00').getTime() - new Date(a + 'T00:00:00').getTime() === 86_400_000;
+}
+
+export async function getXp(discordUserId: string): Promise<{
+  totalXp: number; level: number; messageCount: number;
+  currentStreak: number; lastStreakDate: string | null;
+} | null> {
+  const { rows } = await pool.query<{
+    total_xp: number; level: number; message_count: number;
+    current_streak: number; last_streak_date: string | null;
+  }>(
+    `SELECT total_xp, level, message_count, current_streak, last_streak_date FROM discord_member_xp WHERE discord_user_id = $1`,
     [discordUserId]
   );
   if (!rows[0]) return null;
-  return { totalXp: rows[0].total_xp, level: rows[0].level, messageCount: rows[0].message_count };
+  return {
+    totalXp: rows[0].total_xp,
+    level: rows[0].level,
+    messageCount: rows[0].message_count,
+    currentStreak: rows[0].current_streak,
+    lastStreakDate: rows[0].last_streak_date,
+  };
 }
 
 export async function awardXp(
   discordUserId: string,
   amount: number
-): Promise<{ oldLevel: number; newLevel: number; leveledUp: boolean }> {
+): Promise<{ oldLevel: number; newLevel: number; leveledUp: boolean; streak: number; bonusXp: number }> {
   const current = await getXp(discordUserId);
   const oldXp = current?.totalXp ?? 0;
   const oldLevel = current?.level ?? 0;
-  const newXp = oldXp + amount;
+  const today = getTodayET();
+
+  let streak: number;
+  let bonusXp: number;
+
+  if (current?.lastStreakDate === today) {
+    // Already awarded streak today — keep streak, no bonus
+    streak = current.currentStreak;
+    bonusXp = 0;
+  } else if (current?.lastStreakDate && isNextDay(current.lastStreakDate, today)) {
+    // Consecutive day — increment streak
+    streak = (current.currentStreak ?? 0) + 1;
+    bonusXp = Math.min(streak * STREAK_BONUS_XP, STREAK_BONUS_CAP);
+  } else {
+    // First message ever or gap in streak — reset to 1
+    streak = 1;
+    bonusXp = STREAK_BONUS_XP;
+  }
+
+  const newXp = oldXp + amount + bonusXp;
   const newLevel = calculateLevel(newXp);
 
   await pool.query(
-    `INSERT INTO discord_member_xp (discord_user_id, total_xp, level, message_count, last_xp_awarded_at)
-     VALUES ($1, $2, $3, 1, NOW())
+    `INSERT INTO discord_member_xp (discord_user_id, total_xp, level, message_count, last_xp_awarded_at, current_streak, last_streak_date)
+     VALUES ($1, $2, $3, 1, NOW(), $4, $5)
      ON CONFLICT (discord_user_id) DO UPDATE SET
        total_xp = $2,
        level = $3,
        message_count = discord_member_xp.message_count + 1,
        last_xp_awarded_at = NOW(),
+       current_streak = $4,
+       last_streak_date = $5,
        updated_at = NOW()`,
-    [discordUserId, newXp, newLevel]
+    [discordUserId, newXp, newLevel, streak, today]
   );
 
-  return { oldLevel, newLevel, leveledUp: newLevel > oldLevel };
+  return { oldLevel, newLevel, leveledUp: newLevel > oldLevel, streak, bonusXp };
 }
 
-export async function getXpLeaderboard(limit = 10): Promise<Array<{ discordUserId: string; totalXp: number; level: number; messageCount: number }>> {
-  const { rows } = await pool.query<{ discord_user_id: string; total_xp: number; level: number; message_count: number }>(
-    `SELECT discord_user_id, total_xp, level, message_count FROM discord_member_xp ORDER BY total_xp DESC LIMIT $1`,
+export async function getXpLeaderboard(limit = 10): Promise<Array<{ discordUserId: string; totalXp: number; level: number; messageCount: number; currentStreak: number }>> {
+  const { rows } = await pool.query<{ discord_user_id: string; total_xp: number; level: number; message_count: number; current_streak: number }>(
+    `SELECT discord_user_id, total_xp, level, message_count, current_streak FROM discord_member_xp ORDER BY total_xp DESC LIMIT $1`,
     [limit]
   );
   return rows.map(r => ({
@@ -241,6 +282,7 @@ export async function getXpLeaderboard(limit = 10): Promise<Array<{ discordUserI
     totalXp: r.total_xp,
     level: r.level,
     messageCount: r.message_count,
+    currentStreak: r.current_streak,
   }));
 }
 
@@ -368,4 +410,43 @@ export async function getWarningCount(discordUserId: string): Promise<number> {
 export async function clearWarning(id: number): Promise<boolean> {
   const result = await db.delete(discordWarnings).where(eq(discordWarnings.id, id)).returning();
   return result.length > 0;
+}
+
+// ============================================
+// Auto-Purge (weekly cleanup)
+// ============================================
+
+export async function purgeClosedTickets(days: number): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const { rowCount } = await pool.query(
+    `DELETE FROM discord_tickets WHERE is_closed = true AND closed_at < $1`,
+    [cutoff]
+  );
+  return rowCount ?? 0;
+}
+
+export async function purgeResolvedSuggestions(days: number): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const { rowCount } = await pool.query(
+    `DELETE FROM discord_suggestions WHERE status IN ('approved', 'denied') AND created_at < $1`,
+    [cutoff]
+  );
+  return rowCount ?? 0;
+}
+
+export async function purgeOldBirthdayPosts(year: number): Promise<number> {
+  const { rowCount } = await pool.query(
+    `DELETE FROM discord_birthday_posts WHERE year < $1`,
+    [year]
+  );
+  return rowCount ?? 0;
+}
+
+export async function purgeOldMilestonePosts(days: number): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const { rowCount } = await pool.query(
+    `DELETE FROM discord_milestone_posts WHERE created_at < $1`,
+    [cutoff]
+  );
+  return rowCount ?? 0;
 }

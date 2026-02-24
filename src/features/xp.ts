@@ -22,7 +22,7 @@ export async function handleMessageXp(message: Message, _client: Client): Promis
   if (lastAward && Date.now() - lastAward < XP_COOLDOWN_MS) return;
   xpCooldowns.set(message.author.id, Date.now());
 
-  const { oldLevel, newLevel, leveledUp } = await awardXp(message.author.id, XP_PER_MESSAGE);
+  const { oldLevel, newLevel, leveledUp, streak } = await awardXp(message.author.id, XP_PER_MESSAGE);
 
   if (!leveledUp) return;
 
@@ -54,6 +54,9 @@ export async function handleMessageXp(message: Message, _client: Client): Promis
   if (gotNewRole && applicableRole) {
     levelUpMsg += ` You've earned the **${applicableRole.name}** role! 🎊`;
   }
+  if (streak >= 3) {
+    levelUpMsg += ` (${streak}-day streak! 🔥)`;
+  }
   levelUpMsg += ' 🍑';
 
   await (message.channel as TextChannel).send(levelUpMsg).catch(() => {});
@@ -70,6 +73,7 @@ export async function handleRankCommand(interaction: ChatInputCommandInteraction
   const totalXp = xpData?.totalXp ?? 0;
   const level = xpData?.level ?? 0;
   const messageCount = xpData?.messageCount ?? 0;
+  const currentStreak = xpData?.currentStreak ?? 0;
   const nextLevelXp = xpForNextLevel(level);
   const currentLevelXp = Math.max(0, totalXp - calculateLevelThreshold(level));
   const progressPct = nextLevelXp > 0 ? Math.min(100, Math.max(0, Math.floor((currentLevelXp / nextLevelXp) * 100))) : 0;
@@ -87,6 +91,7 @@ export async function handleRankCommand(interaction: ChatInputCommandInteraction
       { name: '⭐ Level', value: `${level}`, inline: true },
       { name: '✨ Total XP', value: `${totalXp.toLocaleString()}`, inline: true },
       { name: '💬 Messages', value: `${messageCount.toLocaleString()}`, inline: true },
+      { name: '🔥 Streak', value: currentStreak >= 1 ? `${currentStreak} days` : 'No active streak', inline: true },
       {
         name: `Progress to Level ${level + 1}`,
         value: `${progressBar} ${progressPct}%\n${currentLevelXp.toLocaleString()} / ${nextLevelXp.toLocaleString()} XP`,
@@ -119,7 +124,8 @@ export async function handleLeaderboardCommand(interaction: ChatInputCommandInte
     const lines = slice.map((entry, idx) => {
       const rank = start + idx + 1;
       const medal = medals[rank - 1] ?? `**${rank}.**`;
-      return `${medal} <@${entry.discordUserId}> — Level ${entry.level} (${entry.totalXp.toLocaleString()} XP)`;
+      const streakBadge = entry.currentStreak >= 3 ? ` 🔥${entry.currentStreak}` : '';
+      return `${medal} <@${entry.discordUserId}> — Level ${entry.level} (${entry.totalXp.toLocaleString()} XP)${streakBadge}`;
     });
 
     pages.push(
