@@ -13,7 +13,7 @@ import {
   SeparatorBuilder,
   ThumbnailBuilder,
 } from '@discordjs/builders';
-import { CHANNELS, CITIZEN_ROLE } from '../config.js';
+import { CHANNELS, CITIZEN_ROLE, NEW_ARRIVAL_ROLE } from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 
 export function setupMemberJoinHandler(client: Client) {
@@ -25,6 +25,25 @@ export function setupMemberJoinHandler(client: Client) {
       if (citizenRole) {
         await member.roles.add(citizenRole);
         console.log(`[Discord Bot] Assigned ${CITIZEN_ROLE} to ${member.displayName}`);
+      }
+
+      // 1b. Auto-assign New Arrival role (removed after 7 days)
+      const newArrivalRole = member.guild.roles.cache.find(r => r.name === NEW_ARRIVAL_ROLE);
+      if (newArrivalRole) {
+        await member.roles.add(newArrivalRole);
+        console.log(`[Discord Bot] Assigned ${NEW_ARRIVAL_ROLE} to ${member.displayName}`);
+        setTimeout(async () => {
+          try {
+            // Re-fetch to ensure member is still in guild and still has the role
+            const freshMember = await member.guild.members.fetch(member.id).catch(() => null);
+            if (freshMember && freshMember.roles.cache.has(newArrivalRole.id)) {
+              await freshMember.roles.remove(newArrivalRole);
+              console.log(`[Discord Bot] Removed ${NEW_ARRIVAL_ROLE} from ${freshMember.displayName} (7 days elapsed)`);
+            }
+          } catch (err) {
+            console.error(`[Discord Bot] Failed to remove ${NEW_ARRIVAL_ROLE} from ${member.displayName}:`, err);
+          }
+        }, 7 * 24 * 60 * 60 * 1000);
       }
 
       // 2. Post welcome message in #welcome channel
@@ -43,7 +62,7 @@ export function setupMemberJoinHandler(client: Client) {
               `Welcome to **Ridgeline, Georgia** \u2014 a close-knit community nestled in the hills ` +
               `where neighbors look out for each other and there's always a story waiting to unfold.\n\n` +
               `I went ahead and pinned that shiny **Ridgeline Citizen** badge on ya \u2014 ` +
-              `you're officially one of us now. \uD83C\uDF51`
+              `you're officially one of us now. You're resident **#${member.guild.memberCount}**! \uD83C\uDF51`
             )
           )
           .setThumbnailAccessory(

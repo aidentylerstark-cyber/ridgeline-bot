@@ -1,45 +1,25 @@
+import cron from 'node-cron';
 import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS, FOUNDING_DATE, MILESTONES } from '../config.js';
+import { hasMilestonePosted, recordMilestonePost } from '../storage.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 
-let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
-
-// Track posted milestones to avoid duplicates — cleared daily since the 1-day
-// window check already prevents duplicate postings across days
-const postedMilestones = new Set<string>();
-let lastMilestoneCleanupDate = '';
-
-export function scheduleMilestoneCheck(client: Client) {
-  const now = new Date();
-  // Check daily at 9 AM EST
-  const next = new Date(now);
-  next.setUTCHours(14, 0, 0, 0); // 9 AM EST = 14:00 UTC
-  if (next <= now) {
-    next.setDate(next.getDate() + 1);
-  }
-  const delay = next.getTime() - now.getTime();
-
-  pendingTimeout = setTimeout(async () => {
+export function scheduleMilestoneCheck(client: Client): cron.ScheduledTask {
+  // Run daily at 9 AM Eastern
+  const task = cron.schedule('0 9 * * *', async () => {
     if (!isBotActive()) return;
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
-      if (!guild) { scheduleMilestoneCheck(client); return; }
+      if (!guild) return;
 
-      // Use cache instead of fetching all members — GuildMembers intent keeps cache populated
-      const members = guild.members.cache;
       const celebChannel = guild.channels.cache.get(CHANNELS.celebrationCorner) as TextChannel | undefined;
+      if (!celebChannel) return;
 
-      if (!celebChannel) { scheduleMilestoneCheck(client); return; }
+      // Fetch all members so cache is complete
+      await guild.members.fetch();
+      const members = guild.members.cache;
 
       const today = new Date();
-      const todayKey = today.toISOString().slice(0, 10);
-
-      // Clear the Set daily to prevent unbounded growth
-      if (lastMilestoneCleanupDate !== todayKey) {
-        postedMilestones.clear();
-        lastMilestoneCleanupDate = todayKey;
-      }
-
       const daysSinceFounding = Math.floor((today.getTime() - FOUNDING_DATE.getTime()) / 86400000);
 
       for (const member of Array.from(members.values())) {
@@ -48,11 +28,10 @@ export function scheduleMilestoneCheck(client: Client) {
         const daysInServer = Math.floor((today.getTime() - member.joinedAt.getTime()) / 86400000);
 
         for (const milestone of MILESTONES) {
-          // Check if they hit this milestone today (within 1 day window)
           if (daysInServer >= milestone.days && daysInServer < milestone.days + 1) {
-            const key = `${member.id}-${milestone.days}`;
-            if (postedMilestones.has(key)) continue;
-            postedMilestones.add(key);
+            const alreadyPosted = await hasMilestonePosted(member.id, milestone.days);
+            if (alreadyPosted) continue;
+            await recordMilestonePost(member.id, milestone.days);
 
             const joinedFormatted = member.joinedAt?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) ?? 'Unknown';
             const isFoundingMember = (member.joinedAt?.getTime() ?? 0) < FOUNDING_DATE.getTime() + 30 * 86400000;
@@ -76,6 +55,15 @@ export function scheduleMilestoneCheck(client: Client) {
               .setTimestamp();
 
             await celebChannel.send({ embeds: [embed] });
+
+            // Assign milestone tier role if it exists in the guild
+            const milestoneRole = guild.roles.cache.find(r => r.name === milestone.tier);
+            if (milestoneRole) {
+              await member.roles.add(milestoneRole).catch(err =>
+                console.error(`[Discord Bot] Failed to assign milestone role ${milestone.tier} to ${member.displayName}:`, err)
+              );
+            }
+
             console.log(`[Discord Bot] Milestone: ${member.displayName} \u2014 ${milestone.label}`);
           }
         }
@@ -83,13 +71,8 @@ export function scheduleMilestoneCheck(client: Client) {
     } catch (err) {
       console.error('[Discord Bot] Milestone check failed:', err);
     }
+  }, { timezone: 'America/New_York' });
 
-    scheduleMilestoneCheck(client);
-  }, delay);
-
-  console.log(`[Discord Bot] Next milestone check in ${Math.round(delay / 60000)} minutes`);
-}
-
-export function cancelMilestoneCheck(): void {
-  if (pendingTimeout) { clearTimeout(pendingTimeout); pendingTimeout = null; }
+  console.log('[Discord Bot] Milestone check scheduled: 9:00 AM ET daily');
+  return task;
 }

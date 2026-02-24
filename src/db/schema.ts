@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, timestamp, integer, boolean, jsonb, unique } from "drizzle-orm/pg-core";
 
 // ============================================
 // Shared tables (used by bot for state/content)
@@ -62,8 +62,53 @@ export const discordMemberXp = pgTable("discord_member_xp", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// ============================================
+// Suggestions table
+// ============================================
+
+export const discordSuggestions = pgTable('discord_suggestions', {
+  id: serial('id').primaryKey(),
+  discordUserId: varchar('discord_user_id', { length: 30 }).notNull(),
+  content: text('content').notNull(),
+  messageId: varchar('message_id', { length: 30 }),  // embed message ID for editing
+  status: varchar('status', { length: 20 }).notNull().default('open'), // open|approved|denied|reviewing
+  reviewedBy: varchar('reviewed_by', { length: 30 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ============================================
+// Starboard table — prevent double-posts
+// ============================================
+
+export const discordStarboard = pgTable('discord_starboard', {
+  id: serial('id').primaryKey(),
+  sourceMessageId: varchar('source_message_id', { length: 30 }).notNull().unique(),
+  starboardMessageId: varchar('starboard_message_id', { length: 30 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ============================================
+// Dedup tables — prevent double-posts after restarts
+// ============================================
+
+export const discordMilestonePosts = pgTable("discord_milestone_posts", {
+  id: serial("id").primaryKey(),
+  discordUserId: varchar("discord_user_id", { length: 30 }).notNull(),
+  milestoneDays: integer("milestone_days").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [unique().on(table.discordUserId, table.milestoneDays)]);
+
+export const discordBirthdayPosts = pgTable("discord_birthday_posts", {
+  id: serial("id").primaryKey(),
+  discordUserId: varchar("discord_user_id", { length: 30 }).notNull(),
+  year: integer("year").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [unique().on(table.discordUserId, table.year)]);
+
 export type SiteContent = typeof siteContent.$inferSelect;
 export type DiscordTicket = typeof discordTickets.$inferSelect;
 export type DiscordBirthday = typeof discordBirthdays.$inferSelect;
 export type DiscordKudo = typeof discordKudos.$inferSelect;
 export type DiscordMemberXp = typeof discordMemberXp.$inferSelect;
+export type DiscordSuggestion = typeof discordSuggestions.$inferSelect;
+export type DiscordStarboard = typeof discordStarboard.$inferSelect;

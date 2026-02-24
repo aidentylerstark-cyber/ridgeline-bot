@@ -8,17 +8,19 @@ import { setupMemberJoinHandler } from './events/member-join.js';
 import { setupInteractionHandler } from './events/interaction.js';
 import { setupMessageHandler, destroyMessageCooldowns } from './events/message.js';
 import { stopInstanceHeartbeat } from './utilities/instance-lock.js';
-import { scheduleConversationStarter, cancelConversationStarter } from './scheduled/conversation-starter.js';
-import { schedulePhotoOfTheWeek, cancelPhotoOfTheWeek } from './scheduled/photo-of-week.js';
-import { scheduleMilestoneCheck, cancelMilestoneCheck } from './scheduled/milestone-check.js';
-import { scheduleFoodTopic, cancelFoodTopic } from './scheduled/food-topic.js';
-import { scheduleBirthdayCheck, cancelBirthdayCheck } from './scheduled/birthday-check.js';
+import { scheduleBirthdayCheck } from './scheduled/birthday-check.js';
+import { scheduleConversationStarter } from './scheduled/conversation-starter.js';
+import { scheduleFoodTopic } from './scheduled/food-topic.js';
+import { scheduleMilestoneCheck } from './scheduled/milestone-check.js';
+import { schedulePhotoOfTheWeek } from './scheduled/photo-of-week.js';
 import { postRoleButtons } from './panels/role-panel.js';
 import { postTicketPanel } from './panels/ticket-panel.js';
 import { postCommunityPoll, postPhotoOfTheWeekPoll } from './panels/polls.js';
 import { postTriggerReference } from './panels/trigger-reference.js';
 import { destroyMemory } from './chatbot/memory.js';
 import { reorganizeCategoryByKey } from './utilities/channel-reorg.js';
+import { setupModLog } from './features/modlog.js';
+import { setupReactionHandler } from './features/starboard.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) {
@@ -41,11 +43,11 @@ async function main() {
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMessageReactions, // Required for starboard
     ],
     makeCache: Options.cacheWithLimits({
       MessageManager: 50,
       PresenceManager: 0,
-      ReactionManager: 0,
       GuildEmojiManager: 0,
       GuildStickerManager: 0,
       VoiceStateManager: 0,
@@ -69,6 +71,8 @@ async function main() {
   setupMemberJoinHandler(client);
   setupInteractionHandler(client, ticketCooldowns);
   setupMessageHandler(client);
+  setupModLog(client);
+  setupReactionHandler(client);
 
   // Attach admin utility methods to client for console/external access
   client.postRoleButtons = () => postRoleButtons(client);
@@ -78,25 +82,23 @@ async function main() {
   client.postPhotoOfTheWeekPoll = (opts?: string[]) => postPhotoOfTheWeekPoll(client, opts);
   client.postTriggerReference = () => postTriggerReference(client);
 
-  // Login and start scheduled features
+  // Login
   await client.login(token);
-  setTimeout(() => {
-    scheduleConversationStarter(client);
-    schedulePhotoOfTheWeek(client);
-    scheduleMilestoneCheck(client);
-    scheduleFoodTopic(client);
-    scheduleBirthdayCheck(client);
-  }, 5000);
+
+  // Register cron-based scheduled tasks (they wait for their scheduled time — no delay needed)
+  const cronTasks = [
+    scheduleBirthdayCheck(client),
+    scheduleMilestoneCheck(client),
+    scheduleConversationStarter(client),
+    scheduleFoodTopic(client),
+    schedulePhotoOfTheWeek(client),
+  ];
 
   // Graceful shutdown
   const shutdown = async () => {
     console.log('[Peaches] Shutting down...');
     stopInstanceHeartbeat();
-    cancelConversationStarter();
-    cancelPhotoOfTheWeek();
-    cancelMilestoneCheck();
-    cancelFoodTopic();
-    cancelBirthdayCheck();
+    cronTasks.forEach(t => t.stop());
     destroyMemory();
     ticketCooldowns.destroy();
     destroyMessageCooldowns();

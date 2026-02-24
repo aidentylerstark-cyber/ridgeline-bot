@@ -1,9 +1,12 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 import { FAQ_RESPONSES } from '../chatbot/faq.js';
 import { PEACHES_PATTERNS, PEACHES_GREETINGS, PEACHES_FALLBACK, pick } from '../chatbot/keywords.js';
 import { addToMemory, getConversationHistory } from '../chatbot/memory.js';
 import { parseBirthdayDate, formatBirthdayDate, registerBirthday, lookupBirthday } from '../features/birthdays.js';
+import { handleMessageXp } from '../features/xp.js';
+import { setCharacterName } from '../storage.js';
 import { CooldownManager } from '../utilities/cooldowns.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 
@@ -59,6 +62,15 @@ RULES:
 - Remember details people share with you in the conversation and reference them naturally
 - You can have opinions, tell stories, make jokes, give advice \u2014 be a REAL personality`;
 
+// Anthropic SDK client — initialized once at module load
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
+
+// Rate-limit guard: cap concurrent Anthropic calls
+let anthropicConcurrent = 0;
+const ANTHROPIC_MAX_CONCURRENT = 5;
+
 // Per-user cooldown to prevent spam (3 second window)
 const messageCooldowns = new CooldownManager(3000);
 
@@ -75,6 +87,9 @@ export function setupMessageHandler(client: Client) {
     if (message.author.bot) return;
     if (!message.guild || message.guild.id !== GUILD_ID) return;
     if (!isBotActive()) return; // Another instance took over — stop processing
+
+    // Award XP for all non-bot guild messages (fire-and-forget, never blocks chatbot)
+    handleMessageXp(message, client).catch(err => console.error('[Peaches] XP award error:', err));
 
     const content = message.content.toLowerCase().trim();
     const originalContent = message.content.trim();
@@ -143,6 +158,22 @@ export function setupMessageHandler(client: Client) {
         return;
       }
 
+      // 2b. Character name registration
+      const charNameMatch = query.match(/my (?:character(?:'s)? )?name is (.+)/i)
+        ?? content.match(/my (?:character(?:'s)? )?name is (.+)/i);
+      if (charNameMatch) {
+        const charName = charNameMatch[1].replace(/[.!?]+$/, '').trim();
+        if (charName.length > 0 && charName.length <= 100) {
+          await setCharacterName(message.author.id, charName);
+          console.log(`[Peaches] Character name set: ${message.author.displayName} → "${charName}"`);
+          await message.reply(
+            `📝 I've got it written down, sugar! Your character's name is **${charName}**. ` +
+            `I'll use it for birthday announcements and town records! 🍑`
+          );
+          return;
+        }
+      }
+
       // 3. Keyword pattern matching
       for (const conv of PEACHES_PATTERNS) {
         if (conv.patterns.some(p => p.test(query) || p.test(content))) {
@@ -179,8 +210,15 @@ export function setupMessageHandler(client: Client) {
       }
 
       // 5. AI conversation (optional — only if ANTHROPIC_API_KEY is set)
-      const anthropicKey = process.env.ANTHROPIC_API_KEY;
-      if (anthropicKey) {
+      if (anthropic) {
+        // Rate-limit guard: shed load if too many concurrent requests
+        if (anthropicConcurrent >= ANTHROPIC_MAX_CONCURRENT) {
+          console.warn(`[Peaches] AI rate-limit guard: ${anthropicConcurrent} concurrent — using fallback`);
+          await message.reply(pick(PEACHES_FALLBACK));
+          return;
+        }
+
+        anthropicConcurrent++;
         try {
           await message.channel.sendTyping();
           const userName = message.member?.displayName ?? message.author.username;
@@ -188,38 +226,29 @@ export function setupMessageHandler(client: Client) {
 
           const history = getConversationHistory(message.channel.id);
 
-          const apiResponse = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': anthropicKey,
-              'anthropic-version': '2023-06-01',
-            },
-            body: JSON.stringify({
-              model: 'claude-haiku-4-5-20251001',
-              max_tokens: 250,
-              system: PEACHES_SYSTEM_PROMPT,
-              messages: history.map((m: { role: string; content: string }) => ({
-                role: m.role === 'user' ? 'user' : 'assistant',
-                content: m.content,
-              })),
-            }),
+          const response = await anthropic.messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 250,
+            system: PEACHES_SYSTEM_PROMPT,
+            messages: history.map(m => ({
+              role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+              content: m.content,
+            })),
           });
 
-          if (apiResponse.ok) {
-            const data = await apiResponse.json() as { content: Array<{ type: string; text?: string }> };
-            const firstBlock = data.content[0];
-            const reply = firstBlock?.type === 'text' ? firstBlock.text ?? null : null;
-            if (reply) {
-              addToMemory(message.channel.id, 'assistant', reply);
-              console.log(`[Peaches] AI response to ${message.author.displayName}: "${cleanMessage?.slice(0, 80)}..."`);
-              await message.reply(reply);
-              return;
-            }
+          const firstBlock = response.content[0];
+          const reply = firstBlock?.type === 'text' ? firstBlock.text : null;
+          if (reply) {
+            addToMemory(message.channel.id, 'assistant', reply);
+            console.log(`[Peaches] AI response to ${message.author.displayName}: "${cleanMessage?.slice(0, 80)}..."`);
+            await message.reply(reply);
+            return;
           }
         } catch (err) {
           console.error('[Peaches] AI error:', err);
           // Fall through to fallback
+        } finally {
+          anthropicConcurrent--;
         }
       }
 

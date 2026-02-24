@@ -1,6 +1,8 @@
 import { ActivityType, type Client } from 'discord.js';
 import { GUILD_ID } from '../config.js';
 import { claimInstanceLock, startInstanceHeartbeat } from '../utilities/instance-lock.js';
+import { registerSlashCommands } from '../commands/index.js';
+import { updateStatsChannels } from '../features/stats-channels.js';
 
 export function setupReadyHandler(client: Client) {
   client.on('ready', async () => {
@@ -15,13 +17,20 @@ export function setupReadyHandler(client: Client) {
       console.error('[Peaches] Failed to claim instance lock (non-fatal):', err);
     }
 
+    // Register slash commands with the guild
+    try {
+      await registerSlashCommands(client);
+    } catch (err) {
+      console.error('[Peaches] Failed to register slash commands (non-fatal):', err);
+    }
+
     // Set bot nickname to Peaches
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
       if (guild && client.user) {
         const me = await guild.members.fetch(client.user.id);
-        await me.setNickname('Peaches \uD83C\uDF51');
-        console.log('[Discord Bot] Nickname set to Peaches \uD83C\uDF51');
+        await me.setNickname('Peaches 🍑');
+        console.log('[Discord Bot] Nickname set to Peaches 🍑');
       }
     } catch {
       console.log('[Discord Bot] Could not set nickname (may already be set)');
@@ -33,15 +42,8 @@ export function setupReadyHandler(client: Client) {
       status: 'online',
     });
 
-    // Clear old slash commands (XP/kudos system was removed)
-    try {
-      const guild = client.guilds.cache.get(GUILD_ID);
-      if (guild) {
-        await guild.commands.set([]);
-        console.log('[Peaches] Cleared old slash commands');
-      }
-    } catch (err) {
-      console.error('[Peaches] Failed to clear slash commands:', err);
-    }
+    // Start stats channel update interval (every 10 minutes)
+    updateStatsChannels(client).catch(() => {});
+    setInterval(() => updateStatsChannels(client).catch(() => {}), 10 * 60 * 1000);
   });
 }

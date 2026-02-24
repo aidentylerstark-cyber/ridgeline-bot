@@ -214,6 +214,60 @@ export async function runMigrations(): Promise<void> {
       ON discord_member_xp (total_xp DESC)
     `);
 
+    // Suggestions table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_suggestions (
+        id SERIAL PRIMARY KEY,
+        discord_user_id VARCHAR(30) NOT NULL,
+        content TEXT NOT NULL,
+        message_id VARCHAR(30),
+        status VARCHAR(20) NOT NULL DEFAULT 'open',
+        reviewed_by VARCHAR(30),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_suggestions_user
+        ON discord_suggestions (discord_user_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_suggestions_message
+        ON discord_suggestions (message_id) WHERE message_id IS NOT NULL
+    `);
+
+    // Starboard table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_starboard (
+        id SERIAL PRIMARY KEY,
+        source_message_id VARCHAR(30) NOT NULL UNIQUE,
+        starboard_message_id VARCHAR(30),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Dedup tables — prevent double milestone/birthday posts after restarts
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_milestone_posts (
+        id SERIAL PRIMARY KEY,
+        discord_user_id VARCHAR(30) NOT NULL,
+        milestone_days INTEGER NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE (discord_user_id, milestone_days)
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_birthday_posts (
+        id SERIAL PRIMARY KEY,
+        discord_user_id VARCHAR(30) NOT NULL,
+        year INTEGER NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE (discord_user_id, year)
+      )
+    `);
+
     // Seed ticket counter in site_content if not present
     await client.query(`
       INSERT INTO site_content (key, value) VALUES ('discord_bot_state', '{"nextTicketNumber": 1}')

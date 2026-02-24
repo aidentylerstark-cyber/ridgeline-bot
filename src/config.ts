@@ -26,6 +26,11 @@ export const CHANNELS = {
   ridgelinePhotos: '1383231594248015912',
   foodLovers: '1380939549185675344',
   botCommands: '1097051267207008327',
+  // New feature channels — fill in IDs after creating channels in Discord
+  hallOfFame: '1475717471934746858',       // Starboard destination (#hall-of-fame)
+  modLog: '1475717473989820489',           // Mod log channel (staff-only, #mod-log)
+  statsMembersVC: '1475717469791457352',   // Voice channel showing member count (e.g. "Members: 247")
+  statsOnlineVC: '1475717470936498176',    // Voice channel showing online count (e.g. "Online: 43")
 };
 
 // ─────────────────────────────────────────
@@ -33,6 +38,7 @@ export const CHANNELS = {
 // ─────────────────────────────────────────
 
 export const CITIZEN_ROLE = 'Ridgeline Citizen';
+export const NEW_ARRIVAL_ROLE = 'New Arrival'; // Temporary role removed after 7 days
 
 export const SELF_ASSIGN_ROLES: Record<string, string[]> = {
   '\uD83D\uDD14 Notifications': [
@@ -127,6 +133,32 @@ export const TICKET_COOLDOWN_MS = 60_000;
 export const MAX_TICKETS_PER_DEPARTMENT = 1;
 export const TICKET_LIMIT_BYPASS_ROLES = ['First Lady', 'Ridgeline Owner'];
 export const GLOBAL_STAFF_ROLES = ['Ridgeline Owner', 'First Lady', 'Ridgeline Management', 'Ridgeline Manager'];
+
+// ─────────────────────────────────────────
+// Milestones
+// ─────────────────────────────────────────
+
+// ─────────────────────────────────────────
+// XP / Leveling System
+// ─────────────────────────────────────────
+
+export const XP_PER_MESSAGE = 15;           // Base XP awarded per qualifying message
+export const XP_COOLDOWN_MS = 60_000;       // 1 min between XP awards per user
+export const XP_LEVEL_BASE = 100;           // XP needed for level n = XP_LEVEL_BASE * n^1.5
+
+export const XP_ROLES = [
+  { level: 1,  name: 'Chatterbox' },
+  { level: 5,  name: 'Regular' },
+  { level: 10, name: 'Community Fixture' },
+  { level: 20, name: 'Pillar of Ridgeline' },
+  { level: 35, name: 'Ridgeline Legend' },
+] as const;
+
+// ─────────────────────────────────────────
+// Starboard
+// ─────────────────────────────────────────
+
+export const STARBOARD_THRESHOLD = 5; // ⭐ reactions needed to post to #hall-of-fame
 
 // ─────────────────────────────────────────
 // Milestones

@@ -3,9 +3,13 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   type ButtonInteraction,
+  type ModalSubmitInteraction,
   type Client,
   type GuildMember,
   type TextChannel,
@@ -355,7 +359,7 @@ export async function handleTicketCancelClose(interaction: ButtonInteraction) {
 }
 
 // ─────────────────────────────────────────
-// ticket_adduser
+// ticket_adduser — shows modal for user ID input
 // ─────────────────────────────────────────
 
 export async function handleTicketAddUser(interaction: ButtonInteraction, _client: Client) {
@@ -366,9 +370,8 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
   }
 
   const member = interaction.member as GuildMember;
-
   if (!isValidDepartment(ticket.department)) return;
-  // Only staff can add users to tickets
+
   if (!isStaffForTicket(member, ticket.department)) {
     await interaction.reply({
       content: `Only staff can add users to a ticket, sugar. \uD83C\uDF51`,
@@ -377,23 +380,58 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
     return;
   }
 
-  await interaction.reply({
-    content: `Mention the user you'd like to add to this ticket (e.g., @username). I'll give 'em access! \uD83C\uDF51`,
-    flags: 64,
-  });
+  const modal = new ModalBuilder()
+    .setCustomId('ticket_adduser_modal')
+    .setTitle('Add User to Ticket');
+
+  const input = new TextInputBuilder()
+    .setCustomId('ticket_adduser_input')
+    .setLabel('Discord User ID')
+    .setPlaceholder('Right-click a user → Copy User ID (e.g. 123456789012345678)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMinLength(17)
+    .setMaxLength(21);
+
+  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+  await interaction.showModal(modal);
+}
+
+// ─────────────────────────────────────────
+// ticket_adduser_modal submit
+// ─────────────────────────────────────────
+
+export async function handleTicketAddUserModal(interaction: ModalSubmitInteraction, _client: Client) {
+  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
+  if (!ticket) {
+    await interaction.reply({ content: `This doesn't seem to be an active ticket, sugar.`, flags: 64 });
+    return;
+  }
+
+  const member = interaction.member as GuildMember;
+  if (!isValidDepartment(ticket.department)) return;
+
+  if (!isStaffForTicket(member, ticket.department)) {
+    await interaction.reply({ content: `Only staff can add users to a ticket, sugar. \uD83C\uDF51`, flags: 64 });
+    return;
+  }
+
+  const rawInput = interaction.fields.getTextInputValue('ticket_adduser_input').trim();
+  // Accept a raw user ID or a <@mention>
+  const userId = rawInput.match(/^<@!?(\d+)>$/)?.[1] ?? (rawInput.match(/^\d{17,21}$/) ? rawInput : null);
+
+  if (!userId) {
+    await interaction.reply({
+      content: `That doesn't look like a valid User ID, sugar! Right-click a user, hit "Copy User ID", and paste it in. \uD83C\uDF51`,
+      flags: 64,
+    });
+    return;
+  }
 
   const channel = interaction.channel as TextChannel;
-  const filter = (m: { author: { id: string }; mentions: { users: { size: number } } }) => m.author.id === interaction.user.id && m.mentions.users.size > 0;
 
   try {
-    const collected = await channel.awaitMessages({ filter, max: 1, time: 30_000, errors: ['time'] });
-    const msg = collected.first();
-    if (!msg) return;
-
-    const targetUser = msg.mentions.users.first();
-    if (!targetUser) return;
-
-    await channel.permissionOverwrites.edit(targetUser.id, {
+    await channel.permissionOverwrites.edit(userId, {
       ViewChannel: true,
       SendMessages: true,
       ReadMessageHistory: true,
@@ -401,10 +439,14 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
       EmbedLinks: true,
     });
 
-    await channel.send(`\uD83C\uDF51 **${targetUser.displayName}** has been added to this ticket by ${interaction.user}!`);
-    console.log(`[Peaches] Ticket #${ticket.ticketNumber}: ${targetUser.displayName} added by ${interaction.user.displayName}`);
-    await msg.delete().catch(() => {});
-  } catch {
-    await interaction.followUp({ content: `Took too long, sugar. Try the Add User button again! \uD83C\uDF51`, flags: 64 }).catch(() => {});
+    await interaction.reply({ content: `\uD83C\uDF51 <@${userId}> has been added to this ticket!`, flags: 64 });
+    await channel.send(`\uD83C\uDF51 <@${userId}> was added to this ticket by ${interaction.user}.`);
+    console.log(`[Peaches] Ticket #${ticket.ticketNumber}: <@${userId}> added by ${interaction.user.displayName}`);
+  } catch (err) {
+    console.error('[Peaches] Failed to add user to ticket:', err);
+    await interaction.reply({
+      content: `Couldn't find that user, sugar. Double-check the ID and try again! \uD83C\uDF51`,
+      flags: 64,
+    });
   }
 }

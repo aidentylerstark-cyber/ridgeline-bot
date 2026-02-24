@@ -1,52 +1,32 @@
+import cron from 'node-cron';
 import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 import { getTodaysBirthdays, formatBirthdayDate } from '../features/birthdays.js';
+import { hasBirthdayPosted, recordBirthdayPost } from '../storage.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 
-let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
-
-// Track posted birthday celebrations to avoid duplicates within the current day
-const postedBirthdays = new Set<string>();
-let lastBirthdayCleanupDate = '';
-
-export function scheduleBirthdayCheck(client: Client) {
-  const now = new Date();
-  // Check daily at 8 AM EST = 13:00 UTC
-  const next = new Date(now);
-  next.setUTCHours(13, 0, 0, 0);
-  if (next <= now) {
-    next.setDate(next.getDate() + 1);
-  }
-  const delay = next.getTime() - now.getTime();
-
-  pendingTimeout = setTimeout(async () => {
+export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
+  // Run daily at 8 AM Eastern
+  const task = cron.schedule('0 8 * * *', async () => {
     if (!isBotActive()) return;
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
-      if (!guild) { scheduleBirthdayCheck(client); return; }
+      if (!guild) return;
 
       const birthdayChannel = guild.channels.cache.get(CHANNELS.birthdays) as TextChannel | undefined;
-      if (!birthdayChannel) { scheduleBirthdayCheck(client); return; }
+      if (!birthdayChannel) return;
 
       const today = new Date();
-      const todayKey = `${today.getMonth() + 1}-${today.getDate()}`;
-
-      // Clear the Set when the day changes to prevent unbounded growth
-      if (lastBirthdayCleanupDate !== todayKey) {
-        postedBirthdays.clear();
-        lastBirthdayCleanupDate = todayKey;
-      }
-
       const birthdayPeople = await getTodaysBirthdays();
 
       if (birthdayPeople.length > 0) {
-        // Fetch only the members we need
         const members = await guild.members.fetch({ user: birthdayPeople.map(b => b.discordUserId) });
+        const currentYear = today.getFullYear();
 
         for (const bp of birthdayPeople) {
-          const key = `${bp.discordUserId}-${todayKey}`;
-          if (postedBirthdays.has(key)) continue;
-          postedBirthdays.add(key);
+          const alreadyPosted = await hasBirthdayPosted(bp.discordUserId, currentYear);
+          if (alreadyPosted) continue;
+          await recordBirthdayPost(bp.discordUserId, currentYear);
 
           const member = members.get(bp.discordUserId);
           if (!member) continue;
@@ -77,13 +57,8 @@ export function scheduleBirthdayCheck(client: Client) {
     } catch (err) {
       console.error('[Peaches] Birthday check failed:', err);
     }
+  }, { timezone: 'America/New_York' });
 
-    scheduleBirthdayCheck(client);
-  }, delay);
-
-  console.log(`[Discord Bot] Next birthday check in ${Math.round(delay / 60000)} minutes`);
-}
-
-export function cancelBirthdayCheck(): void {
-  if (pendingTimeout) { clearTimeout(pendingTimeout); pendingTimeout = null; }
+  console.log('[Discord Bot] Birthday check scheduled: 8:00 AM ET daily');
+  return task;
 }

@@ -1,8 +1,7 @@
+import cron from 'node-cron';
 import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
-
-let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const FOOD_TOPICS: Array<{ emoji: string; title: string; prompt: string; poll?: { question: string; options: string[] } }> = [
   { emoji: '\uD83C\uDF57', title: 'Southern Comfort Week', prompt: 'What\'s your ultimate comfort food? Fried chicken, mac & cheese, biscuits and gravy \u2014 share your favorites and recipes!', poll: { question: '\uD83C\uDF57 Best Southern comfort food?', options: ['Fried Chicken', 'Mac & Cheese', 'Biscuits & Gravy', 'Cornbread', 'Collard Greens'] } },
@@ -19,29 +18,16 @@ const FOOD_TOPICS: Array<{ emoji: string; title: string; prompt: string; poll?: 
   { emoji: '\uD83C\uDF73', title: 'Brunch Goals', prompt: 'If Ridgeline had a brunch spot, what would be on the menu? Eggs benedict, pancake stacks, mimosas?' },
 ];
 
-export function scheduleFoodTopic(client: Client) {
-  const now = new Date();
-  // Post every Monday at 11 AM EST
-  const next = new Date(now);
-  const daysUntilMonday = (8 - next.getUTCDay()) % 7;
-  next.setDate(next.getDate() + daysUntilMonday);
-  next.setUTCHours(16, 0, 0, 0); // 11 AM EST = 16:00 UTC
-
-  if (next <= now) {
-    next.setDate(next.getDate() + 7);
-  }
-
-  const delay = next.getTime() - now.getTime();
-
-  pendingTimeout = setTimeout(async () => {
+export function scheduleFoodTopic(client: Client): cron.ScheduledTask {
+  // Run every Monday at 11 AM Eastern
+  const task = cron.schedule('0 11 * * 1', async () => {
     if (!isBotActive()) return;
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
-      if (!guild) { scheduleFoodTopic(client); return; }
+      if (!guild) return;
 
       const foodChannel = guild.channels.cache.get(CHANNELS.foodLovers) as TextChannel | undefined;
-
-      if (!foodChannel) { scheduleFoodTopic(client); return; }
+      if (!foodChannel) return;
 
       const today = new Date();
       const startOfYear = new Date(today.getFullYear(), 0, 0);
@@ -76,14 +62,8 @@ export function scheduleFoodTopic(client: Client) {
     } catch (err) {
       console.error('[Discord Bot] Food topic failed:', err);
     }
+  }, { timezone: 'America/New_York' });
 
-    scheduleFoodTopic(client);
-  }, delay);
-
-  const daysUntil = Math.round(delay / 86400000);
-  console.log(`[Discord Bot] Next food topic in ~${daysUntil} days`);
-}
-
-export function cancelFoodTopic(): void {
-  if (pendingTimeout) { clearTimeout(pendingTimeout); pendingTimeout = null; }
+  console.log('[Discord Bot] Food topic scheduled: 11:00 AM ET every Monday');
+  return task;
 }

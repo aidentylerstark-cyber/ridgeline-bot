@@ -259,8 +259,7 @@ export async function closeTicket(
   // Mark as closed in database
   await storage.closeDiscordTicket(channel.id, closedBy.id);
 
-  // Delete channel after a short delay
-  await new Promise(r => setTimeout(r, 5000));
+  // Delete channel immediately after transcript send resolves (no artificial delay)
   try {
     await channel.delete('Ticket closed');
     console.log(`[Peaches] Ticket #${ticket.ticketNumber} closed by ${closedBy.displayName}`);

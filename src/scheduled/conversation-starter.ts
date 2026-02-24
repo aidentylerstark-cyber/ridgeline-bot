@@ -1,8 +1,7 @@
+import cron from 'node-cron';
 import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
-
-let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const CONVERSATION_PROMPTS = [
   { emoji: '\u2600\uFE0F', prompt: 'Good morning, Ridgeline! What\'s your character up to today?' },
@@ -28,17 +27,9 @@ const CONVERSATION_PROMPTS = [
   { emoji: '\uD83D\uDCAD', prompt: 'What\'s one rumor going around town right now?' },
 ];
 
-export function scheduleConversationStarter(client: Client) {
-  const now = new Date();
-  // Schedule for 10 AM EST daily
-  const next = new Date(now);
-  next.setUTCHours(15, 0, 0, 0); // 10 AM EST = 15:00 UTC
-  if (next <= now) {
-    next.setDate(next.getDate() + 1);
-  }
-  const delay = next.getTime() - now.getTime();
-
-  pendingTimeout = setTimeout(async () => {
+export function scheduleConversationStarter(client: Client): cron.ScheduledTask {
+  // Run daily at 10 AM Eastern
+  const task = cron.schedule('0 10 * * *', async () => {
     if (!isBotActive()) return;
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
@@ -63,13 +54,8 @@ export function scheduleConversationStarter(client: Client) {
     } catch (err) {
       console.error('[Discord Bot] Failed to post conversation starter:', err);
     }
+  }, { timezone: 'America/New_York' });
 
-    scheduleConversationStarter(client);
-  }, delay);
-
-  console.log(`[Discord Bot] Next conversation starter in ${Math.round(delay / 60000)} minutes`);
-}
-
-export function cancelConversationStarter(): void {
-  if (pendingTimeout) { clearTimeout(pendingTimeout); pendingTimeout = null; }
+  console.log('[Discord Bot] Conversation starter scheduled: 10:00 AM ET daily');
+  return task;
 }
