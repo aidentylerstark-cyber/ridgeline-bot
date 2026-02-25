@@ -118,7 +118,7 @@ export function setupMessageHandler(client: Client) {
     const botUser = client.user;
     if (!botUser) return;
 
-    const isMentioned = message.mentions.has(botUser);
+    const isMentioned = message.mentions.has(botUser, { ignoreEveryone: true, ignoreRoles: true });
     // Only trigger when "peaches" is used as a name (standalone word), not the fruit
     const isBotTrigger = /^hey peaches\b/.test(content) ||
                          /^yo peaches\b/.test(content) ||
