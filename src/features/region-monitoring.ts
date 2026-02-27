@@ -109,17 +109,22 @@ export async function processRegionUpdate(client: Client, payload: Record<string
     const prevNormalized = Array.isArray(previous.agents) ? previous.agents.map(normalizeAgent) : [];
     const currNormalized = agents.map(normalizeAgent);
 
-    const prevKeys = new Set(prevNormalized.map(a => a.key));
-    const currKeys = new Set(currNormalized.map(a => a.key));
+    // Skip diff if previous snapshot has corrupted data from the old format bug
+    const hasCorruptedPrev = prevNormalized.some(a => a.key === '[object Object]');
 
-    const arrivals = currNormalized.filter(a => !prevKeys.has(a.key));
-    const departures = prevNormalized.filter(a => !currKeys.has(a.key));
+    if (!hasCorruptedPrev) {
+      const prevKeys = new Set(prevNormalized.map(a => a.key));
+      const currKeys = new Set(currNormalized.map(a => a.key));
 
-    if (arrivals.length > 0) {
-      await channel.send(`**${region}** — Arrived: ${arrivals.map(formatAgentLink).join(', ')}`).catch(() => {});
-    }
-    if (departures.length > 0) {
-      await channel.send(`**${region}** — Departed: ${departures.map(formatAgentLink).join(', ')}`).catch(() => {});
+      const arrivals = currNormalized.filter(a => !prevKeys.has(a.key));
+      const departures = prevNormalized.filter(a => !currKeys.has(a.key));
+
+      if (arrivals.length > 0) {
+        await channel.send(`**${region}** — Arrived: ${arrivals.map(formatAgentLink).join(', ')}`).catch(() => {});
+      }
+      if (departures.length > 0) {
+        await channel.send(`**${region}** — Departed: ${departures.map(formatAgentLink).join(', ')}`).catch(() => {});
+      }
     }
   }
 
