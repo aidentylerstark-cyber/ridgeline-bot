@@ -9,6 +9,7 @@ import {
   getLatestSnapshotAllRegions,
   getRegionSnapshotsSince,
   type RegionSnapshotRow,
+  type RegionAgent,
 } from '../storage.js';
 
 // ── Alert cooldowns (in-memory) ──
@@ -40,13 +41,45 @@ export function destroyRegionCooldowns(): void {
   alertCooldowns.clear();
 }
 
+// ── Agent helpers ──
+
+const SL_PROFILE_URL = 'https://world.secondlife.com/resident/';
+
+/** Normalize a raw agent value (string or {key, name}) into a consistent object. */
+function normalizeAgent(raw: unknown): { key: string; name: string } {
+  if (typeof raw === 'object' && raw !== null && 'key' in raw && 'name' in raw) {
+    const obj = raw as { key: string; name: string };
+    return { key: String(obj.key), name: String(obj.name) };
+  }
+  const s = String(raw);
+  return { key: s, name: s };
+}
+
+/** Format an agent as a clickable SL profile link. */
+function formatAgentLink(agent: { key: string; name: string }): string {
+  // If key looks like a UUID, make a clickable link; otherwise plain text
+  if (agent.key !== agent.name && agent.key.length > 8) {
+    return `[${agent.name}](${SL_PROFILE_URL}${agent.key})`;
+  }
+  return agent.name;
+}
+
 // ── Process incoming region update ──
 
 export async function processRegionUpdate(client: Client, payload: Record<string, unknown>): Promise<void> {
   const region = String(payload.region ?? '').trim();
   if (!region) return;
 
-  const agents = Array.isArray(payload.agents) ? payload.agents.map(String) : [];
+  const rawAgents: RegionAgent[] = Array.isArray(payload.agents)
+    ? payload.agents.map((a: unknown) => {
+        if (typeof a === 'object' && a !== null && 'key' in a && 'name' in a) {
+          const obj = a as { key: string; name: string };
+          return { key: String(obj.key), name: String(obj.name) };
+        }
+        return String(a);
+      })
+    : [];
+  const agents = rawAgents;
   const agentCount = typeof payload.agentCount === 'number' ? payload.agentCount : agents.length;
   const rawFps = typeof payload.fps === 'number' ? Math.round(payload.fps) : null;
   const rawDilation = typeof payload.dilation === 'number' ? String(payload.dilation) : null;
@@ -73,17 +106,20 @@ export async function processRegionUpdate(client: Client, payload: Record<string
 
   // ── Arrival / Departure messages ──
   if (previous && eventType === 'status') {
-    const prevAgents = new Set(Array.isArray(previous.agents) ? previous.agents.map(String) : []);
-    const currAgents = new Set(agents);
+    const prevNormalized = Array.isArray(previous.agents) ? previous.agents.map(normalizeAgent) : [];
+    const currNormalized = agents.map(normalizeAgent);
 
-    const arrivals = agents.filter(a => !prevAgents.has(a));
-    const departures = [...prevAgents].filter(a => !currAgents.has(a));
+    const prevKeys = new Set(prevNormalized.map(a => a.key));
+    const currKeys = new Set(currNormalized.map(a => a.key));
+
+    const arrivals = currNormalized.filter(a => !prevKeys.has(a.key));
+    const departures = prevNormalized.filter(a => !currKeys.has(a.key));
 
     if (arrivals.length > 0) {
-      await channel.send(`**${region}** — Arrived: ${arrivals.join(', ')}`).catch(() => {});
+      await channel.send(`**${region}** — Arrived: ${arrivals.map(formatAgentLink).join(', ')}`).catch(() => {});
     }
     if (departures.length > 0) {
-      await channel.send(`**${region}** — Departed: ${departures.join(', ')}`).catch(() => {});
+      await channel.send(`**${region}** — Departed: ${departures.map(formatAgentLink).join(', ')}`).catch(() => {});
     }
   }
 
@@ -189,7 +225,7 @@ export async function handleRegionCommand(interaction: ChatInputCommandInteracti
     const status = isOffline ? '\u{1F534} Offline' : '\u{1F7E2} Online';
     const updatedTs = Math.floor(new Date(snap.created_at).getTime() / 1000);
     const agentList = Array.isArray(snap.agents) && snap.agents.length > 0
-      ? snap.agents.map(String).join(', ')
+      ? snap.agents.map(a => formatAgentLink(normalizeAgent(a))).join(', ')
       : 'None';
 
     const lines = [
@@ -250,8 +286,8 @@ export async function postDailySummary(client: Client): Promise<void> {
     let incidents = 0;
 
     for (const snap of regionSnaps) {
-      const agents = Array.isArray(snap.agents) ? snap.agents.map(String) : [];
-      for (const a of agents) allAgents.add(a);
+      const agents = Array.isArray(snap.agents) ? snap.agents.map(normalizeAgent) : [];
+      for (const a of agents) allAgents.add(a.key);
       if (snap.agent_count > peakConcurrent) {
         peakConcurrent = snap.agent_count;
         peakTime = new Date(snap.created_at);

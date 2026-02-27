@@ -25,7 +25,7 @@ sendUpdate(string eventType)
         count = MAX_AGENTS;
     }
 
-    // Build agent name array
+    // Build agent array with UUID + display name
     string agentsJson = "[";
     integer i;
     for (i = 0; i < count; i++)
@@ -40,7 +40,7 @@ sendUpdate(string eventType)
         {
             agentsJson += ",";
         }
-        agentsJson += "\"" + name + "\"";
+        agentsJson += "{\"key\":\"" + (string)agentKey + "\",\"name\":\"" + name + "\"}";
     }
     agentsJson += "]";
 

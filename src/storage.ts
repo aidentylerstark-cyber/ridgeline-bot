@@ -492,11 +492,13 @@ export async function purgeOldAuditLogs(days: number, excludeActions?: string[])
 // Region Monitoring
 // ============================================
 
+export type RegionAgent = { key: string; name: string } | string;
+
 export interface RegionSnapshotRow {
   id: number;
   region_name: string;
   agent_count: number;
-  agents: string[];
+  agents: RegionAgent[];
   fps: number | null;
   dilation: string | null;
   event_type: string;
@@ -506,7 +508,7 @@ export interface RegionSnapshotRow {
 export async function insertRegionSnapshot(data: {
   regionName: string;
   agentCount: number;
-  agents: string[];
+  agents: RegionAgent[];
   fps: number | null;
   dilation: string | null;
   eventType: string;
