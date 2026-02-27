@@ -16,6 +16,7 @@ import {
   isValidDepartment,
 } from '../config.js';
 import { hasTicketLimitBypass, countUserOpenTicketsInDepartment, createTicketChannel, sendTicketOpeningEmbed } from '../features/tickets.js';
+import { logAuditEvent } from '../features/audit-log.js';
 import type { CooldownManager } from '../utilities/cooldowns.js';
 
 // ─────────────────────────────────────────
@@ -262,4 +263,12 @@ export async function handleTicketModalSubmit(
   });
 
   console.log(`[Peaches] Ticket #${ticketNumber} opened by ${member.displayName} (${department})`);
+
+  logAuditEvent(client, guild, {
+    action: 'ticket_create',
+    actorId: member.id,
+    details: `Ticket #${String(ticketNumber).padStart(4, '0')} created by ${member.displayName} (${TICKET_CATEGORIES[department].label})`,
+    channelId: channel.id,
+    referenceId: `ticket-${String(ticketNumber).padStart(4, '0')}`,
+  });
 }

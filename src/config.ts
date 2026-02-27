@@ -31,6 +31,7 @@ export const CHANNELS = {
   modLog: '1475717473989820489',           // Mod log channel (staff-only, #mod-log)
   statsMembersVC: '1475717469791457352',   // Voice channel showing member count (e.g. "Members: 247")
   statsOnlineVC: '1475717470936498176',    // Voice channel showing online count (e.g. "Online: 43")
+  regionMonitoring: '1420963602457825330', // SL region monitoring alerts & logs
 };
 
 // ─────────────────────────────────────────
@@ -162,6 +163,25 @@ export const XP_ROLES = [
 // ─────────────────────────────────────────
 
 export const STARBOARD_THRESHOLD = 5; // ⭐ reactions needed to post to #hall-of-fame
+
+// ─────────────────────────────────────────
+// Region Monitoring (Second Life)
+// ─────────────────────────────────────────
+
+export const REGION_NAMES = [
+  'Cherokee Rose', 'Oakley Springs', 'Crescent Creek', 'MeadowView Heights',
+] as const;
+export type RegionName = typeof REGION_NAMES[number];
+
+export const REGION_ALERT_THRESHOLDS = {
+  fpsWarning: 25,        // yellow embed, no ping
+  fpsCritical: 15,       // red embed + staff ping
+  dilationWarning: 0.7,  // orange warning
+} as const;
+
+export const REGION_ALERT_COOLDOWN_MS = 15 * 60 * 1000;
+export const REGION_OFFLINE_THRESHOLD_MS = 20 * 60 * 1000;
+export const REGION_SNAPSHOT_RETENTION_DAYS = 7;
 
 // ─────────────────────────────────────────
 // Milestones

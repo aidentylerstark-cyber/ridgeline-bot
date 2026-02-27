@@ -138,6 +138,122 @@ export async function registerSlashCommands(client: Client): Promise<void> {
           .setMinValue(1)
       ),
 
+    // /auditlog (staff only) — subcommands
+    new SlashCommandBuilder()
+      .setName('auditlog')
+      .setDescription('[Staff] Audit log management')
+      .addSubcommand(sub => sub
+        .setName('search')
+        .setDescription('[Staff] Search the audit log')
+        .addUserOption(opt =>
+          opt.setName('user')
+            .setDescription('Filter by user (as actor or target)')
+            .setRequired(false)
+        )
+        .addStringOption(opt =>
+          opt.setName('action')
+            .setDescription('Filter by action type')
+            .setRequired(false)
+            .addChoices(
+              { name: 'Ticket Created', value: 'ticket_create' },
+              { name: 'Ticket Claimed', value: 'ticket_claim' },
+              { name: 'Ticket Unclaimed', value: 'ticket_unclaim' },
+              { name: 'Ticket Closed', value: 'ticket_close' },
+              { name: 'User Added to Ticket', value: 'ticket_add_user' },
+              { name: 'Ticket Close Denied', value: 'ticket_deny_close' },
+              { name: 'Warning Issued', value: 'warn_issue' },
+              { name: 'Warning Cleared', value: 'warn_clear' },
+              { name: 'Suggestion Approved', value: 'suggestion_approve' },
+              { name: 'Suggestion Denied', value: 'suggestion_deny' },
+              { name: 'Suggestion Under Review', value: 'suggestion_review' },
+              { name: 'Member Timed Out', value: 'member_timeout' },
+              { name: 'Role Assigned', value: 'role_assign' },
+              { name: 'Role Removed', value: 'role_remove' },
+              { name: 'Announcement Posted', value: 'announce_post' },
+              { name: 'Member Joined', value: 'member_join' },
+              { name: 'Member Left', value: 'member_leave' },
+            )
+        )
+        .addStringOption(opt =>
+          opt.setName('after')
+            .setDescription('After date: YYYY-MM-DD or today, this-week, this-month')
+            .setRequired(false)
+        )
+        .addStringOption(opt =>
+          opt.setName('before')
+            .setDescription('Before date (YYYY-MM-DD)')
+            .setRequired(false)
+        )
+        .addStringOption(opt =>
+          opt.setName('reference')
+            .setDescription('Filter by reference ID (e.g. ticket-0042)')
+            .setRequired(false)
+        )
+      )
+      .addSubcommand(sub => sub
+        .setName('export')
+        .setDescription('[Staff] Export audit log as a text file')
+        .addUserOption(opt =>
+          opt.setName('user')
+            .setDescription('Filter by user (as actor or target)')
+            .setRequired(false)
+        )
+        .addStringOption(opt =>
+          opt.setName('action')
+            .setDescription('Filter by action type')
+            .setRequired(false)
+            .addChoices(
+              { name: 'Ticket Created', value: 'ticket_create' },
+              { name: 'Ticket Claimed', value: 'ticket_claim' },
+              { name: 'Ticket Unclaimed', value: 'ticket_unclaim' },
+              { name: 'Ticket Closed', value: 'ticket_close' },
+              { name: 'User Added to Ticket', value: 'ticket_add_user' },
+              { name: 'Ticket Close Denied', value: 'ticket_deny_close' },
+              { name: 'Warning Issued', value: 'warn_issue' },
+              { name: 'Warning Cleared', value: 'warn_clear' },
+              { name: 'Suggestion Approved', value: 'suggestion_approve' },
+              { name: 'Suggestion Denied', value: 'suggestion_deny' },
+              { name: 'Suggestion Under Review', value: 'suggestion_review' },
+              { name: 'Member Timed Out', value: 'member_timeout' },
+              { name: 'Role Assigned', value: 'role_assign' },
+              { name: 'Role Removed', value: 'role_remove' },
+              { name: 'Announcement Posted', value: 'announce_post' },
+              { name: 'Member Joined', value: 'member_join' },
+              { name: 'Member Left', value: 'member_leave' },
+            )
+        )
+        .addStringOption(opt =>
+          opt.setName('after')
+            .setDescription('After date: YYYY-MM-DD or today, this-week, this-month')
+            .setRequired(false)
+        )
+        .addStringOption(opt =>
+          opt.setName('before')
+            .setDescription('Before date (YYYY-MM-DD)')
+            .setRequired(false)
+        )
+      )
+      .addSubcommand(sub => sub
+        .setName('stats')
+        .setDescription('[Staff] View audit log action breakdown (last 30 days)')
+      )
+      .addSubcommand(sub => sub
+        .setName('config')
+        .setDescription('[Staff] View or set audit log retention period')
+        .addIntegerOption(opt =>
+          opt.setName('days')
+            .setDescription('Retention period in days (7-730)')
+            .setRequired(false)
+            .setMinValue(7)
+            .setMaxValue(730)
+        )
+      ),
+
+    // /region (staff only)
+    new SlashCommandBuilder()
+      .setName('region')
+      .setDescription('[Staff] Check current SL region status'),
+
     // /help
     new SlashCommandBuilder()
       .setName('help')

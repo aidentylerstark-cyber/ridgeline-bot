@@ -14,6 +14,7 @@ import {
 
 import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
 import { createSuggestion, getSuggestion, updateSuggestionStatus, updateSuggestionMessageId } from '../storage.js';
+import { logAuditEvent } from './audit-log.js';
 
 function isStaff(member: GuildMember): boolean {
   return GLOBAL_STAFF_ROLES.some(roleName => member.roles.cache.some(r => r.name === roleName));
@@ -151,4 +152,15 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
 
   await interaction.update({ embeds: [updatedEmbed.toJSON()], components: [] });
   console.log(`[Peaches] Suggestion #${suggestionId} ${status} by ${interaction.user.username}`);
+
+  const auditActionMap = { approved: 'suggestion_approve', denied: 'suggestion_deny', reviewing: 'suggestion_review' } as const;
+  if (interaction.guild) {
+    logAuditEvent(_client, interaction.guild, {
+      action: auditActionMap[status],
+      actorId: interaction.user.id,
+      targetId: suggestion.discordUserId,
+      details: `Suggestion #${suggestionId} ${status} by ${reviewerName}: ${suggestion.content.slice(0, 100)}`,
+      referenceId: `suggestion-${suggestionId}`,
+    });
+  }
 }

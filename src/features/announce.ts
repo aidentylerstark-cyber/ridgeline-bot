@@ -7,6 +7,7 @@ import {
   type GuildMember,
 } from 'discord.js';
 import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
+import { logAuditEvent } from './audit-log.js';
 
 export async function handleAnnounceCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   // Staff-only check
@@ -54,6 +55,15 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
 
   const content = pingRole ? `<@&${pingRole.id}>` : undefined;
   await destChannel.send({ content, embeds: [embed] });
+
+  if (interaction.guild) {
+    logAuditEvent(_client, interaction.guild, {
+      action: 'announce_post',
+      actorId: interaction.user.id,
+      details: `Announcement posted: "${title}" in #${destChannel.name}`,
+      channelId: destChannel.id,
+    });
+  }
 
   await interaction.editReply({ content: `✅ Announcement posted to <#${destChannel.id}>! 🍑` });
   console.log(`[Peaches] Announcement posted by ${interaction.user.username}: "${title}" → #${destChannel.name}`);

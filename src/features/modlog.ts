@@ -1,6 +1,7 @@
 import { AuditLogEvent, EmbedBuilder, GuildVerificationLevel, type Client, type Guild, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
+import { logAuditEvent } from './audit-log.js';
 
 function getModLogChannel(guild: Guild): TextChannel | null {
   if (!CHANNELS.modLog) return null;
@@ -34,6 +35,14 @@ export function setupModLog(client: Client): void {
       .setTimestamp();
 
     await logChannel.send({ embeds: [embed] }).catch(() => {});
+
+    // DB-only audit log (embed already posted above)
+    logAuditEvent(client, member.guild, {
+      action: 'member_join',
+      actorId: member.id,
+      targetId: member.id,
+      details: `${member.user.tag} joined the server`,
+    });
 
     // Anti-raid: track join rate
     const now = Date.now();
@@ -105,6 +114,14 @@ export function setupModLog(client: Client): void {
       .setTimestamp();
 
     await logChannel.send({ embeds: [embed] }).catch(() => {});
+
+    // DB-only audit log (embed already posted above)
+    logAuditEvent(client, member.guild, {
+      action: 'member_leave',
+      actorId: member.id,
+      targetId: member.id,
+      details: `${member.user.tag} left the server`,
+    });
   });
 
   // ── Message deleted ────────────────────────────────────────

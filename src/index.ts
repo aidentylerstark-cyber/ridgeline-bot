@@ -15,6 +15,8 @@ import { scheduleFoodTopic } from './scheduled/food-topic.js';
 import { scheduleMilestoneCheck } from './scheduled/milestone-check.js';
 import { schedulePhotoOfTheWeek } from './scheduled/photo-of-week.js';
 import { scheduleCleanup } from './scheduled/cleanup.js';
+import { scheduleStaffReport } from './scheduled/staff-report.js';
+import { scheduleTicketInactivityCheck } from './scheduled/ticket-inactivity.js';
 import { postRoleButtons } from './panels/role-panel.js';
 import { postTicketPanel } from './panels/ticket-panel.js';
 import { postCommunityPoll, postPhotoOfTheWeekPoll } from './panels/polls.js';
@@ -23,6 +25,9 @@ import { destroyMemory } from './chatbot/memory.js';
 import { reorganizeCategoryByKey } from './utilities/channel-reorg.js';
 import { setupModLog } from './features/modlog.js';
 import { setupReactionHandler } from './features/starboard.js';
+import { startRegionWebhookServer } from './api/region-webhook.js';
+import { scheduleRegionDailySummary } from './scheduled/region-daily-summary.js';
+import { destroyRegionCooldowns } from './features/region-monitoring.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) {
@@ -87,6 +92,9 @@ async function main() {
   // Login
   await client.login(token);
 
+  // Start HTTP server for region monitoring webhook
+  const regionServer = startRegionWebhookServer(client);
+
   // Register cron-based scheduled tasks (they wait for their scheduled time — no delay needed)
   const cronTasks = [
     scheduleBirthdayCheck(client),
@@ -95,6 +103,9 @@ async function main() {
     scheduleFoodTopic(client),
     schedulePhotoOfTheWeek(client),
     scheduleCleanup(client),
+    scheduleStaffReport(client),
+    scheduleTicketInactivityCheck(client),
+    scheduleRegionDailySummary(client),
   ];
 
   // Graceful shutdown
@@ -106,6 +117,8 @@ async function main() {
     ticketCooldowns.destroy();
     destroyMessageCooldowns();
     destroyXpCooldowns();
+    destroyRegionCooldowns();
+    regionServer.close();
     client.destroy();
     process.exit(0);
   };

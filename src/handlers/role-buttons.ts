@@ -4,6 +4,7 @@ import {
   type Client,
   type GuildMember,
 } from 'discord.js';
+import { logAuditEvent } from '../features/audit-log.js';
 
 export async function handleRoleButton(interaction: ButtonInteraction, client: Client) {
   const roleName = interaction.customId.replace('role_', '').replace(/_/g, ' ');
@@ -26,6 +27,14 @@ export async function handleRoleButton(interaction: ButtonInteraction, client: C
     if (member.roles.cache.has(role.id)) {
       await member.roles.remove(role);
       console.log(`[Peaches] Role removed: ${role.name} from ${member.displayName}`);
+      if (guild) {
+        logAuditEvent(client, guild, {
+          action: 'role_remove',
+          actorId: member.id,
+          targetId: member.id,
+          details: `Self-removed role **${role.name}**`,
+        });
+      }
       const removeEmbed = new EmbedBuilder()
         .setColor(0xCC8844)
         .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
@@ -34,6 +43,14 @@ export async function handleRoleButton(interaction: ButtonInteraction, client: C
     } else {
       await member.roles.add(role);
       console.log(`[Peaches] Role added: ${role.name} to ${member.displayName}`);
+      if (guild) {
+        logAuditEvent(client, guild, {
+          action: 'role_assign',
+          actorId: member.id,
+          targetId: member.id,
+          details: `Self-assigned role **${role.name}**`,
+        });
+      }
       const addEmbed = new EmbedBuilder()
         .setColor(0xD4A574)
         .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })

@@ -117,6 +117,47 @@ export const discordBirthdayPosts = pgTable("discord_birthday_posts", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [unique().on(table.discordUserId, table.year)]);
 
+// ============================================
+// Scheduled Role Removals
+// ============================================
+
+export const discordScheduledRoleRemovals = pgTable("discord_scheduled_role_removals", {
+  id: serial("id").primaryKey(),
+  discordUserId: varchar("discord_user_id", { length: 30 }).notNull(),
+  roleName: varchar("role_name", { length: 100 }).notNull(),
+  removeAt: timestamp("remove_at").notNull(),
+}, (table) => [unique().on(table.discordUserId, table.roleName)]);
+
+// ============================================
+// Audit Log table
+// ============================================
+
+export const discordAuditLog = pgTable('discord_audit_log', {
+  id: serial('id').primaryKey(),
+  action: varchar('action', { length: 50 }).notNull(),
+  actorDiscordId: varchar('actor_discord_id', { length: 30 }).notNull(),
+  targetDiscordId: varchar('target_discord_id', { length: 30 }),
+  details: text('details').notNull(),
+  channelId: varchar('channel_id', { length: 30 }),
+  referenceId: varchar('reference_id', { length: 100 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ============================================
+// Region Monitoring (Second Life)
+// ============================================
+
+export const regionSnapshots = pgTable('region_snapshots', {
+  id: serial('id').primaryKey(),
+  regionName: varchar('region_name', { length: 100 }).notNull(),
+  agentCount: integer('agent_count').notNull().default(0),
+  agents: jsonb('agents').notNull().default([]),
+  fps: integer('fps'),
+  dilation: varchar('dilation', { length: 10 }),
+  eventType: varchar('event_type', { length: 20 }).notNull().default('status'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 export type SiteContent = typeof siteContent.$inferSelect;
 export type DiscordTicket = typeof discordTickets.$inferSelect;
 export type DiscordBirthday = typeof discordBirthdays.$inferSelect;
@@ -125,3 +166,6 @@ export type DiscordMemberXp = typeof discordMemberXp.$inferSelect;
 export type DiscordSuggestion = typeof discordSuggestions.$inferSelect;
 export type DiscordStarboard = typeof discordStarboard.$inferSelect;
 export type DiscordWarning = typeof discordWarnings.$inferSelect;
+export type DiscordAuditLog = typeof discordAuditLog.$inferSelect;
+export type DiscordScheduledRoleRemoval = typeof discordScheduledRoleRemovals.$inferSelect;
+export type RegionSnapshot = typeof regionSnapshots.$inferSelect;

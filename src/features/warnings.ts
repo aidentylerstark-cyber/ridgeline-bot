@@ -1,6 +1,7 @@
 import { EmbedBuilder, type Client, type ChatInputCommandInteraction, type GuildMember } from 'discord.js';
 import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
 import { addWarning, getWarnings, getWarningCount, clearWarning } from '../storage.js';
+import { logAuditEvent } from './audit-log.js';
 
 function isStaff(member: GuildMember): boolean {
   return GLOBAL_STAFF_ROLES.some(r => member.roles.cache.some(role => role.name === r));
@@ -47,6 +48,16 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
     await (modLogChannel as import('discord.js').TextChannel).send({ embeds: [logEmbed] }).catch(() => {});
   }
 
+  if (interaction.guild) {
+    logAuditEvent(_client, interaction.guild, {
+      action: 'warn_issue',
+      actorId: interaction.user.id,
+      targetId: target.id,
+      details: `Warning #${warning.id} issued to ${target.username}: ${reason}`,
+      referenceId: `warning-${warning.id}`,
+    });
+  }
+
   // DM the warned user
   try {
     await target.send(
@@ -62,12 +73,30 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
   const targetMember = interaction.guild?.members.cache.get(target.id);
   if (targetMember) {
     if (totalWarnings === 3) {
-      await targetMember.timeout(60 * 60 * 1000, `Auto-timeout: ${totalWarnings} warnings`).catch(() => {});
+      const timedOut = await targetMember.timeout(60 * 60 * 1000, `Auto-timeout: ${totalWarnings} warnings`).then(() => true).catch(() => false);
+      if (timedOut && interaction.guild) {
+        logAuditEvent(_client, interaction.guild, {
+          action: 'member_timeout',
+          actorId: interaction.user.id,
+          targetId: target.id,
+          details: `Auto-timeout (1 hour) applied to ${target.username} — ${totalWarnings} warnings`,
+          severity: 'warning',
+        });
+      }
       await interaction.editReply({ content: `⚠️ Warning #${warning.id} issued to <@${target.id}>. **${totalWarnings} warnings** — auto-timeout applied for 1 hour. 🍑` });
       return;
     }
     if (totalWarnings >= 5) {
-      await targetMember.timeout(24 * 60 * 60 * 1000, `Auto-timeout: ${totalWarnings} warnings`).catch(() => {});
+      const timedOut = await targetMember.timeout(24 * 60 * 60 * 1000, `Auto-timeout: ${totalWarnings} warnings`).then(() => true).catch(() => false);
+      if (timedOut && interaction.guild) {
+        logAuditEvent(_client, interaction.guild, {
+          action: 'member_timeout',
+          actorId: interaction.user.id,
+          targetId: target.id,
+          details: `Auto-timeout (24 hours) applied to ${target.username} — ${totalWarnings} warnings`,
+          severity: 'critical',
+        });
+      }
       await interaction.editReply({ content: `⚠️ Warning #${warning.id} issued to <@${target.id}>. **${totalWarnings} warnings** — auto-timeout applied for 24 hours. 🍑` });
       return;
     }
@@ -130,4 +159,13 @@ export async function handleClearWarnCommand(interaction: ChatInputCommandIntera
 
   await interaction.editReply({ content: `✅ Warning #${id} has been cleared from the record. 🍑` });
   console.log(`[Peaches] Warning #${id} cleared by ${interaction.user.username}`);
+
+  if (interaction.guild) {
+    logAuditEvent(_client, interaction.guild, {
+      action: 'warn_clear',
+      actorId: interaction.user.id,
+      details: `Warning #${id} cleared by ${interaction.user.username}`,
+      referenceId: `warning-${id}`,
+    });
+  }
 }

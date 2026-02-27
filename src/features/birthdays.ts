@@ -1,3 +1,4 @@
+import type { ChatInputCommandInteraction } from 'discord.js';
 import * as storage from '../storage.js';
 
 // ─────────────────────────────────────────
@@ -62,6 +63,52 @@ export async function registerBirthday(discordUserId: string, month: number, day
 export async function lookupBirthday(discordUserId: string) {
   return storage.getBirthday(discordUserId);
 }
+
+// ─────────────────────────────────────────
+// Slash Command Handler
+// ─────────────────────────────────────────
+
+export async function handleBirthdayCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+  const sub = interaction.options.getSubcommand();
+
+  if (sub === 'set') {
+    const dateStr = interaction.options.getString('date', true);
+    const parsed = parseBirthdayDate(dateStr);
+    if (!parsed) {
+      await interaction.reply({
+        content: `Hmm, couldn't make sense of that date, sugar. Try something like **January 15** or **1/15**! 🍑`,
+        flags: 64,
+      });
+      return;
+    }
+    await registerBirthday(interaction.user.id, parsed.month, parsed.day);
+    await interaction.reply({
+      content: `🎂 Got it! I've written down **${formatBirthdayDate(parsed.month, parsed.day)}** for you. I'll make sure the whole town knows when your big day arrives! 🍑`,
+      flags: 64,
+    });
+    return;
+  }
+
+  if (sub === 'check') {
+    const entry = await lookupBirthday(interaction.user.id);
+    if (entry) {
+      await interaction.reply({
+        content: `🎂 I've got your birthday on file! It's **${formatBirthdayDate(entry.month, entry.day)}**. Peaches never forgets! 🍑`,
+        flags: 64,
+      });
+    } else {
+      await interaction.reply({
+        content: `I don't have your birthday yet, sugar! Use \`/birthday set\` to register it! 🍑`,
+        flags: 64,
+      });
+    }
+    return;
+  }
+}
+
+// ─────────────────────────────────────────
+// Scheduled Checks
+// ─────────────────────────────────────────
 
 export async function getTodaysBirthdays() {
   const today = new Date();

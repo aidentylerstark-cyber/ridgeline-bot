@@ -1,6 +1,12 @@
 import { CHANNELS } from '../config.js';
 
-export const FAQ_RESPONSES: Array<{ triggers: string[]; response: string }> = [
+function compileTriggers(triggers: string[]): RegExp[] {
+  return triggers.map(t =>
+    new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+  );
+}
+
+const RAW_FAQ: Array<{ triggers: string[]; response: string }> = [
   {
     triggers: ['rules', 'guidelines', 'community rules'],
     response: `Honey, the rules are posted right over in <#${CHANNELS.rules}>. Give 'em a read \u2014 Peaches doesn't make the rules, but she WILL enforce 'em. \uD83D\uDCDC`,
@@ -46,3 +52,8 @@ export const FAQ_RESPONSES: Array<{ triggers: string[]; response: string }> = [
     response: `Wanna have your say? Keep an eye on <#${CHANNELS.communityPolls}> \u2014 your vote matters, darlin'. Democracy is alive and well in Ridgeline! \uD83D\uDDF3\uFE0F`,
   },
 ];
+
+export const FAQ_RESPONSES = RAW_FAQ.map(faq => ({
+  ...faq,
+  compiledTriggers: compileTriggers(faq.triggers),
+}));

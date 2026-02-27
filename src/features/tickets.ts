@@ -14,6 +14,7 @@ import {
 import { createTranscript } from 'discord-html-transcripts';
 import * as storage from '../storage.js';
 import { TICKET_CATEGORIES, CHANNELS, TICKET_LIMIT_BYPASS_ROLES, GLOBAL_STAFF_ROLES, isValidDepartment, type TicketDepartment } from '../config.js';
+import { logAuditEvent } from './audit-log.js';
 
 // ─────────────────────────────────────────
 // Utility Checks
@@ -264,6 +265,15 @@ export async function closeTicket(
     await channel.send('⚠️ There was a database error closing this ticket. Please try again or contact a developer.').catch(() => {});
     return;
   }
+
+  logAuditEvent(client, channel.guild, {
+    action: 'ticket_close',
+    actorId: closedBy.id,
+    targetId: ticket.discordUserId,
+    details: `Ticket #${String(ticket.ticketNumber).padStart(4, '0')} closed by ${closedBy.displayName}`,
+    channelId: channel.id,
+    referenceId: `ticket-${String(ticket.ticketNumber).padStart(4, '0')}`,
+  });
 
   // Delete channel immediately after transcript send resolves (no artificial delay)
   try {

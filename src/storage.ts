@@ -470,3 +470,91 @@ export async function purgeOldMilestonePosts(days: number): Promise<number> {
   );
   return rowCount ?? 0;
 }
+
+export async function purgeOldAuditLogs(days: number, excludeActions?: string[]): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  if (excludeActions && excludeActions.length > 0) {
+    const placeholders = excludeActions.map((_, i) => `$${i + 2}`).join(', ');
+    const { rowCount } = await pool.query(
+      `DELETE FROM discord_audit_log WHERE created_at < $1 AND action NOT IN (${placeholders})`,
+      [cutoff, ...excludeActions]
+    );
+    return rowCount ?? 0;
+  }
+  const { rowCount } = await pool.query(
+    `DELETE FROM discord_audit_log WHERE created_at < $1`,
+    [cutoff]
+  );
+  return rowCount ?? 0;
+}
+
+// ============================================
+// Region Monitoring
+// ============================================
+
+export interface RegionSnapshotRow {
+  id: number;
+  region_name: string;
+  agent_count: number;
+  agents: string[];
+  fps: number | null;
+  dilation: string | null;
+  event_type: string;
+  created_at: Date;
+}
+
+export async function insertRegionSnapshot(data: {
+  regionName: string;
+  agentCount: number;
+  agents: string[];
+  fps: number | null;
+  dilation: string | null;
+  eventType: string;
+}): Promise<void> {
+  await pool.query(
+    `INSERT INTO region_snapshots (region_name, agent_count, agents, fps, dilation, event_type)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [data.regionName, data.agentCount, JSON.stringify(data.agents), data.fps, data.dilation, data.eventType]
+  );
+}
+
+export async function getLatestRegionSnapshot(regionName: string): Promise<RegionSnapshotRow | null> {
+  const { rows } = await pool.query<RegionSnapshotRow>(
+    `SELECT * FROM region_snapshots WHERE region_name = $1 ORDER BY created_at DESC LIMIT 1`,
+    [regionName]
+  );
+  return rows[0] ?? null;
+}
+
+export async function getLatestSnapshotAllRegions(): Promise<RegionSnapshotRow[]> {
+  const { rows } = await pool.query<RegionSnapshotRow>(
+    `SELECT DISTINCT ON (region_name) * FROM region_snapshots ORDER BY region_name, created_at DESC`
+  );
+  return rows;
+}
+
+export async function getRegionSnapshotsSince(hours: number): Promise<RegionSnapshotRow[]> {
+  const { rows } = await pool.query<RegionSnapshotRow>(
+    `SELECT * FROM region_snapshots WHERE created_at > NOW() - INTERVAL '1 hour' * $1 ORDER BY created_at ASC`,
+    [hours]
+  );
+  return rows;
+}
+
+export async function purgeOldRegionSnapshots(days: number): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const { rowCount } = await pool.query(
+    `DELETE FROM region_snapshots WHERE created_at < $1`,
+    [cutoff]
+  );
+  return rowCount ?? 0;
+}
+
+export async function purgeAuditLogsByAction(action: string, days: number): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const { rowCount } = await pool.query(
+    `DELETE FROM discord_audit_log WHERE action = $1 AND created_at < $2`,
+    [action, cutoff]
+  );
+  return rowCount ?? 0;
+}

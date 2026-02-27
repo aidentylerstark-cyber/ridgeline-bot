@@ -22,6 +22,7 @@ import {
   type TicketDepartment,
 } from '../config.js';
 import { hasTicketLimitBypass, countUserOpenTicketsInDepartment, isStaffForTicket, getStaffMentions, closeTicket } from '../features/tickets.js';
+import { logAuditEvent } from '../features/audit-log.js';
 import type { CooldownManager } from '../utilities/cooldowns.js';
 
 // ─────────────────────────────────────────
@@ -144,6 +145,17 @@ export async function handleTicketClaim(interaction: ButtonInteraction, client: 
   await storage.updateTicketClaim(interaction.channelId ?? '', member.id);
   console.log(`[Peaches] Ticket #${ticket.ticketNumber} claimed by ${member.displayName}`);
 
+  if (interaction.guild) {
+    logAuditEvent(client, interaction.guild, {
+      action: 'ticket_claim',
+      actorId: member.id,
+      targetId: ticket.discordUserId,
+      details: `Ticket #${String(ticket.ticketNumber).padStart(4, '0')} claimed by ${member.displayName}`,
+      channelId: interaction.channelId ?? undefined,
+      referenceId: `ticket-${String(ticket.ticketNumber).padStart(4, '0')}`,
+    });
+  }
+
   const claimEmbed = new EmbedBuilder()
     .setColor(0x4A7C59)
     .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
@@ -189,6 +201,17 @@ export async function handleTicketUnclaim(interaction: ButtonInteraction, client
   const previousClaimer = ticket.claimedBy;
   await storage.updateTicketClaim(interaction.channelId ?? '', null);
   console.log(`[Peaches] Ticket #${ticket.ticketNumber} unclaimed by <@${previousClaimer}>`);
+
+  if (interaction.guild) {
+    logAuditEvent(client, interaction.guild, {
+      action: 'ticket_unclaim',
+      actorId: member.id,
+      targetId: ticket.discordUserId,
+      details: `Ticket #${String(ticket.ticketNumber).padStart(4, '0')} unclaimed (was claimed by <@${previousClaimer}>)`,
+      channelId: interaction.channelId ?? undefined,
+      referenceId: `ticket-${String(ticket.ticketNumber).padStart(4, '0')}`,
+    });
+  }
 
   const unclaimEmbed = new EmbedBuilder()
     .setColor(0xCC8844)
@@ -373,6 +396,19 @@ export async function handleTicketDenyClose(interaction: ButtonInteraction, _cli
     content: `Close request denied by **${member.displayName}** \u2014 this ticket stays open. \uD83C\uDF51`,
     components: [],
   });
+
+  const guild = interaction.guild;
+  if (guild) {
+    logAuditEvent(_client, guild, {
+      action: 'ticket_deny_close',
+      actorId: member.id,
+      targetId: ticket.discordUserId,
+      details: `Close request denied for Ticket #${String(ticket.ticketNumber).padStart(4, '0')} by ${member.displayName}`,
+      channelId: interaction.channelId ?? undefined,
+      referenceId: `ticket-${String(ticket.ticketNumber).padStart(4, '0')}`,
+    });
+  }
+
   console.log(`[Peaches] Ticket #${ticket.ticketNumber} close denied by ${member.displayName}`);
 }
 
@@ -495,6 +531,17 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
     await interaction.reply({ content: `\uD83C\uDF51 ${targetMember} has been added to this ticket!`, flags: 64 });
     await channel.send(`\uD83C\uDF51 ${targetMember} was added to this ticket by ${interaction.user}.`);
     console.log(`[Peaches] Ticket #${ticket.ticketNumber}: ${targetMember.displayName} added by ${interaction.user.displayName}`);
+
+    if (guild) {
+      logAuditEvent(_client, guild, {
+        action: 'ticket_add_user',
+        actorId: member.id,
+        targetId: targetMember.id,
+        details: `${targetMember.displayName} added to Ticket #${String(ticket.ticketNumber).padStart(4, '0')} by ${member.displayName}`,
+        channelId: channel.id,
+        referenceId: `ticket-${String(ticket.ticketNumber).padStart(4, '0')}`,
+      });
+    }
   } catch (err) {
     console.error('[Peaches] Failed to add user to ticket:', err);
     await interaction.reply({

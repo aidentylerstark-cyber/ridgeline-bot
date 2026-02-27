@@ -301,6 +301,61 @@ export async function runMigrations(): Promise<void> {
         ON discord_scheduled_role_removals (remove_at)
     `);
 
+    // Audit Log table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_audit_log (
+        id SERIAL PRIMARY KEY,
+        action VARCHAR(50) NOT NULL,
+        actor_discord_id VARCHAR(30) NOT NULL,
+        target_discord_id VARCHAR(30),
+        details TEXT NOT NULL,
+        channel_id VARCHAR(30),
+        reference_id VARCHAR(100),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_audit_log_action
+        ON discord_audit_log (action)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_audit_log_actor
+        ON discord_audit_log (actor_discord_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_audit_log_target
+        ON discord_audit_log (target_discord_id) WHERE target_discord_id IS NOT NULL
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_audit_log_created
+        ON discord_audit_log (created_at DESC)
+    `);
+
+    // Region monitoring snapshots
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS region_snapshots (
+        id SERIAL PRIMARY KEY,
+        region_name VARCHAR(100) NOT NULL,
+        agent_count INTEGER NOT NULL DEFAULT 0,
+        agents JSONB NOT NULL DEFAULT '[]',
+        fps INTEGER,
+        dilation VARCHAR(10),
+        event_type VARCHAR(20) NOT NULL DEFAULT 'status',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_region_snapshots_region_created
+        ON region_snapshots (region_name, created_at DESC)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_region_snapshots_created
+        ON region_snapshots (created_at DESC)
+    `);
+
     // Seed ticket counter in site_content if not present
     await client.query(`
       INSERT INTO site_content (key, value) VALUES ('discord_bot_state', '{"nextTicketNumber": 1}')
