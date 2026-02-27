@@ -119,11 +119,11 @@ export async function processRegionUpdate(client: Client, payload: Record<string
       const arrivals = currNormalized.filter(a => !prevKeys.has(a.key));
       const departures = prevNormalized.filter(a => !currKeys.has(a.key));
 
-      if (arrivals.length > 0) {
-        await channel.send(`**${region}** — Arrived: ${arrivals.map(formatAgentLink).join(', ')}`).catch(() => {});
+      for (const agent of arrivals) {
+        await channel.send(`**${region}** — Arrived: ${formatAgentLink(agent)}`).catch(() => {});
       }
-      if (departures.length > 0) {
-        await channel.send(`**${region}** — Departed: ${departures.map(formatAgentLink).join(', ')}`).catch(() => {});
+      for (const agent of departures) {
+        await channel.send(`**${region}** — Departed: ${formatAgentLink(agent)}`).catch(() => {});
       }
     }
   }
