@@ -91,11 +91,14 @@ export async function postTimecardPanel(client: Client, department?: string): Pr
       }
     }
 
-    // Clear old bot messages
-    const oldMessages = await channel.messages.fetch({ limit: 50 });
-    const botMessages = oldMessages.filter(m => m.author.id === client.user?.id);
-    for (const msg of Array.from(botMessages.values())) {
-      await msg.delete().catch(() => {});
+    // Check if panel already exists — skip if bot already has a message with buttons here
+    const existingMessages = await channel.messages.fetch({ limit: 20 });
+    const hasPanel = existingMessages.some(
+      m => m.author.id === client.user?.id && m.components.length > 0
+    );
+    if (hasPanel) {
+      console.log(`[Peaches] Timecard panel already exists for ${dept.label} in #${channel.name} — skipping`);
+      continue;
     }
 
     // Build embed + button row
