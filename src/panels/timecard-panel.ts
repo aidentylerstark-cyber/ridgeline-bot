@@ -71,7 +71,7 @@ export async function postTimecardPanel(client: Client, department?: string): Pr
       try {
         // No permissionOverwrites — inherits/syncs from parent category automatically
         const created = await guild.channels.create({
-          name: 'time-card',
+          name: 'time-cards',
           type: ChannelType.GuildText,
           parent: parentCategory.id,
           topic: `${dept.emoji} ${dept.label} timecard — clock in/out here`,
