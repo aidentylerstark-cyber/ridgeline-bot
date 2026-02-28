@@ -200,8 +200,12 @@ export const TIMECARD_DEPARTMENTS: Record<string, TimecardDepartment> = {
   fire:      { label: 'Fire',       emoji: '\uD83D\uDD25', categoryPattern: 'fire',       staffRoles: ['Fire Staff'] },
 };
 
-/** Channel name(s) to look for inside each department category */
-export const TIMECARD_CHANNEL_NAMES = ['time-card', 'timecard', 'time-cards', 'timecards'];
+/** Channel name(s) to look for inside each department category (with and without emoji prefix) */
+export const TIMECARD_CHANNEL_NAMES = [
+  'time-card', 'timecard', 'time-cards', 'timecards', 'time-clock',
+  '\u23F0\u250Atime-card', '\u23F0\u250Atimecard', '\u23F0\u250Atime-cards', '\u23F0\u250Atimecards', '\u23F0\u250Atime-clock',
+  '\u23F0\u250Atimeclock-for-departments',
+];
 
 export type TimecardDepartmentKey = keyof typeof TIMECARD_DEPARTMENTS;
 
