@@ -1,5 +1,6 @@
 import {
   EmbedBuilder,
+  PermissionFlagsBits,
   type ButtonInteraction,
   type Client,
   type GuildMember,
@@ -7,25 +8,10 @@ import {
 } from 'discord.js';
 import {
   TIMECARD_DEPARTMENTS,
-  GLOBAL_STAFF_ROLES,
   isValidTimecardDepartment,
 } from '../config.js';
 import { getOpenTimecard, clockIn, clockOut, getTimecardSessions } from '../storage.js';
 import { logAuditEvent } from '../features/audit-log.js';
-
-// ─────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────
-
-function hasTimecardAccess(member: GuildMember, department: string): boolean {
-  // Global staff can access all departments
-  if (GLOBAL_STAFF_ROLES.some(r => member.roles.cache.some(role => role.name === r))) return true;
-
-  // Department-specific staff roles
-  const dept = TIMECARD_DEPARTMENTS[department];
-  if (!dept) return false;
-  return dept.staffRoles.some(r => member.roles.cache.some(role => role.name === r));
-}
 
 function formatDuration(totalMinutes: number): string {
   const hours = Math.floor(totalMinutes / 60);
@@ -83,15 +69,6 @@ export async function handleTimecardClockIn(interaction: ButtonInteraction, clie
   const member = interaction.member as GuildMember;
   if (!member) {
     await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
-    return;
-  }
-
-  // Check role access
-  if (!hasTimecardAccess(member, dept)) {
-    await interaction.reply({
-      content: `Sorry sugar, you don't have the right role to clock in for **${TIMECARD_DEPARTMENTS[dept].label}**. \uD83C\uDF51`,
-      flags: 64,
-    });
     return;
   }
 
