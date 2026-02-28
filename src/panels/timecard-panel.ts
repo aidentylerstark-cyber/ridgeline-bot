@@ -3,17 +3,11 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
-  MessageFlags,
+  EmbedBuilder,
   PermissionFlagsBits,
-  SeparatorSpacingSize,
   type Client,
   type TextChannel,
 } from 'discord.js';
-import {
-  ContainerBuilder,
-  TextDisplayBuilder,
-  SeparatorBuilder,
-} from '@discordjs/builders';
 import { GUILD_ID, TIMECARD_DEPARTMENTS, TIMECARD_CHANNEL_NAMES } from '../config.js';
 
 /**
@@ -104,51 +98,37 @@ export async function postTimecardPanel(client: Client, department?: string): Pr
       await msg.delete().catch(() => {});
     }
 
-    // Build Components V2 panel
-    const panelContainer = new ContainerBuilder()
-      .setAccentColor(0xD4A574);
-
-    panelContainer.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `## ${dept.emoji}  ${dept.label} \u2014 Timecard\n` +
+    // Build embed + button row
+    const embed = new EmbedBuilder()
+      .setColor(0xD4A574)
+      .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Timecard', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+      .setTitle(`${dept.emoji}  ${dept.label} \u2014 Timecard`)
+      .setDescription(
         `> *Peaches is keepin' track of your hours, sugar!*\n\n` +
         `Clock in when you start your shift, clock out when you're done. ` +
-        `Check your weekly hours anytime with the **My Hours** button.`
-      )
-    );
-
-    panelContainer.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
-
-    panelContainer.addActionRowComponents(
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`timecard_clockin_${key}`)
-          .setLabel('Clock In')
-          .setStyle(ButtonStyle.Success)
-          .setEmoji('\uD83D\uDFE2'),
-        new ButtonBuilder()
-          .setCustomId(`timecard_clockout_${key}`)
-          .setLabel('Clock Out')
-          .setStyle(ButtonStyle.Danger)
-          .setEmoji('\uD83D\uDD34'),
-        new ButtonBuilder()
-          .setCustomId(`timecard_myhours_${key}`)
-          .setLabel('My Hours')
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji('\uD83D\uDCCA'),
-      )
-    );
-
-    panelContainer.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
+        `Check your weekly hours anytime with the **My Hours** button.\n\n` +
         `-# You can only be clocked in to one department at a time. Sessions over 12 hours are auto-closed.`
-      )
+      );
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`timecard_clockin_${key}`)
+        .setLabel('Clock In')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('\uD83D\uDFE2'),
+      new ButtonBuilder()
+        .setCustomId(`timecard_clockout_${key}`)
+        .setLabel('Clock Out')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('\uD83D\uDD34'),
+      new ButtonBuilder()
+        .setCustomId(`timecard_myhours_${key}`)
+        .setLabel('My Hours')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('\uD83D\uDCCA'),
     );
 
-    await channel.send({
-      components: [panelContainer],
-      flags: MessageFlags.IsComponentsV2,
-    });
+    await channel.send({ embeds: [embed], components: [row] });
     console.log(`[Peaches] Timecard panel posted for ${dept.label} in #${channel.name} (category: ${channel.parent?.name})`);
   }
 }
