@@ -193,10 +193,10 @@ export interface TimecardDepartment {
 export const TIMECARD_DEPARTMENTS: Record<string, TimecardDepartment> = {
   sheriff:   { label: 'Sheriff',    emoji: '\uD83D\uDE94', categoryPattern: 'sheriff',    staffRoles: ['Sheriff', 'Deputy'] },
   safehaven: { label: 'Safe Haven', emoji: '\uD83C\uDFE0', categoryPattern: 'safe haven', staffRoles: ['Safe Haven Staff'] },
-  cfs:       { label: 'CFS',        emoji: '\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67', categoryPattern: 'cfs',          staffRoles: ['CFS Staff'] },
+  cfs:       { label: 'CFS',        emoji: '\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67', categoryPattern: 'child & family services', staffRoles: ['CFS Staff'] },
   marketing: { label: 'Marketing',  emoji: '\uD83D\uDCE2', categoryPattern: 'marketing',  staffRoles: ['Marketing Director', 'Marketing Team'] },
   medical:   { label: 'Medical',    emoji: '\uD83C\uDFE5', categoryPattern: 'medical',    staffRoles: ['Medical Staff'] },
-  dpw:       { label: 'DPW',        emoji: '\uD83D\uDD27', categoryPattern: 'dpw',        staffRoles: ['DPW Staff'] },
+  dpw:       { label: 'DPW',        emoji: '\uD83D\uDD27', categoryPattern: 'department of public works', staffRoles: ['DPW Staff'] },
   fire:      { label: 'Fire',       emoji: '\uD83D\uDD25', categoryPattern: 'fire',       staffRoles: ['Fire Staff'] },
 };
 
