@@ -7,6 +7,7 @@ import {
   type Client,
   type TextChannel,
 } from 'discord.js';
+
 import { GUILD_ID, TIMECARD_DEPARTMENTS, TIMECARD_CHANNEL_NAMES } from '../config.js';
 
 /**
@@ -55,33 +56,10 @@ export async function postTimecardPanel(client: Client, department?: string): Pr
   for (const [key, dept] of Object.entries(departments)) {
     if (!dept) continue;
 
-    let channel = findTimecardChannel(client, key);
-
-    // If no channel exists, find the department category and create one
+    const channel = findTimecardChannel(client, key);
     if (!channel) {
-      const parentCategory = guild.channels.cache.find(
-        c => c.type === ChannelType.GuildCategory &&
-          c.name.toLowerCase().includes(dept.categoryPattern.toLowerCase())
-      );
-      if (!parentCategory) {
-        console.log(`[Peaches] Timecard panel skipped for ${dept.label}: no category matching "${dept.categoryPattern}" found`);
-        continue;
-      }
-
-      try {
-        // No permissionOverwrites — inherits/syncs from parent category automatically
-        const created = await guild.channels.create({
-          name: '\u23F0\u250Atime-cards',
-          type: ChannelType.GuildText,
-          parent: parentCategory.id,
-          topic: `${dept.emoji} ${dept.label} timecard — clock in/out here`,
-        });
-        channel = created as TextChannel;
-        console.log(`[Peaches] Created #time-card in "${parentCategory.name}" for ${dept.label}`);
-      } catch (err) {
-        console.error(`[Peaches] Failed to create time-card channel for ${dept.label}:`, err);
-        continue;
-      }
+      console.log(`[Peaches] Timecard panel skipped for ${dept.label}: no timecard channel found`);
+      continue;
     }
 
     // Check if panel already exists — skip if bot already has a message with buttons here
