@@ -602,12 +602,18 @@ export async function getOpenTimecard(userId: string): Promise<TimecardRow | nul
   return rows[0] ?? null;
 }
 
-export async function clockIn(userId: string, department: string): Promise<TimecardRow> {
+export async function clockIn(userId: string, department: string): Promise<TimecardRow | null> {
+  // Atomic: only insert if user has no open timecard (prevents race condition from double-clicks)
   const { rows } = await pool.query<TimecardRow>(
-    `INSERT INTO discord_timecards (discord_user_id, department) VALUES ($1, $2) RETURNING *`,
+    `INSERT INTO discord_timecards (discord_user_id, department)
+     SELECT $1, $2
+     WHERE NOT EXISTS (
+       SELECT 1 FROM discord_timecards WHERE discord_user_id = $1 AND clock_out_at IS NULL
+     )
+     RETURNING *`,
     [userId, department]
   );
-  return rows[0];
+  return rows[0] ?? null;
 }
 
 export async function clockOut(userId: string, auto = false): Promise<TimecardRow | null> {

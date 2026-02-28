@@ -1,6 +1,5 @@
 import {
   EmbedBuilder,
-  PermissionFlagsBits,
   type ButtonInteraction,
   type Client,
   type GuildMember,
@@ -12,44 +11,7 @@ import {
 } from '../config.js';
 import { getOpenTimecard, clockIn, clockOut, getTimecardSessions } from '../storage.js';
 import { logAuditEvent } from '../features/audit-log.js';
-
-function formatDuration(totalMinutes: number): string {
-  const hours = Math.floor(totalMinutes / 60);
-  const mins = totalMinutes % 60;
-  if (hours === 0) return `${mins}m`;
-  return `${hours}h ${mins}m`;
-}
-
-function getWeekBoundsEST(): { monday: Date; nextMonday: Date } {
-  // Get current time in ET
-  const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
-  const now = new Date(nowStr);
-
-  // Find Monday of current week (Mon=1)
-  const dayOfWeek = now.getDay(); // 0=Sun
-  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
-  const monday = new Date(now);
-  monday.setDate(monday.getDate() - daysFromMonday);
-  monday.setHours(0, 0, 0, 0);
-
-  const nextMonday = new Date(monday);
-  nextMonday.setDate(nextMonday.getDate() + 7);
-
-  // Convert back to UTC for DB queries
-  const mondayET = new Date(monday.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const nextMondayET = new Date(nextMonday.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-
-  // Use a simpler approach: construct dates in ET timezone
-  const mondayUTC = new Date(
-    Date.UTC(monday.getFullYear(), monday.getMonth(), monday.getDate(), 5, 0, 0) // 00:00 ET = 05:00 UTC (EST)
-  );
-  const nextMondayUTC = new Date(
-    Date.UTC(nextMonday.getFullYear(), nextMonday.getMonth(), nextMonday.getDate(), 5, 0, 0)
-  );
-
-  return { monday: mondayUTC, nextMonday: nextMondayUTC };
-}
+import { formatDuration, getWeekBoundsET } from '../utilities/timecard-helpers.js';
 
 function extractDepartment(customId: string, prefix: string): string {
   return customId.slice(prefix.length);
@@ -86,6 +48,11 @@ export async function handleTimecardClockIn(interaction: ButtonInteraction, clie
 
   // Clock in
   const record = await clockIn(member.id, dept);
+  if (!record) {
+    await interaction.reply({ content: 'Something went wrong clocking you in, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    return;
+  }
+
   const deptConfig = TIMECARD_DEPARTMENTS[dept];
   const timestamp = Math.floor(new Date(record.clock_in_at).getTime() / 1000);
 
@@ -207,7 +174,7 @@ export async function handleTimecardMyHours(interaction: ButtonInteraction, clie
 
   await interaction.deferReply({ flags: 64 });
 
-  const { monday, nextMonday } = getWeekBoundsEST();
+  const { monday, nextMonday } = getWeekBoundsET();
   const sessions = await getTimecardSessions(member.id, dept, monday, nextMonday);
   const deptConfig = TIMECARD_DEPARTMENTS[dept];
 

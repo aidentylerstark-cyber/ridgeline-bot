@@ -9,17 +9,11 @@ import {
 import { GUILD_ID, TIMECARD_DEPARTMENTS, TIMECARD_PAYROLL_CATEGORY_NAME } from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { getAllTimecardSessions } from '../storage.js';
-
-function formatDuration(totalMinutes: number): string {
-  const hours = Math.floor(totalMinutes / 60);
-  const mins = totalMinutes % 60;
-  if (hours === 0) return `${mins}m`;
-  return `${hours}h ${mins}m`;
-}
+import { formatDuration, getPayPeriodBoundsET } from '../utilities/timecard-helpers.js';
 
 export function scheduleTimecardPayroll(client: Client): cron.ScheduledTask {
-  // Saturday midnight ET — weekly payroll report
-  return cron.schedule('0 0 * * 6', async () => {
+  // Sunday midnight ET — weekly payroll report (covers Mon 00:00 → Sun 00:00 ET)
+  return cron.schedule('0 0 * * 0', async () => {
     if (!isBotActive()) return;
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
@@ -42,27 +36,10 @@ export function scheduleTimecardPayroll(client: Client): cron.ScheduledTask {
         console.log(`[Peaches] Created payroll category (${payrollCategory.id})`);
       }
 
-      // Compute previous Monday to this Saturday (today)
-      const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
-      const now = new Date(nowStr);
+      // Get Mon–Sun pay period bounds (handles EST/EDT properly)
+      const { start, end, startLocal } = getPayPeriodBoundsET();
 
-      // Saturday -> previous Monday is 5 days ago
-      const prevMonday = new Date(now);
-      prevMonday.setDate(prevMonday.getDate() - 5);
-      prevMonday.setHours(0, 0, 0, 0);
-
-      const thisSaturday = new Date(now);
-      thisSaturday.setHours(23, 59, 59, 999);
-
-      // Convert to UTC (approximate EST offset)
-      const prevMondayUTC = new Date(
-        Date.UTC(prevMonday.getFullYear(), prevMonday.getMonth(), prevMonday.getDate(), 5, 0, 0)
-      );
-      const thisSaturdayUTC = new Date(
-        Date.UTC(thisSaturday.getFullYear(), thisSaturday.getMonth(), thisSaturday.getDate(), 5, 0, 0)
-      );
-
-      const sessions = await getAllTimecardSessions(prevMondayUTC, thisSaturdayUTC);
+      const sessions = await getAllTimecardSessions(start, end);
 
       if (sessions.length === 0) {
         console.log('[Peaches] Payroll report: no timecard sessions this week');
@@ -85,7 +62,7 @@ export function scheduleTimecardPayroll(client: Client): cron.ScheduledTask {
       const firstLadyRole = guild.roles.cache.find(r => r.name === 'First Lady');
 
       // Create private payroll channel
-      const dateLabel = prevMonday.toLocaleDateString('en-US', {
+      const dateLabel = startLocal.toLocaleDateString('en-US', {
         month: '2-digit', day: '2-digit', year: 'numeric',
       }).replace(/\//g, '-');
 
@@ -118,14 +95,18 @@ export function scheduleTimecardPayroll(client: Client): cron.ScheduledTask {
       let grandTotalSessions = 0;
       const embeds: EmbedBuilder[] = [];
 
+      // Compute end of Saturday for display
+      const saturdayLocal = new Date(startLocal);
+      saturdayLocal.setDate(saturdayLocal.getDate() + 5);
+
       // Header embed
       const headerEmbed = new EmbedBuilder()
         .setColor(0xD4A574)
         .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Payroll Report', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
         .setTitle('\uD83D\uDCB0 Weekly Payroll Report')
         .setDescription(
-          `**Pay Period:** ${prevMonday.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric' })}` +
-          ` \u2014 ${thisSaturday.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric', year: 'numeric' })}\n` +
+          `**Pay Period:** ${startLocal.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric' })}` +
+          ` \u2014 ${saturdayLocal.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric', year: 'numeric' })}\n` +
           `**Departments:** ${deptMap.size}\n` +
           `**Total Sessions:** ${sessions.length}`
         )

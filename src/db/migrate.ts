@@ -397,6 +397,11 @@ export async function runMigrations(): Promise<void> {
         ON discord_timecards (clock_in_at) WHERE clock_out_at IS NULL
     `);
 
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_timecards_user_dept_date
+        ON discord_timecards (discord_user_id, department, clock_in_at DESC)
+    `);
+
     // Seed ticket counter in site_content if not present
     await client.query(`
       INSERT INTO site_content (key, value) VALUES ('discord_bot_state', '{"nextTicketNumber": 1}')

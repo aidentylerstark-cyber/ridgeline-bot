@@ -4,13 +4,7 @@ import { TIMECARD_DEPARTMENTS, TIMECARD_AUTO_CLOCKOUT_HOURS } from '../config.js
 import { isBotActive } from '../utilities/instance-lock.js';
 import { getStaleOpenTimecards, clockOut } from '../storage.js';
 import { findTimecardChannel } from '../panels/timecard-panel.js';
-
-function formatDuration(totalMinutes: number): string {
-  const hours = Math.floor(totalMinutes / 60);
-  const mins = totalMinutes % 60;
-  if (hours === 0) return `${mins}m`;
-  return `${hours}h ${mins}m`;
-}
+import { formatDuration } from '../utilities/timecard-helpers.js';
 
 export function scheduleTimecardAutoClockout(client: Client): cron.ScheduledTask {
   // Every 30 minutes — check for stale open timecards
