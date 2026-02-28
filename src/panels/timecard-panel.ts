@@ -4,7 +4,6 @@ import {
   ButtonStyle,
   ChannelType,
   EmbedBuilder,
-  PermissionFlagsBits,
   type Client,
   type TextChannel,
 } from 'discord.js';
@@ -70,18 +69,12 @@ export async function postTimecardPanel(client: Client, department?: string): Pr
       }
 
       try {
+        // No permissionOverwrites — inherits/syncs from parent category automatically
         const created = await guild.channels.create({
           name: 'time-card',
           type: ChannelType.GuildText,
           parent: parentCategory.id,
           topic: `${dept.emoji} ${dept.label} timecard — clock in/out here`,
-          permissionOverwrites: [
-            // Inherit category permissions by default, but ensure bot can send
-            ...(client.user ? [{
-              id: client.user.id,
-              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks],
-            }] : []),
-          ],
         });
         channel = created as TextChannel;
         console.log(`[Peaches] Created #time-card in "${parentCategory.name}" for ${dept.label}`);
