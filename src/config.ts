@@ -191,13 +191,18 @@ export interface TimecardDepartment {
 }
 
 export const TIMECARD_DEPARTMENTS: Record<string, TimecardDepartment> = {
-  sheriff:   { label: 'Sheriff',    emoji: '\uD83D\uDE94', categoryPattern: 'sheriff',    staffRoles: ['Sheriff', 'Deputy', 'Dispatch', 'Forensics'] },
-  safehaven: { label: 'Safe Haven', emoji: '\uD83C\uDFE0', categoryPattern: 'safe haven', staffRoles: ['Safe Haven Staff'] },
-  cfs:       { label: 'CFS',        emoji: '\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67', categoryPattern: 'child & family services', staffRoles: ['CFS Staff'] },
-  marketing: { label: 'Marketing',  emoji: '\uD83D\uDCE2', categoryPattern: 'marketing',  staffRoles: ['Marketing Director', 'Marketing Team'] },
-  medical:   { label: 'Medical',    emoji: '\uD83C\uDFE5', categoryPattern: 'medical',    staffRoles: ['Medical Staff'] },
-  dpw:       { label: 'DPW',        emoji: '\uD83D\uDD27', categoryPattern: 'department of public works', staffRoles: ['DPW Staff'] },
-  fire:      { label: 'Fire',       emoji: '\uD83D\uDD25', categoryPattern: 'fire',       staffRoles: ['Fire Staff'] },
+  sheriff:     { label: 'Sheriff',              emoji: '\uD83D\uDE94', categoryPattern: 'sheriff',                    staffRoles: ['Sheriff', 'Deputy', 'Dispatch', 'Forensics'] },
+  safehaven:   { label: 'Safe Haven',           emoji: '\uD83C\uDFE1', categoryPattern: 'safe haven',                staffRoles: ['Safe Haven Staff'] },
+  cfs:         { label: 'CFS',                  emoji: '\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67', categoryPattern: 'child & family services', staffRoles: ['CFS Staff'] },
+  marketing:   { label: 'Marketing',            emoji: '\uD83D\uDCE2', categoryPattern: 'marketing',                 staffRoles: ['Marketing Director', 'Marketing Team'] },
+  medical:     { label: 'Medical',              emoji: '\uD83C\uDFE5', categoryPattern: 'medical',                   staffRoles: ['Medical Staff'] },
+  dpw:         { label: 'DPW',                  emoji: '\uD83D\uDD27', categoryPattern: 'department of public works', staffRoles: ['DPW Staff'] },
+  fire:        { label: 'Fire',                 emoji: '\uD83D\uDD25', categoryPattern: 'fire',                      staffRoles: ['Fire Staff'] },
+  court:       { label: 'Court',                emoji: '\u2696\uFE0F', categoryPattern: 'superior court',            staffRoles: ['Judge', 'Attorney', 'Bailiff', 'Court Clerk', 'Court Staff'] },
+  events:      { label: 'Events',               emoji: '\uD83D\uDCC5', categoryPattern: 'events team',               staffRoles: ['Events Director', 'Events Team'] },
+  dandelions:  { label: 'Little Dandelions',    emoji: '\uD83C\uDF3C', categoryPattern: 'little dandelions',         staffRoles: ['Little Dandelions Staff', 'Dandelions Staff', 'Teacher'] },
+  licensing:   { label: 'Licensing',            emoji: '\uD83C\uDFF7\uFE0F', categoryPattern: 'division of licensing',    staffRoles: ['Licensing Staff', 'DMV Staff'] },
+  deptheads:   { label: 'Department Heads',     emoji: '\uD83C\uDFDB\uFE0F', categoryPattern: 'department head center',   staffRoles: ['Department Head'] },
 };
 
 /** Channel name(s) to look for inside each department category (with and without emoji prefix) */
