@@ -59,12 +59,13 @@ export function scheduleCleanup(client: Client): cron.ScheduledTask {
     try {
       const tickets = await purgeClosedTickets(90);
       const suggestions = await purgeResolvedSuggestions(60);
-      const currentYear = new Date().getFullYear();
-      const birthdayPosts = await purgeOldBirthdayPosts(currentYear);
+      const lastYear = new Date().getFullYear() - 1;
+      const birthdayPosts = await purgeOldBirthdayPosts(lastYear);
       const milestonePosts = await purgeOldMilestonePosts(730);
 
-      // Configurable audit log retention
-      const configuredDays = await getContentByKey('audit_log_retention_days') as number | undefined;
+      // Configurable audit log retention — validate type from DB
+      const rawConfiguredDays = await getContentByKey('audit_log_retention_days');
+      const configuredDays = typeof rawConfiguredDays === 'number' && rawConfiguredDays > 0 ? rawConfiguredDays : undefined;
       const defaultRetentionDays = configuredDays ?? 90;
 
       // Per-action overrides

@@ -107,7 +107,15 @@ export async function processChatbotMessage(
   // 2b. Character name registration
   const charNameMatch = query.match(/my (?:character(?:'s)? )?name is (.+)/i);
   if (charNameMatch) {
-    const charName = charNameMatch[1].replace(/[.!?]+$/, '').trim();
+    // Sanitize: strip trailing punctuation, collapse whitespace, remove Discord markdown/mentions
+    const charName = charNameMatch[1]
+      .replace(/[.!?]+$/, '')
+      .replace(/<@!?\d+>/g, '')    // strip user mentions
+      .replace(/<#\d+>/g, '')      // strip channel mentions
+      .replace(/<@&\d+>/g, '')     // strip role mentions
+      .replace(/[*_~`|]/g, '')     // strip markdown formatting
+      .replace(/\s+/g, ' ')        // collapse whitespace
+      .trim();
     if (charName.length > 0 && charName.length <= 100) {
       await setCharacterName(message.author.id, charName);
       console.log(`[Peaches] Character name set: ${message.author.displayName} → "${charName}"`);
@@ -148,7 +156,7 @@ export async function processChatbotMessage(
   }
 
   // 4. Greeting check
-  if (!query || query.length < 3 || /^(hi|hey|hello|sup|yo|hiya|heya|mornin|evening|afternoon|night|hey there|hola|ayo|ayy|waddup)$/i.test(query)) {
+  if (!query || query.length < 3 || /^(hi+|hey+|hello+|sup|yo+|hiya|heya|mornin|evening|afternoon|night|hey there|hola|ayo|ayy+|waddup|howdy|what'?s up|wassup|greetings|ello|henlo)$/i.test(query)) {
     console.log(`[Peaches] Greeting response to ${message.author.displayName}`);
     await message.reply(pick(PEACHES_GREETINGS));
     return;
@@ -179,11 +187,13 @@ export async function processChatbotMessage(
           role: m.role === 'user' ? 'user' as const : 'assistant' as const,
           content: m.content,
         })),
+      }, {
+        timeout: 10_000, // 10 second timeout to prevent indefinite blocking
       });
 
       const firstBlock = response.content[0];
-      const reply = firstBlock?.type === 'text' ? firstBlock.text : null;
-      if (reply) {
+      const reply = firstBlock?.type === 'text' ? firstBlock.text.trim() : null;
+      if (reply && reply.length > 0) {
         addToMemory(message.channel.id, 'assistant', reply);
         console.log(`[Peaches] AI response to ${message.author.displayName}: "${cleanMessage?.slice(0, 80)}..."`);
         // Split responses exceeding Discord's 2000-char limit

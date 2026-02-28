@@ -38,8 +38,9 @@ export function scheduleConversationStarter(client: Client): cron.ScheduledTask 
       const generalChat = guild.channels.cache.get(CHANNELS.generalChat) as TextChannel | undefined;
       if (!generalChat) return;
 
-      const today = new Date();
-      const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
+      const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / 86400000);
       const promptIndex = dayOfYear % CONVERSATION_PROMPTS.length;
       const { emoji, prompt } = CONVERSATION_PROMPTS[promptIndex];
 

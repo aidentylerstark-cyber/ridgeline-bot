@@ -4,6 +4,7 @@
  */
 
 const MEMORY_MAX_MESSAGES = 20;
+const MEMORY_MAX_CHANNELS = 200; // Global cap on tracked channels to prevent unbounded memory growth
 const MEMORY_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -51,4 +52,18 @@ export function addToMemory(channelId: string, role: string, content: string): v
     history.splice(0, history.length - MEMORY_MAX_MESSAGES);
   }
   conversationMemory.set(channelId, history);
+
+  // Evict oldest channels if we exceed the global cap
+  if (conversationMemory.size > MEMORY_MAX_CHANNELS) {
+    let oldestChannel: string | null = null;
+    let oldestTime = Infinity;
+    for (const [chId, entries] of conversationMemory) {
+      const lastTs = entries[entries.length - 1]?.timestamp ?? 0;
+      if (lastTs < oldestTime) {
+        oldestTime = lastTs;
+        oldestChannel = chId;
+      }
+    }
+    if (oldestChannel) conversationMemory.delete(oldestChannel);
+  }
 }

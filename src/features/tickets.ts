@@ -47,11 +47,15 @@ export function isStaffForTicket(member: GuildMember, department: TicketDepartme
 export function getStaffMentions(guild: Guild, department: TicketDepartment): string {
   const config = TICKET_CATEGORIES[department];
   const allStaffRoles = Array.from(new Set([...config.staffRoles, ...GLOBAL_STAFF_ROLES]));
-  return allStaffRoles
+  const mentions = allStaffRoles
     .map(roleName => guild.roles.cache.find(r => r.name === roleName))
     .filter(Boolean)
     .map(r => `<@&${r?.id}>`)
     .join(' ');
+  if (!mentions) {
+    console.warn(`[Peaches] No staff roles found in guild cache for department "${department}" — staff will not be pinged`);
+  }
+  return mentions;
 }
 
 // ─────────────────────────────────────────
@@ -217,9 +221,12 @@ export async function closeTicket(
       `This ticket has been closed by ${closedBy}.\n` +
       `*Saving transcript and closing up shop...* \uD83C\uDF51`
     );
-  await channel.send({ embeds: [closingEmbed] });
+  await channel.send({ embeds: [closingEmbed] }).catch(err =>
+    console.error('[Peaches] Failed to send closing embed:', err)
+  );
 
-  // Generate transcript
+  // Generate transcript — if this fails, still proceed with closing (transcript is best-effort)
+  let transcriptFailed = false;
   try {
     const transcript = await createTranscript(channel, {
       limit: -1,
@@ -254,7 +261,9 @@ export async function closeTicket(
       await logChannel.send({ embeds: [logEmbed], files: [transcript] });
     }
   } catch (err) {
-    console.error('[Peaches] Transcript generation failed:', err);
+    transcriptFailed = true;
+    console.error('[Peaches] Transcript generation failed (ticket will still close):', err);
+    await channel.send('⚠️ Transcript generation failed — the ticket will still be closed but the transcript may be incomplete.').catch(() => {});
   }
 
   // Mark as closed in database — if this fails, do NOT delete the channel (prevents phantom open tickets)

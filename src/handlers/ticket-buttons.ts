@@ -134,15 +134,17 @@ export async function handleTicketClaim(interaction: ButtonInteraction, client: 
     return;
   }
 
-  if (ticket.claimedBy) {
+  // Atomic claim: prevents race condition when two staff click "Claim" simultaneously
+  const claimed = await storage.atomicClaimTicket(interaction.channelId ?? '', member.id);
+  if (!claimed) {
+    // Re-fetch to show who claimed it
+    const refreshed = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
     await interaction.reply({
-      content: `This ticket's already been claimed by <@${ticket.claimedBy}>, hon! \uD83C\uDF51`,
+      content: `This ticket's already been claimed by <@${refreshed?.claimedBy ?? 'someone'}>, hon! \uD83C\uDF51`,
       flags: 64,
     });
     return;
   }
-
-  await storage.updateTicketClaim(interaction.channelId ?? '', member.id);
   console.log(`[Peaches] Ticket #${ticket.ticketNumber} claimed by ${member.displayName}`);
 
   if (interaction.guild) {
@@ -470,20 +472,23 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
 // ─────────────────────────────────────────
 
 export async function handleTicketAddUserModal(interaction: ModalSubmitInteraction, _client: Client) {
+  // Defer immediately — DB/API calls below may exceed the 3-second interaction timeout
+  await interaction.deferReply({ flags: 64 });
+
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
   if (!ticket) {
-    await interaction.reply({ content: `This doesn't seem to be an active ticket, sugar.`, flags: 64 });
+    await interaction.editReply({ content: `This doesn't seem to be an active ticket, sugar.` });
     return;
   }
 
   const member = interaction.member as GuildMember;
   if (!isValidDepartment(ticket.department)) {
-    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    await interaction.editReply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51' });
     return;
   }
 
   if (!isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: `Only staff can add users to a ticket, sugar. \uD83C\uDF51`, flags: 64 });
+    await interaction.editReply({ content: `Only staff can add users to a ticket, sugar. \uD83C\uDF51` });
     return;
   }
 
@@ -492,9 +497,8 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
   const userId = rawInput.match(/^<@!?(\d+)>$/)?.[1] ?? (rawInput.match(/^\d{17,21}$/) ? rawInput : null);
 
   if (!userId) {
-    await interaction.reply({
+    await interaction.editReply({
       content: `That doesn't look like a valid User ID, sugar! Right-click a user, hit "Copy User ID", and paste it in. \uD83C\uDF51`,
-      flags: 64,
     });
     return;
   }
@@ -504,7 +508,7 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
 
   // Verify the user actually exists in the guild before modifying permissions
   if (!guild) {
-    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    await interaction.editReply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51' });
     return;
   }
 
@@ -512,9 +516,8 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
   try {
     targetMember = await guild.members.fetch(userId);
   } catch {
-    await interaction.reply({
+    await interaction.editReply({
       content: `Couldn't find a member with that ID in this server, sugar. Double-check the ID and try again! \uD83C\uDF51`,
-      flags: 64,
     });
     return;
   }
@@ -528,7 +531,7 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
       EmbedLinks: true,
     });
 
-    await interaction.reply({ content: `\uD83C\uDF51 ${targetMember} has been added to this ticket!`, flags: 64 });
+    await interaction.editReply({ content: `\uD83C\uDF51 ${targetMember} has been added to this ticket!` });
     await channel.send(`\uD83C\uDF51 ${targetMember} was added to this ticket by ${interaction.user}.`);
     console.log(`[Peaches] Ticket #${ticket.ticketNumber}: ${targetMember.displayName} added by ${interaction.user.displayName}`);
 
@@ -544,9 +547,8 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
     }
   } catch (err) {
     console.error('[Peaches] Failed to add user to ticket:', err);
-    await interaction.reply({
+    await interaction.editReply({
       content: `Something went wrong adding that user, sugar. Try again or check bot permissions! \uD83C\uDF51`,
-      flags: 64,
     });
   }
 }

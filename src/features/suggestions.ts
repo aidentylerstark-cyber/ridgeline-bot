@@ -96,8 +96,8 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   }
 
   // Parse suggestion ID from customId (e.g. suggestion_approve_42)
-  const parts = interaction.customId.split('_');
-  const suggestionId = parseInt(parts[parts.length - 1] ?? '', 10);
+  const idMatch = interaction.customId.match(/suggestion_(?:approve|deny|reviewing)_(\d+)$/);
+  const suggestionId = idMatch ? parseInt(idMatch[1], 10) : NaN;
   if (isNaN(suggestionId)) {
     await interaction.reply({ content: "Couldn't find that suggestion, sugar. 🍑", flags: 64 });
     return;

@@ -26,15 +26,14 @@ async function checkKudosCooldown(giverId: string): Promise<string | null> {
     const next = new Date(lastGiven + 24 * 60 * 60 * 1000);
     return `You've already spread your kindness today, sugar! You can give kudos again <t:${Math.floor(next.getTime() / 1000)}:R>. 🍑`;
   }
+  // Set cooldown immediately to prevent TOCTOU race (two rapid requests both passing the check).
+  // processKudos() will update the timestamp to the real value on success.
+  kudosCooldowns.set(giverId, Date.now());
   if (!lastGiven) {
-    // Set cooldown immediately to prevent TOCTOU race (two rapid requests both passing the check)
-    kudosCooldowns.set(giverId, Date.now());
     const alreadyGiven = await hasGivenKudosToday(giverId);
     if (alreadyGiven) {
       return "You've already given kudos today, sugar! Check back tomorrow. 🍑";
     }
-    // Not on cooldown — clear the premature entry so processKudos() sets the real timestamp
-    kudosCooldowns.delete(giverId);
   }
   return null;
 }

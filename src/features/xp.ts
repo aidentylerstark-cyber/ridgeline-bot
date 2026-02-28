@@ -41,12 +41,14 @@ export async function handleMessageXp(message: Message, client: Client): Promise
       await message.member.roles.add(role).catch(() => {});
       gotNewRole = true;
 
-      // Remove lower XP roles
+      // Remove all other XP roles to ensure clean state
       for (const xpRole of XP_ROLES) {
         if (xpRole.name === applicableRole.name) continue;
         const oldRole = message.guild.roles.cache.find(r => r.name === xpRole.name);
         if (oldRole && message.member.roles.cache.has(oldRole.id)) {
-          await message.member.roles.remove(oldRole).catch(() => {});
+          await message.member.roles.remove(oldRole).catch(err =>
+            console.error(`[Peaches] Failed to remove old XP role ${xpRole.name} from ${message.member?.displayName}:`, err)
+          );
         }
       }
     }

@@ -70,7 +70,8 @@ export function setupReactionHandler(client: Client): void {
         });
         console.log(`[Peaches] Starboard: updated ${sourceId} to ${starCount} stars`);
       } catch {
-        // Starboard message deleted or inaccessible — ignore
+        // Starboard message deleted or inaccessible — log for awareness
+        console.warn(`[Peaches] Starboard: orphaned entry ${sourceId} — starboard message ${existing.starboardMessageId} is missing`);
       }
       return;
     }
@@ -81,6 +82,12 @@ export function setupReactionHandler(client: Client): void {
     pendingStarboard.add(sourceId);
 
     try {
+      // Double-check DB after acquiring in-memory lock to handle multi-process races
+      const recheck = await getStarboardEntry(sourceId).catch(() => null);
+      if (recheck) {
+        return;
+      }
+
       // First time reaching threshold — create new starboard entry
       const starboardMsg = await hallOfFame.send({
         content: `⭐ **${starCount}** | <#${msg.channel.id}>`,

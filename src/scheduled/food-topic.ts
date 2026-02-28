@@ -29,9 +29,9 @@ export function scheduleFoodTopic(client: Client): cron.ScheduledTask {
       const foodChannel = guild.channels.cache.get(CHANNELS.foodLovers) as TextChannel | undefined;
       if (!foodChannel) return;
 
-      const today = new Date();
-      const startOfYear = new Date(today.getFullYear(), 0, 0);
-      const weekOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / (7 * 86400000));
+      const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const weekOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / (7 * 86400000));
       const topicIndex = weekOfYear % FOOD_TOPICS.length;
       const topic = FOOD_TOPICS[topicIndex];
 

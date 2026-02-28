@@ -192,9 +192,9 @@ export async function handleTicketModalSubmit(
     return;
   }
 
-  const slName = interaction.fields.getTextInputValue('ticket_sl_name');
-  const subject = interaction.fields.getTextInputValue('ticket_subject');
-  const details = interaction.fields.getTextInputValue('ticket_details');
+  const slName = interaction.fields.getTextInputValue('ticket_sl_name').trim();
+  const subject = interaction.fields.getTextInputValue('ticket_subject').trim();
+  const details = interaction.fields.getTextInputValue('ticket_details').trim();
 
   let extraFields: Array<{ name: string; value: string }> = [];
 
@@ -215,24 +215,23 @@ export async function handleTicketModalSubmit(
     if (location) extraFields = [{ name: '\uD83D\uDCCD Location', value: location }];
   }
 
+  // Defer immediately — DB calls below may exceed Discord's 3-second interaction timeout
+  await interaction.deferReply({ flags: 64 });
+
   // Per-department limit check (bypass for First Lady / Ridgeline Owner)
   if (!hasTicketLimitBypass(member)) {
     const deptCount = await countUserOpenTicketsInDepartment(member.id, department);
     if (deptCount >= MAX_TICKETS_PER_DEPARTMENT) {
       const config = TICKET_CATEGORIES[department];
-      await interaction.reply({
+      await interaction.editReply({
         content: `Sugar, you already have an open ticket in **${config.emoji} ${config.label}**! ` +
           `Close that one first before openin' another in the same department. \uD83C\uDF51`,
-        flags: 64,
       });
       return;
     }
   }
 
-  await interaction.deferReply({ flags: 64 });
-
-  // Cooldown already set in handleTicketOpen — refresh it now that ticket is confirmed
-  ticketCooldowns.set(member.id);
+  // Cooldown was already set in handleTicketOpen — don't reset it here
 
   // Create the ticket channel
   const result = await createTicketChannel(client, guild, member, department, subject, slName);

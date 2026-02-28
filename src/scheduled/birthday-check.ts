@@ -13,10 +13,11 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
       const guild = client.guilds.cache.get(GUILD_ID);
       if (!guild) return;
 
-      const birthdayChannel = guild.channels.cache.get(CHANNELS.celebrationCorner) as TextChannel | undefined;
+      const birthdayChannel = guild.channels.cache.get(CHANNELS.birthdays ?? CHANNELS.celebrationCorner) as TextChannel | undefined;
       if (!birthdayChannel) return;
 
-      const today = new Date();
+      // Use Eastern time to match the cron schedule timezone
+      const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
       const birthdayPeople = await getTodaysBirthdays();
 
       if (birthdayPeople.length > 0) {

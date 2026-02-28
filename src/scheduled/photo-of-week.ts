@@ -44,6 +44,12 @@ export function schedulePhotoOfTheWeek(client: Client): cron.ScheduledTask {
           }
         }
 
+        if (topMessage && topStars >= 1) {
+          if (!celebChannel) {
+            console.warn('[Discord Bot] Celebration corner channel missing — Photo of the Week winner not announced');
+          }
+        }
+
         if (topMessage && topStars >= 1 && celebChannel) {
           const imageUrl =
             topMessage.attachments.first()?.url ??

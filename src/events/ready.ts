@@ -4,6 +4,16 @@ import { claimInstanceLock, startInstanceHeartbeat } from '../utilities/instance
 import { registerSlashCommands } from '../commands/index.js';
 import { updateStatsChannels } from '../features/stats-channels.js';
 
+let _statsInterval: ReturnType<typeof setInterval> | null = null;
+
+/** Clear the stats update interval on shutdown to prevent timer leaks. */
+export function destroyStatsInterval(): void {
+  if (_statsInterval) {
+    clearInterval(_statsInterval);
+    _statsInterval = null;
+  }
+}
+
 export function setupReadyHandler(client: Client) {
   client.on('clientReady', async () => {
     console.log(`[Discord Bot] Logged in as ${client.user?.tag}`);
@@ -74,6 +84,6 @@ export function setupReadyHandler(client: Client) {
 
     // Start stats channel update interval (every 10 minutes)
     updateStatsChannels(client).catch(err => console.error('[Peaches] Stats channel update failed:', err));
-    setInterval(() => updateStatsChannels(client).catch(err => console.error('[Peaches] Stats channel update failed:', err)), 10 * 60 * 1000);
+    _statsInterval = setInterval(() => updateStatsChannels(client).catch(err => console.error('[Peaches] Stats channel update failed:', err)), 10 * 60 * 1000);
   });
 }

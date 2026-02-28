@@ -175,7 +175,10 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
         [data.action, data.actorId, data.targetId ?? null, data.details, data.channelId ?? null, data.referenceId ?? null]
       );
     } catch (err) {
-      console.error('[Peaches] Audit log DB insert failed:', err);
+      // Escalate critical actions to console.error with full context for investigation
+      const isCritical = ['ticket_close', 'warn_issue', 'member_timeout'].includes(data.action);
+      const logFn = isCritical ? console.error : console.warn;
+      logFn(`[Peaches] Audit log DB insert failed (action=${data.action}, actor=${data.actorId}):`, err);
     }
 
     // 2. Post embed to #mod-log (unless skipped)
@@ -433,7 +436,8 @@ async function handleAuditSearch(interaction: ChatInputCommandInteraction, clien
   collector.on('collect', async (i) => {
     if (i.customId === 'audit_prev') page = Math.max(0, page - 1);
     if (i.customId === 'audit_next') page = Math.min(pages.length - 1, page + 1);
-    await i.update({ embeds: [pages[page]!], components: [buildRow()] });
+    const safePage = Math.max(0, Math.min(page, pages.length - 1));
+    await i.update({ embeds: [pages[safePage]!], components: [buildRow()] });
   });
 
   collector.on('end', async () => {

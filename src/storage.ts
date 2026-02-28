@@ -75,6 +75,16 @@ export async function updateTicketClaim(channelId: string, claimedBy: string | n
     .where(and(eq(discordTickets.channelId, channelId), eq(discordTickets.isClosed, false)));
 }
 
+/** Atomically claim a ticket only if it is currently unclaimed. Returns true if claimed. */
+export async function atomicClaimTicket(channelId: string, claimedBy: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE discord_tickets SET claimed_by = $1
+     WHERE channel_id = $2 AND is_closed = false AND claimed_by IS NULL`,
+    [claimedBy, channelId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 export async function closeDiscordTicket(channelId: string, closedBy: string): Promise<void> {
   await db.update(discordTickets)
     .set({ isClosed: true, closedBy, closedAt: new Date() })
@@ -231,46 +241,63 @@ export async function awardXp(
   discordUserId: string,
   amount: number
 ): Promise<{ oldLevel: number; newLevel: number; leveledUp: boolean; streak: number; bonusXp: number }> {
-  const current = await getXp(discordUserId);
-  const oldXp = current?.totalXp ?? 0;
-  const oldLevel = current?.level ?? 0;
-  const today = getTodayET();
+  const dbClient = await pool.connect();
+  try {
+    await dbClient.query('BEGIN');
 
-  let streak: number;
-  let bonusXp: number;
+    // Lock the row to prevent concurrent XP awards from racing
+    const { rows } = await dbClient.query<{
+      total_xp: number; level: number; current_streak: number; last_streak_date: string | null;
+    }>(
+      `SELECT total_xp, level, current_streak, last_streak_date
+       FROM discord_member_xp WHERE discord_user_id = $1 FOR UPDATE`,
+      [discordUserId]
+    );
 
-  if (current?.lastStreakDate === today) {
-    // Already awarded streak today — keep streak, no bonus
-    streak = current.currentStreak;
-    bonusXp = 0;
-  } else if (current?.lastStreakDate && isNextDay(current.lastStreakDate, today)) {
-    // Consecutive day — increment streak
-    streak = (current.currentStreak ?? 0) + 1;
-    bonusXp = Math.min(streak * STREAK_BONUS_XP, STREAK_BONUS_CAP);
-  } else {
-    // First message ever or gap in streak — reset to 1
-    streak = 1;
-    bonusXp = STREAK_BONUS_XP;
+    const current = rows[0] ?? null;
+    const oldXp = current?.total_xp ?? 0;
+    const oldLevel = current?.level ?? 0;
+    const today = getTodayET();
+
+    let streak: number;
+    let bonusXp: number;
+
+    if (current?.last_streak_date === today) {
+      streak = current.current_streak;
+      bonusXp = 0;
+    } else if (current?.last_streak_date && isNextDay(current.last_streak_date, today)) {
+      streak = (current.current_streak ?? 0) + 1;
+      bonusXp = Math.min(streak * STREAK_BONUS_XP, STREAK_BONUS_CAP);
+    } else {
+      streak = 1;
+      bonusXp = STREAK_BONUS_XP;
+    }
+
+    const newXp = oldXp + amount + bonusXp;
+    const newLevel = calculateLevel(newXp);
+
+    await dbClient.query(
+      `INSERT INTO discord_member_xp (discord_user_id, total_xp, level, message_count, last_xp_awarded_at, current_streak, last_streak_date)
+       VALUES ($1, $2, $3, 1, NOW(), $4, $5)
+       ON CONFLICT (discord_user_id) DO UPDATE SET
+         total_xp = $2,
+         level = $3,
+         message_count = discord_member_xp.message_count + 1,
+         last_xp_awarded_at = NOW(),
+         current_streak = $4,
+         last_streak_date = $5,
+         updated_at = NOW()`,
+      [discordUserId, newXp, newLevel, streak, today]
+    );
+
+    await dbClient.query('COMMIT');
+    return { oldLevel, newLevel, leveledUp: newLevel > oldLevel, streak, bonusXp };
+  } catch (err) {
+    await dbClient.query('ROLLBACK');
+    throw err;
+  } finally {
+    dbClient.release();
   }
-
-  const newXp = oldXp + amount + bonusXp;
-  const newLevel = calculateLevel(newXp);
-
-  await pool.query(
-    `INSERT INTO discord_member_xp (discord_user_id, total_xp, level, message_count, last_xp_awarded_at, current_streak, last_streak_date)
-     VALUES ($1, $2, $3, 1, NOW(), $4, $5)
-     ON CONFLICT (discord_user_id) DO UPDATE SET
-       total_xp = $2,
-       level = $3,
-       message_count = discord_member_xp.message_count + 1,
-       last_xp_awarded_at = NOW(),
-       current_streak = $4,
-       last_streak_date = $5,
-       updated_at = NOW()`,
-    [discordUserId, newXp, newLevel, streak, today]
-  );
-
-  return { oldLevel, newLevel, leveledUp: newLevel > oldLevel, streak, bonusXp };
 }
 
 export async function getXpLeaderboard(limit = 10): Promise<Array<{ discordUserId: string; totalXp: number; level: number; messageCount: number; currentStreak: number }>> {

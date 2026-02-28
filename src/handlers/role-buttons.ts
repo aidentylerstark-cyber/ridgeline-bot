@@ -58,11 +58,13 @@ export async function handleRoleButton(interaction: ButtonInteraction, client: C
       await interaction.reply({ embeds: [addEmbed], flags: 64 });
     }
   } catch (err) {
-    console.error(`[Discord Bot] Role toggle error:`, err);
-    const errorEmbed = new EmbedBuilder()
-      .setColor(0xCC4444)
-      .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
-      .setDescription(`Oh honey, somethin' went sideways tryin' to toggle that role. Try again or holler at a moderator! \uD83C\uDF51`);
-    await interaction.reply({ embeds: [errorEmbed], flags: 64 });
+    console.error(`[Discord Bot] Role toggle error for ${role.name}:`, err);
+    if (!interaction.replied) {
+      const errorEmbed = new EmbedBuilder()
+        .setColor(0xCC4444)
+        .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+        .setDescription(`Oh honey, somethin' went sideways tryin' to toggle that role. Try again or holler at a moderator! \uD83C\uDF51`);
+      await interaction.reply({ embeds: [errorEmbed], flags: 64 });
+    }
   }
 }

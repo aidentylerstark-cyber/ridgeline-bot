@@ -3,7 +3,7 @@ import { Client, GatewayIntentBits, Options } from 'discord.js';
 import { runMigrations } from './db/migrate.js';
 import { TICKET_COOLDOWN_MS } from './config.js';
 import { CooldownManager } from './utilities/cooldowns.js';
-import { setupReadyHandler } from './events/ready.js';
+import { setupReadyHandler, destroyStatsInterval } from './events/ready.js';
 import { setupMemberJoinHandler } from './events/member-join.js';
 import { setupInteractionHandler } from './events/interaction.js';
 import { setupMessageHandler, destroyMessageCooldowns } from './events/message.js';
@@ -118,6 +118,7 @@ async function main() {
     destroyMessageCooldowns();
     destroyXpCooldowns();
     destroyRegionCooldowns();
+    destroyStatsInterval();
     regionServer.close();
     client.destroy();
     process.exit(0);

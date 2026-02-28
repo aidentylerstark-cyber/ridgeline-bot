@@ -28,7 +28,7 @@ export function scheduleMilestoneCheck(client: Client): cron.ScheduledTask {
         const daysInServer = Math.floor((today.getTime() - member.joinedAt.getTime()) / 86400000);
 
         for (const milestone of MILESTONES) {
-          if (daysInServer >= milestone.days && daysInServer < milestone.days + 1) {
+          if (daysInServer >= milestone.days) {
             const alreadyPosted = await hasMilestonePosted(member.id, milestone.days);
             if (alreadyPosted) continue;
             await recordMilestonePost(member.id, milestone.days);

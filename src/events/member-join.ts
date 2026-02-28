@@ -24,17 +24,25 @@ export function setupMemberJoinHandler(client: Client) {
       // 1. Auto-assign Citizen role
       const citizenRole = member.guild.roles.cache.find(r => r.name === CITIZEN_ROLE);
       if (citizenRole) {
-        await member.roles.add(citizenRole);
-        console.log(`[Discord Bot] Assigned ${CITIZEN_ROLE} to ${member.displayName}`);
+        try {
+          await member.roles.add(citizenRole);
+          console.log(`[Discord Bot] Assigned ${CITIZEN_ROLE} to ${member.displayName}`);
+        } catch (err) {
+          console.error(`[Discord Bot] Failed to assign ${CITIZEN_ROLE} to ${member.displayName}:`, err);
+        }
       }
 
       // 1b. Auto-assign New Arrival role (scheduled for removal after 7 days via DB)
       const newArrivalRole = member.guild.roles.cache.find(r => r.name === NEW_ARRIVAL_ROLE);
       if (newArrivalRole) {
-        await member.roles.add(newArrivalRole);
-        const removeAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-        await scheduleRoleRemoval(member.id, NEW_ARRIVAL_ROLE, removeAt);
-        console.log(`[Discord Bot] Assigned ${NEW_ARRIVAL_ROLE} to ${member.displayName} (removal scheduled for ${removeAt.toISOString()})`);
+        try {
+          await member.roles.add(newArrivalRole);
+          const removeAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+          await scheduleRoleRemoval(member.id, NEW_ARRIVAL_ROLE, removeAt);
+          console.log(`[Discord Bot] Assigned ${NEW_ARRIVAL_ROLE} to ${member.displayName} (removal scheduled for ${removeAt.toISOString()})`);
+        } catch (err) {
+          console.error(`[Discord Bot] Failed to assign ${NEW_ARRIVAL_ROLE} to ${member.displayName}:`, err);
+        }
       }
 
       // 2. Post welcome message in #welcome channel

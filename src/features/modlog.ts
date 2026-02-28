@@ -44,9 +44,12 @@ export function setupModLog(client: Client): void {
       details: `${member.user.tag} joined the server`,
     });
 
-    // Anti-raid: track join rate
+    // Anti-raid: track join rate (in-memory — resets on restart, which is acceptable
+    // since a restart inherently breaks the rapid-join window)
     const now = Date.now();
     recentJoins.push(now);
+    // Cap array size to prevent unbounded growth during sustained joins
+    while (recentJoins.length > RAID_THRESHOLD * 3) recentJoins.shift();
     while (recentJoins.length > 0 && recentJoins[0]! < now - RAID_WINDOW_MS) recentJoins.shift();
 
     if (!raidModeActive && recentJoins.length >= RAID_THRESHOLD) {

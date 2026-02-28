@@ -47,11 +47,18 @@ const SL_PROFILE_URL = 'https://world.secondlife.com/resident/';
 
 /** Normalize a raw agent value (string or {key, name}) into a consistent object. */
 function normalizeAgent(raw: unknown): { key: string; name: string } {
-  if (typeof raw === 'object' && raw !== null && 'key' in raw && 'name' in raw) {
-    const obj = raw as { key: string; name: string };
-    return { key: String(obj.key), name: String(obj.name) };
+  if (raw != null && typeof raw === 'object' && 'key' in raw && 'name' in raw) {
+    const key = String((raw as Record<string, unknown>).key ?? '').trim();
+    const name = String((raw as Record<string, unknown>).name ?? '').trim();
+    // Guard against corrupted data (e.g. "[object Object]" from old format bugs)
+    if (key && key !== '[object Object]' && name) {
+      return { key, name };
+    }
   }
-  const s = String(raw);
+  const s = String(raw ?? '').trim();
+  if (!s || s === '[object Object]' || s === 'undefined' || s === 'null') {
+    return { key: 'unknown', name: 'Unknown Agent' };
+  }
   return { key: s, name: s };
 }
 

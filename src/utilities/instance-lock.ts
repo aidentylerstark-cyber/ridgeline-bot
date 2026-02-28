@@ -40,8 +40,12 @@ export async function claimInstanceLock(): Promise<void> {
  * destroy the client and exit the process so Railway doesn't keep the old
  * container alive.
  */
+let heartbeatInProgress = false;
+
 export function startInstanceHeartbeat(client: Client): void {
   heartbeatTimer = setInterval(async () => {
+    if (heartbeatInProgress) return;
+    heartbeatInProgress = true;
     try {
       const { rows } = await pool.query(
         'SELECT instance_id FROM bot_instance_lock WHERE id = 1'
@@ -65,6 +69,8 @@ export function startInstanceHeartbeat(client: Client): void {
         client.destroy();
         setTimeout(() => process.exit(1), 1000);
       }
+    } finally {
+      heartbeatInProgress = false;
     }
   }, 5000);
 }

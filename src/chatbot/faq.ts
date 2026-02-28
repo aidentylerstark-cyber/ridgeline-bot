@@ -1,9 +1,14 @@
 import { CHANNELS } from '../config.js';
 
 function compileTriggers(triggers: string[]): RegExp[] {
-  return triggers.map(t =>
-    new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
-  );
+  return triggers.reduce<RegExp[]>((acc, t) => {
+    try {
+      acc.push(new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'));
+    } catch (err) {
+      console.error(`[Peaches] Failed to compile FAQ trigger regex for "${t}":`, err);
+    }
+    return acc;
+  }, []);
 }
 
 const RAW_FAQ: Array<{ triggers: string[]; response: string }> = [

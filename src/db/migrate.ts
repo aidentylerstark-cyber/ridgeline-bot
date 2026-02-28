@@ -163,6 +163,18 @@ export async function runMigrations(): Promise<void> {
       )
     `);
 
+    // Index for daily birthday lookups (month + day)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_birthdays_month_day
+        ON discord_birthdays (month, day)
+    `);
+
+    // Index for ticket cleanup queries on closed_at
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_tickets_closed_at
+        ON discord_tickets (closed_at) WHERE is_closed = true
+    `);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS discord_kudos (
         id SERIAL PRIMARY KEY,
