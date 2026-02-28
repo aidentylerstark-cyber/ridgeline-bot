@@ -179,6 +179,39 @@ export const REGION_ALERT_THRESHOLDS = {
   dilationWarning: 0.7,  // orange warning
 } as const;
 
+// ─────────────────────────────────────────
+// Timecard System
+// ─────────────────────────────────────────
+
+export interface TimecardDepartment {
+  label: string;
+  emoji: string;
+  categoryPattern: string; // Substring to match against parent category name (case-insensitive)
+  staffRoles: string[];
+}
+
+export const TIMECARD_DEPARTMENTS: Record<string, TimecardDepartment> = {
+  sheriff:   { label: 'Sheriff',    emoji: '\uD83D\uDE94', categoryPattern: 'sheriff',    staffRoles: ['Sheriff', 'Deputy'] },
+  safehaven: { label: 'Safe Haven', emoji: '\uD83C\uDFE0', categoryPattern: 'safe haven', staffRoles: ['Safe Haven Staff'] },
+  cfs:       { label: 'CFS',        emoji: '\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67', categoryPattern: 'cfs',          staffRoles: ['CFS Staff'] },
+  marketing: { label: 'Marketing',  emoji: '\uD83D\uDCE2', categoryPattern: 'marketing',  staffRoles: ['Marketing Director', 'Marketing Team'] },
+  medical:   { label: 'Medical',    emoji: '\uD83C\uDFE5', categoryPattern: 'medical',    staffRoles: ['Medical Staff'] },
+  dpw:       { label: 'DPW',        emoji: '\uD83D\uDD27', categoryPattern: 'dpw',        staffRoles: ['DPW Staff'] },
+  fire:      { label: 'Fire',       emoji: '\uD83D\uDD25', categoryPattern: 'fire',       staffRoles: ['Fire Staff'] },
+};
+
+/** Channel name(s) to look for inside each department category */
+export const TIMECARD_CHANNEL_NAMES = ['time-card', 'timecard', 'time-cards', 'timecards'];
+
+export type TimecardDepartmentKey = keyof typeof TIMECARD_DEPARTMENTS;
+
+export function isValidTimecardDepartment(value: string): value is TimecardDepartmentKey {
+  return value in TIMECARD_DEPARTMENTS;
+}
+
+export const TIMECARD_PAYROLL_CATEGORY_NAME = 'payroll'; // Discord category name to scan for
+export const TIMECARD_AUTO_CLOCKOUT_HOURS = 12;
+
 export const REGION_ALERT_COOLDOWN_MS = 15 * 60 * 1000;
 export const REGION_OFFLINE_THRESHOLD_MS = 20 * 60 * 1000;
 export const REGION_SNAPSHOT_RETENTION_DAYS = 7;

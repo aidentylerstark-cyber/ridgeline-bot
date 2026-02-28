@@ -368,6 +368,35 @@ export async function runMigrations(): Promise<void> {
         ON region_snapshots (created_at DESC)
     `);
 
+    // Timecards table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_timecards (
+        id SERIAL PRIMARY KEY,
+        discord_user_id VARCHAR(30) NOT NULL,
+        department VARCHAR(30) NOT NULL,
+        clock_in_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        clock_out_at TIMESTAMP,
+        total_minutes INTEGER,
+        auto_clock_out BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_timecards_user_open
+        ON discord_timecards (discord_user_id) WHERE clock_out_at IS NULL
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_timecards_dept_date
+        ON discord_timecards (department, clock_in_at DESC)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_timecards_stale
+        ON discord_timecards (clock_in_at) WHERE clock_out_at IS NULL
+    `);
+
     // Seed ticket counter in site_content if not present
     await client.query(`
       INSERT INTO site_content (key, value) VALUES ('discord_bot_state', '{"nextTicketNumber": 1}')

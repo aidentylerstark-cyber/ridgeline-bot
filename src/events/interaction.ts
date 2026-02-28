@@ -13,6 +13,7 @@ import {
   handleTicketAddUserModal,
 } from '../handlers/ticket-buttons.js';
 import { handleTicketDepartmentSelect, handleTicketModalSubmit } from '../handlers/ticket-modal.js';
+import { handleTimecardClockIn, handleTimecardClockOut, handleTimecardMyHours } from '../handlers/timecard-buttons.js';
 import type { CooldownManager } from '../utilities/cooldowns.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { handleBirthdayCommand } from '../features/birthdays.js';
@@ -128,6 +129,9 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     { match: 'ticket_deny_close', exact: true, handler: handleTicketDenyClose },
     { match: 'ticket_cancel_close', exact: true, handler: (i) => handleTicketCancelClose(i) },
     { match: 'ticket_adduser', exact: true, handler: handleTicketAddUser },
+    { match: 'timecard_clockin_', handler: handleTimecardClockIn },
+    { match: 'timecard_clockout_', handler: handleTimecardClockOut },
+    { match: 'timecard_myhours_', handler: handleTimecardMyHours },
   ];
 
   client.on('interactionCreate', async (interaction: Interaction) => {

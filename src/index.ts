@@ -21,6 +21,9 @@ import { postRoleButtons } from './panels/role-panel.js';
 import { postTicketPanel } from './panels/ticket-panel.js';
 import { postCommunityPoll, postPhotoOfTheWeekPoll } from './panels/polls.js';
 import { postTriggerReference } from './panels/trigger-reference.js';
+import { postTimecardPanel } from './panels/timecard-panel.js';
+import { scheduleTimecardPayroll } from './scheduled/timecard-payroll.js';
+import { scheduleTimecardAutoClockout } from './scheduled/timecard-auto-clockout.js';
 import { destroyMemory } from './chatbot/memory.js';
 import { reorganizeCategoryByKey } from './utilities/channel-reorg.js';
 import { setupModLog } from './features/modlog.js';
@@ -88,6 +91,7 @@ async function main() {
   client.postCommunityPoll = (q: string, opts: string[], dur?: number) => postCommunityPoll(client, q, opts, dur);
   client.postPhotoOfTheWeekPoll = (opts?: string[]) => postPhotoOfTheWeekPoll(client, opts);
   client.postTriggerReference = () => postTriggerReference(client);
+  client.postTimecardPanel = (dept?: string) => postTimecardPanel(client, dept);
 
   // Login
   await client.login(token);
@@ -106,6 +110,8 @@ async function main() {
     scheduleStaffReport(client),
     scheduleTicketInactivityCheck(client),
     scheduleRegionDailySummary(client),
+    scheduleTimecardPayroll(client),
+    scheduleTimecardAutoClockout(client),
   ];
 
   // Graceful shutdown

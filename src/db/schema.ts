@@ -169,3 +169,20 @@ export type DiscordWarning = typeof discordWarnings.$inferSelect;
 export type DiscordAuditLog = typeof discordAuditLog.$inferSelect;
 export type DiscordScheduledRoleRemoval = typeof discordScheduledRoleRemovals.$inferSelect;
 export type RegionSnapshot = typeof regionSnapshots.$inferSelect;
+
+// ============================================
+// Timecards
+// ============================================
+
+export const discordTimecards = pgTable('discord_timecards', {
+  id: serial('id').primaryKey(),
+  discordUserId: varchar('discord_user_id', { length: 30 }).notNull(),
+  department: varchar('department', { length: 30 }).notNull(),
+  clockInAt: timestamp('clock_in_at').notNull().defaultNow(),
+  clockOutAt: timestamp('clock_out_at'),
+  totalMinutes: integer('total_minutes'),
+  autoClockOut: boolean('auto_clock_out').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export type DiscordTimecard = typeof discordTimecards.$inferSelect;

@@ -579,6 +579,87 @@ export async function purgeOldRegionSnapshots(days: number): Promise<number> {
   return rowCount ?? 0;
 }
 
+// ============================================
+// Timecards
+// ============================================
+
+export interface TimecardRow {
+  id: number;
+  discord_user_id: string;
+  department: string;
+  clock_in_at: Date;
+  clock_out_at: Date | null;
+  total_minutes: number | null;
+  auto_clock_out: boolean;
+  created_at: Date;
+}
+
+export async function getOpenTimecard(userId: string): Promise<TimecardRow | null> {
+  const { rows } = await pool.query<TimecardRow>(
+    `SELECT * FROM discord_timecards WHERE discord_user_id = $1 AND clock_out_at IS NULL LIMIT 1`,
+    [userId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function clockIn(userId: string, department: string): Promise<TimecardRow> {
+  const { rows } = await pool.query<TimecardRow>(
+    `INSERT INTO discord_timecards (discord_user_id, department) VALUES ($1, $2) RETURNING *`,
+    [userId, department]
+  );
+  return rows[0];
+}
+
+export async function clockOut(userId: string, auto = false): Promise<TimecardRow | null> {
+  const { rows } = await pool.query<TimecardRow>(
+    `UPDATE discord_timecards
+     SET clock_out_at = NOW(),
+         total_minutes = EXTRACT(EPOCH FROM (NOW() - clock_in_at))::int / 60,
+         auto_clock_out = $2
+     WHERE discord_user_id = $1 AND clock_out_at IS NULL
+     RETURNING *`,
+    [userId, auto]
+  );
+  return rows[0] ?? null;
+}
+
+export async function getTimecardSessions(
+  userId: string,
+  department: string,
+  since: Date,
+  until: Date
+): Promise<TimecardRow[]> {
+  const { rows } = await pool.query<TimecardRow>(
+    `SELECT * FROM discord_timecards
+     WHERE discord_user_id = $1 AND department = $2
+       AND clock_in_at >= $3 AND clock_in_at < $4
+     ORDER BY clock_in_at DESC`,
+    [userId, department, since, until]
+  );
+  return rows;
+}
+
+export async function getAllTimecardSessions(since: Date, until: Date): Promise<TimecardRow[]> {
+  const { rows } = await pool.query<TimecardRow>(
+    `SELECT * FROM discord_timecards
+     WHERE clock_in_at >= $1 AND clock_in_at < $2
+       AND clock_out_at IS NOT NULL
+     ORDER BY department, discord_user_id, clock_in_at`,
+    [since, until]
+  );
+  return rows;
+}
+
+export async function getStaleOpenTimecards(maxHours: number): Promise<TimecardRow[]> {
+  const { rows } = await pool.query<TimecardRow>(
+    `SELECT * FROM discord_timecards
+     WHERE clock_out_at IS NULL
+       AND clock_in_at < NOW() - INTERVAL '1 hour' * $1`,
+    [maxHours]
+  );
+  return rows;
+}
+
 export async function purgeAuditLogsByAction(action: string, days: number): Promise<number> {
   const cutoff = new Date(Date.now() - days * 86_400_000);
   const { rowCount } = await pool.query(

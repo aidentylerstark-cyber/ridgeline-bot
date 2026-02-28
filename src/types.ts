@@ -9,5 +9,6 @@ declare module 'discord.js' {
     postCommunityPoll?: (question: string, options: string[], durationHours?: number) => Promise<void>;
     postPhotoOfTheWeekPoll?: (options?: string[]) => Promise<void>;
     postTriggerReference?: () => Promise<void>;
+    postTimecardPanel?: (department?: string) => Promise<void>;
   }
 }

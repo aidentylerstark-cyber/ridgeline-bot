@@ -35,7 +35,9 @@ export type AuditAction =
   | 'role_remove'
   | 'announce_post'
   | 'member_join'
-  | 'member_leave';
+  | 'member_leave'
+  | 'timecard_clock_in'
+  | 'timecard_clock_out';
 
 export type AuditSeverity = 'info' | 'warning' | 'critical';
 
@@ -71,6 +73,8 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   announce_post:      'Announcement Posted',
   member_join:        'Member Joined',
   member_leave:       'Member Left',
+  timecard_clock_in:  'Timecard Clock In',
+  timecard_clock_out: 'Timecard Clock Out',
 };
 
 const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
@@ -91,6 +95,8 @@ const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
   announce_post:      0xD4A574,
   member_join:        0x57F287,
   member_leave:       0xED4245,
+  timecard_clock_in:  0x57F287,
+  timecard_clock_out: 0xED4245,
 };
 
 const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
@@ -111,6 +117,8 @@ const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
   announce_post:      '\uD83D\uDCE2',
   member_join:        '\uD83D\uDCE5',
   member_leave:       '\uD83D\uDCE4',
+  timecard_clock_in:  '\uD83D\uDFE2',
+  timecard_clock_out: '\uD83D\uDD34',
 };
 
 const SEVERITY_COLORS: Record<AuditSeverity, number> = {
