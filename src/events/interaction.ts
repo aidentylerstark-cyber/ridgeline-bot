@@ -17,8 +17,6 @@ import { handleTimecardClockIn, handleTimecardClockOut, handleTimecardMyHours } 
 import type { CooldownManager } from '../utilities/cooldowns.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { handleBirthdayCommand } from '../features/birthdays.js';
-import { handleKudosCommand, handleKudosContextMenu, handleKudosModalSubmit } from '../features/kudos.js';
-import { handleRankCommand, handleLeaderboardCommand } from '../features/xp.js';
 import { handleSuggestCommand, handleSuggestionReview } from '../features/suggestions.js';
 import { handleAnnounceCommand } from '../features/announce.js';
 import { handleWarnCommand, handleWarningsCommand, handleClearWarnCommand } from '../features/warnings.js';
@@ -50,18 +48,6 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
         value:
           '`/birthday set <date>` — Register your birthday\n' +
           '`/birthday check` — See your registered birthday',
-      },
-      {
-        name: '💛 Kudos',
-        value:
-          '`/kudos <user> <reason>` — Give kudos to someone (once per 24h)\n' +
-          'Right-click a member → Apps → **Give Kudos**',
-      },
-      {
-        name: '⭐ XP & Levels',
-        value:
-          '`/rank [user]` — View your XP rank\n' +
-          '`/leaderboard` — Top 50 chatters (paginated)',
       },
       { name: '💡 Suggestions', value: '`/suggest <idea>` — Submit a suggestion for Ridgeline' },
       { name: '🎟️ Tickets', value: `Click "Open a Ticket" in <#${CHANNELS.ticketPanel}> for staff support` },
@@ -99,9 +85,6 @@ type SlashHandler = (i: ChatInputCommandInteraction, c: Client) => Promise<void>
 
 const SLASH_COMMANDS: Record<string, SlashHandler> = {
   birthday:    (i) => handleBirthdayCommand(i),
-  kudos:       handleKudosCommand,
-  rank:        handleRankCommand,
-  leaderboard: handleLeaderboardCommand,
   suggest:     handleSuggestCommand,
   announce:    handleAnnounceCommand,
   warn:        handleWarnCommand,
@@ -145,15 +128,6 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
         return;
       }
 
-      // ── USER CONTEXT MENU ──
-      if (interaction.isUserContextMenuCommand()) {
-        if (interaction.commandName === 'Give Kudos') {
-          await handleKudosContextMenu(interaction, client);
-          return;
-        }
-        return;
-      }
-
       // ── BUTTON INTERACTIONS ──
       if (interaction.isButton()) {
         const entry = BUTTON_HANDLERS.find(h =>
@@ -174,12 +148,6 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
 
       // ── MODAL SUBMISSIONS ──
       if (interaction.isModalSubmit()) {
-        // Context menu kudos modal
-        if (interaction.customId.startsWith('kudos_ctx_modal_')) {
-          await handleKudosModalSubmit(interaction, client);
-          return;
-        }
-
         if (interaction.customId.startsWith('ticket_modal_')) {
           await handleTicketModalSubmit(interaction, client, ticketCooldowns);
           return;

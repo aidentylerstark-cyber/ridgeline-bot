@@ -153,11 +153,7 @@ export async function postTriggerReference(client: Client) {
       `### :gear: Automatic Features (No Trigger Needed)\n\n` +
       `**Welcome Messages** — New members get auto-role + welcome + DM\n` +
       `**Birthday Announcements** — Daily at 8 AM EST in <#${CHANNELS.celebrationCorner}>\n` +
-      `**Milestone Celebrations** — Daily at 9 AM EST in <#${CHANNELS.celebrationCorner}>\n` +
-      `**XP Level-ups** — Posted in <#${CHANNELS.celebrationCorner}>\n` +
-      `**Conversation Starters** — Daily at 10 AM EST in <#${CHANNELS.generalChat}>\n` +
-      `**Photo of the Week** — Sundays at 12 PM EST in <#${CHANNELS.generalChat}>\n` +
-      `**Food Topics** — Mondays at 11 AM EST in <#${CHANNELS.foodLovers}>`
+      `**Milestone Celebrations** — Daily at 9 AM EST in <#${CHANNELS.celebrationCorner}>`
     )
   );
 

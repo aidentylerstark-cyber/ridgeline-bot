@@ -1,7 +1,5 @@
 import {
   SlashCommandBuilder,
-  ContextMenuCommandBuilder,
-  ApplicationCommandType,
   type Client,
 } from 'discord.js';
 import { GUILD_ID } from '../config.js';
@@ -31,37 +29,6 @@ export async function registerSlashCommands(client: Client): Promise<void> {
         .setName('check')
         .setDescription('Check your registered birthday')
       ),
-
-    // /kudos
-    new SlashCommandBuilder()
-      .setName('kudos')
-      .setDescription('Give kudos to a community member (once per 24h)')
-      .addUserOption(opt =>
-        opt.setName('user')
-          .setDescription('Who deserves the kudos?')
-          .setRequired(true)
-      )
-      .addStringOption(opt =>
-        opt.setName('reason')
-          .setDescription('Why are you giving them kudos?')
-          .setRequired(true)
-          .setMaxLength(300)
-      ),
-
-    // /rank
-    new SlashCommandBuilder()
-      .setName('rank')
-      .setDescription("Check your XP rank (or someone else's)")
-      .addUserOption(opt =>
-        opt.setName('user')
-          .setDescription('User to check (default: yourself)')
-          .setRequired(false)
-      ),
-
-    // /leaderboard
-    new SlashCommandBuilder()
-      .setName('leaderboard')
-      .setDescription('View the top XP earners in Ridgeline'),
 
     // /suggest
     new SlashCommandBuilder()
@@ -259,10 +226,6 @@ export async function registerSlashCommands(client: Client): Promise<void> {
       .setName('help')
       .setDescription('Get help with Peaches and server features'),
 
-    // Right-click → Give Kudos (context menu)
-    new ContextMenuCommandBuilder()
-      .setName('Give Kudos')
-      .setType(ApplicationCommandType.User),
   ];
 
   await guild.commands.set(commands.map(c => c.toJSON()));

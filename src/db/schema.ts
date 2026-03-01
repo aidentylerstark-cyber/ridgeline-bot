@@ -41,27 +41,6 @@ export const discordBirthdays = pgTable("discord_birthdays", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const discordKudos = pgTable("discord_kudos", {
-  id: serial("id").primaryKey(),
-  recipientDiscordId: varchar("recipient_discord_id", { length: 30 }).notNull(),
-  giverDiscordId: varchar("giver_discord_id", { length: 30 }).notNull(),
-  reason: text("reason").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const discordMemberXp = pgTable("discord_member_xp", {
-  id: serial("id").primaryKey(),
-  discordUserId: varchar("discord_user_id", { length: 30 }).notNull().unique(),
-  totalXp: integer("total_xp").notNull().default(0),
-  level: integer("level").notNull().default(0),
-  messageCount: integer("message_count").notNull().default(0),
-  lastXpAwardedAt: timestamp("last_xp_awarded_at"),
-  currentStreak: integer("current_streak").notNull().default(0),
-  lastStreakDate: varchar("last_streak_date", { length: 10 }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
 // ============================================
 // Suggestions table
 // ============================================
@@ -73,17 +52,6 @@ export const discordSuggestions = pgTable('discord_suggestions', {
   messageId: varchar('message_id', { length: 30 }),  // embed message ID for editing
   status: varchar('status', { length: 20 }).notNull().default('open'), // open|approved|denied|reviewing
   reviewedBy: varchar('reviewed_by', { length: 30 }),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
-
-// ============================================
-// Starboard table — prevent double-posts
-// ============================================
-
-export const discordStarboard = pgTable('discord_starboard', {
-  id: serial('id').primaryKey(),
-  sourceMessageId: varchar('source_message_id', { length: 30 }).notNull().unique(),
-  starboardMessageId: varchar('starboard_message_id', { length: 30 }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -161,10 +129,7 @@ export const regionSnapshots = pgTable('region_snapshots', {
 export type SiteContent = typeof siteContent.$inferSelect;
 export type DiscordTicket = typeof discordTickets.$inferSelect;
 export type DiscordBirthday = typeof discordBirthdays.$inferSelect;
-export type DiscordKudo = typeof discordKudos.$inferSelect;
-export type DiscordMemberXp = typeof discordMemberXp.$inferSelect;
 export type DiscordSuggestion = typeof discordSuggestions.$inferSelect;
-export type DiscordStarboard = typeof discordStarboard.$inferSelect;
 export type DiscordWarning = typeof discordWarnings.$inferSelect;
 export type DiscordAuditLog = typeof discordAuditLog.$inferSelect;
 export type DiscordScheduledRoleRemoval = typeof discordScheduledRoleRemovals.$inferSelect;

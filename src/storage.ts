@@ -1,12 +1,11 @@
 import { eq, and } from "drizzle-orm";
 import { db, pool } from "./db/index.js";
 import {
-  siteContent, discordTickets, discordBirthdays, discordKudos, discordMemberXp,
-  discordSuggestions, discordStarboard, discordWarnings,
+  siteContent, discordTickets, discordBirthdays,
+  discordSuggestions, discordWarnings,
   type SiteContent, type DiscordTicket, type DiscordBirthday,
   type DiscordSuggestion, type DiscordWarning,
 } from "./db/schema.js";
-import { XP_LEVEL_BASE, STREAK_BONUS_XP, STREAK_BONUS_CAP } from "./config.js";
 
 // ============================================
 // Site Content (key-value JSON store — shared with web app)
@@ -188,170 +187,6 @@ export async function setCharacterName(discordUserId: string, characterName: str
 }
 
 // ============================================
-// XP / Leveling
-// ============================================
-
-export function calculateLevel(totalXp: number): number {
-  if (!Number.isFinite(totalXp) || totalXp < 0) return 0;
-  let level = 0;
-  let xpRequired = 0;
-  while (level < 1000) { // Hard cap to prevent infinite loops on corrupted data
-    const nextLevelXp = Math.floor(XP_LEVEL_BASE * Math.pow(level + 1, 1.5));
-    if (totalXp < xpRequired + nextLevelXp) break;
-    xpRequired += nextLevelXp;
-    level++;
-  }
-  return level;
-}
-
-export function xpForNextLevel(level: number): number {
-  return Math.floor(XP_LEVEL_BASE * Math.pow(level + 1, 1.5));
-}
-
-function getTodayET(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-}
-
-function isNextDay(a: string, b: string): boolean {
-  return new Date(b + 'T00:00:00').getTime() - new Date(a + 'T00:00:00').getTime() === 86_400_000;
-}
-
-export async function getXp(discordUserId: string): Promise<{
-  totalXp: number; level: number; messageCount: number;
-  currentStreak: number; lastStreakDate: string | null;
-} | null> {
-  const { rows } = await pool.query<{
-    total_xp: number; level: number; message_count: number;
-    current_streak: number; last_streak_date: string | null;
-  }>(
-    `SELECT total_xp, level, message_count, current_streak, last_streak_date FROM discord_member_xp WHERE discord_user_id = $1`,
-    [discordUserId]
-  );
-  if (!rows[0]) return null;
-  return {
-    totalXp: rows[0].total_xp,
-    level: rows[0].level,
-    messageCount: rows[0].message_count,
-    currentStreak: rows[0].current_streak,
-    lastStreakDate: rows[0].last_streak_date,
-  };
-}
-
-export async function awardXp(
-  discordUserId: string,
-  amount: number
-): Promise<{ oldLevel: number; newLevel: number; leveledUp: boolean; streak: number; bonusXp: number }> {
-  const dbClient = await pool.connect();
-  try {
-    await dbClient.query('BEGIN');
-
-    // Lock the row to prevent concurrent XP awards from racing
-    const { rows } = await dbClient.query<{
-      total_xp: number; level: number; current_streak: number; last_streak_date: string | null;
-    }>(
-      `SELECT total_xp, level, current_streak, last_streak_date
-       FROM discord_member_xp WHERE discord_user_id = $1 FOR UPDATE`,
-      [discordUserId]
-    );
-
-    const current = rows[0] ?? null;
-    const oldXp = current?.total_xp ?? 0;
-    const oldLevel = current?.level ?? 0;
-    const today = getTodayET();
-
-    let streak: number;
-    let bonusXp: number;
-
-    if (current?.last_streak_date === today) {
-      streak = current.current_streak;
-      bonusXp = 0;
-    } else if (current?.last_streak_date && isNextDay(current.last_streak_date, today)) {
-      streak = (current.current_streak ?? 0) + 1;
-      bonusXp = Math.min(streak * STREAK_BONUS_XP, STREAK_BONUS_CAP);
-    } else {
-      streak = 1;
-      bonusXp = STREAK_BONUS_XP;
-    }
-
-    const newXp = oldXp + amount + bonusXp;
-    const newLevel = calculateLevel(newXp);
-
-    await dbClient.query(
-      `INSERT INTO discord_member_xp (discord_user_id, total_xp, level, message_count, last_xp_awarded_at, current_streak, last_streak_date)
-       VALUES ($1, $2, $3, 1, NOW(), $4, $5)
-       ON CONFLICT (discord_user_id) DO UPDATE SET
-         total_xp = $2,
-         level = $3,
-         message_count = discord_member_xp.message_count + 1,
-         last_xp_awarded_at = NOW(),
-         current_streak = $4,
-         last_streak_date = $5,
-         updated_at = NOW()`,
-      [discordUserId, newXp, newLevel, streak, today]
-    );
-
-    await dbClient.query('COMMIT');
-    return { oldLevel, newLevel, leveledUp: newLevel > oldLevel, streak, bonusXp };
-  } catch (err) {
-    await dbClient.query('ROLLBACK');
-    throw err;
-  } finally {
-    dbClient.release();
-  }
-}
-
-export async function getXpLeaderboard(limit = 10): Promise<Array<{ discordUserId: string; totalXp: number; level: number; messageCount: number; currentStreak: number }>> {
-  const { rows } = await pool.query<{ discord_user_id: string; total_xp: number; level: number; message_count: number; current_streak: number }>(
-    `SELECT discord_user_id, total_xp, level, message_count, current_streak FROM discord_member_xp ORDER BY total_xp DESC LIMIT $1`,
-    [limit]
-  );
-  return rows.map(r => ({
-    discordUserId: r.discord_user_id,
-    totalXp: r.total_xp,
-    level: r.level,
-    messageCount: r.message_count,
-    currentStreak: r.current_streak,
-  }));
-}
-
-// ============================================
-// Kudos
-// ============================================
-
-export async function giveKudos(recipientId: string, giverId: string, reason: string): Promise<void> {
-  await db.insert(discordKudos).values({
-    recipientDiscordId: recipientId,
-    giverDiscordId: giverId,
-    reason,
-  });
-}
-
-export async function getKudosReceived(discordUserId: string): Promise<number> {
-  const { rows } = await pool.query<{ count: string }>(
-    `SELECT COUNT(*) FROM discord_kudos WHERE recipient_discord_id = $1`,
-    [discordUserId]
-  );
-  return parseInt(rows[0]?.count ?? '0', 10);
-}
-
-export async function hasGivenKudosToday(giverId: string): Promise<boolean> {
-  const { rows } = await pool.query<{ count: string }>(
-    `SELECT COUNT(*) FROM discord_kudos WHERE giver_discord_id = $1 AND created_at > NOW() - INTERVAL '24 hours'`,
-    [giverId]
-  );
-  return parseInt(rows[0]?.count ?? '0', 10) > 0;
-}
-
-export async function getKudosLeaderboard(limit = 10): Promise<Array<{ discordUserId: string; kudosCount: number }>> {
-  const { rows } = await pool.query<{ discord_user_id: string; count: string }>(
-    `SELECT recipient_discord_id AS discord_user_id, COUNT(*) AS count
-     FROM discord_kudos GROUP BY recipient_discord_id ORDER BY count DESC LIMIT $1`,
-    [limit]
-  );
-  return rows.map(r => ({ discordUserId: r.discord_user_id, kudosCount: parseInt(r.count, 10) }));
-}
-
-// ============================================
 // Suggestions
 // ============================================
 
@@ -384,34 +219,6 @@ export async function updateSuggestionMessageId(id: number, messageId: string): 
   await db.update(discordSuggestions)
     .set({ messageId })
     .where(eq(discordSuggestions.id, id));
-}
-
-// ============================================
-// Starboard
-// ============================================
-
-export async function hasStarboardEntry(sourceMessageId: string): Promise<boolean> {
-  const { rows } = await pool.query<{ exists: boolean }>(
-    `SELECT EXISTS (SELECT 1 FROM discord_starboard WHERE source_message_id = $1) AS exists`,
-    [sourceMessageId]
-  );
-  return rows[0]?.exists ?? false;
-}
-
-export async function createStarboardEntry(sourceMessageId: string, starboardMessageId: string): Promise<void> {
-  await pool.query(
-    `INSERT INTO discord_starboard (source_message_id, starboard_message_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-    [sourceMessageId, starboardMessageId]
-  );
-}
-
-export async function getStarboardEntry(sourceMessageId: string): Promise<{ starboardMessageId: string | null } | null> {
-  const { rows } = await pool.query<{ starboard_message_id: string | null }>(
-    `SELECT starboard_message_id FROM discord_starboard WHERE source_message_id = $1`,
-    [sourceMessageId]
-  );
-  if (!rows[0]) return null;
-  return { starboardMessageId: rows[0].starboard_message_id };
 }
 
 // ============================================

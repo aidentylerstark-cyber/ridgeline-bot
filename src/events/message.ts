@@ -1,6 +1,5 @@
 import { ChannelType, ThreadAutoArchiveDuration, type Client } from 'discord.js';
 import { GUILD_ID, CHANNELS, TICKET_CATEGORIES } from '../config.js';
-import { handleMessageXp } from '../features/xp.js';
 import { CooldownManager } from '../utilities/cooldowns.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { processChatbotMessage } from '../chatbot/pipeline.js';
@@ -27,11 +26,6 @@ export function setupMessageHandler(client: Client) {
     const ticketCategoryIds = new Set(Object.values(TICKET_CATEGORIES).map(c => c.categoryId));
     const parentId = 'parentId' in message.channel ? message.channel.parentId : null;
     const isTicketChannel = parentId != null && ticketCategoryIds.has(parentId);
-
-    // Award XP for non-bot guild messages — skip ticket channels
-    if (!isTicketChannel) {
-      handleMessageXp(message, client).catch(err => console.error('[Peaches] XP award error:', err));
-    }
 
     // Auto-thread every post in #character-intros (keep channel tidy)
     if (

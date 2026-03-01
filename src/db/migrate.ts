@@ -76,31 +76,6 @@ async function migrateJsonData(client: PoolClient): Promise<void> {
     console.error("[Migration] Birthday migration failed (non-fatal):", err);
   }
 
-  // Migrate kudos
-  try {
-    const kudosCount = await client.query("SELECT COUNT(*) FROM discord_kudos");
-    if (parseInt(kudosCount.rows[0].count) === 0) {
-      const kudosFile = path.join(dataDir, "kudos.json");
-      if (fs.existsSync(kudosFile)) {
-        const data = JSON.parse(fs.readFileSync(kudosFile, "utf-8"));
-        let count = 0;
-        for (const [recipientId, entry] of Object.entries(data) as Array<[string, Record<string, unknown>]>) {
-          const history = (entry.history ?? []) as Array<Record<string, unknown>>;
-          for (const h of history) {
-            await client.query(
-              `INSERT INTO discord_kudos (recipient_discord_id, giver_discord_id, reason, created_at)
-               VALUES ($1, $2, $3, $4)`,
-              [recipientId, h.fromUserId, h.reason, h.timestamp ? new Date(h.timestamp as string) : new Date()]
-            );
-            count++;
-          }
-        }
-        console.log(`[Migration] Migrated ${count} kudos entries from JSON`);
-      }
-    }
-  } catch (err) {
-    console.error("[Migration] Kudos migration failed (non-fatal):", err);
-  }
 }
 
 /**
