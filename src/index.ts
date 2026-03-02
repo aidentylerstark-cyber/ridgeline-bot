@@ -22,7 +22,8 @@ import { scheduleTimecardPayroll } from './scheduled/timecard-payroll.js';
 import { scheduleTimecardAutoClockout } from './scheduled/timecard-auto-clockout.js';
 import { destroyMemory } from './chatbot/memory.js';
 import { reorganizeCategoryByKey } from './utilities/channel-reorg.js';
-import { setupModLog } from './features/modlog.js';
+import { setupModLog, clearRaidModeTimer } from './features/modlog.js';
+import { destroyAuditLogInterval } from './features/audit-log.js';
 import { startRegionWebhookServer } from './api/region-webhook.js';
 import { scheduleRegionDailySummary } from './scheduled/region-daily-summary.js';
 import { destroyRegionCooldowns } from './features/region-monitoring.js';
@@ -32,6 +33,15 @@ if (!token) {
   console.error('[Peaches] No DISCORD_BOT_TOKEN found — cannot start bot');
   process.exit(1);
 }
+
+if (!process.env.DATABASE_URL) {
+  console.error('[Peaches] No DATABASE_URL found — cannot connect to database');
+  process.exit(1);
+}
+
+// Module-level shutdown function — set by main() so the uncaughtException handler can call it
+let shutdown: (() => Promise<void>) | null = null;
+let isShuttingDown = false;
 
 async function main() {
   // Run database migrations
@@ -105,7 +115,9 @@ async function main() {
   ];
 
   // Graceful shutdown
-  const shutdown = async () => {
+  shutdown = async () => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
     console.log('[Peaches] Shutting down...');
     stopInstanceHeartbeat();
     cronTasks.forEach(t => t.stop());
@@ -114,6 +126,8 @@ async function main() {
     destroyMessageCooldowns();
     destroyRegionCooldowns();
     destroyStatsInterval();
+    destroyAuditLogInterval();
+    clearRaidModeTimer();
     regionServer.close();
     client.destroy();
     process.exit(0);
@@ -128,9 +142,14 @@ process.on('unhandledRejection', (reason) => {
   console.error('[Peaches] Unhandled promise rejection:', reason);
 });
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', async (err) => {
   console.error('[Peaches] Uncaught exception — shutting down:', err);
-  process.exit(1);
+  if (shutdown) {
+    await shutdown().catch(() => {});
+  } else {
+    stopInstanceHeartbeat();
+    process.exit(1);
+  }
 });
 
 main().catch((err) => {

@@ -84,7 +84,7 @@ export async function postTimecardPanel(client: Client, department?: string): Pr
         `-# You can only be clocked in to one department at a time. Sessions over 12 hours are auto-closed.`
       );
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`timecard_clockin_${key}`)
         .setLabel('Clock In')
@@ -100,9 +100,14 @@ export async function postTimecardPanel(client: Client, department?: string): Pr
         .setLabel('My Hours')
         .setStyle(ButtonStyle.Secondary)
         .setEmoji('\uD83D\uDCCA'),
+      new ButtonBuilder()
+        .setCustomId(`timecard_lastweek_${key}`)
+        .setLabel('Last Week')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('\uD83D\uDCC5'),
     );
 
-    await channel.send({ embeds: [embed], components: [row] });
+    await channel.send({ embeds: [embed], components: [row1] });
     console.log(`[Peaches] Timecard panel posted for ${dept.label} in #${channel.name} (category: ${channel.parent?.name})`);
   }
 }

@@ -72,32 +72,42 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
   // Auto-escalate on repeat warnings
   const targetMember = interaction.guild?.members.cache.get(target.id);
   if (targetMember) {
-    if (totalWarnings === 3) {
-      const timedOut = await targetMember.timeout(60 * 60 * 1000, `Auto-timeout: ${totalWarnings} warnings`).then(() => true).catch(() => false);
-      if (timedOut && interaction.guild) {
-        logAuditEvent(_client, interaction.guild, {
-          action: 'member_timeout',
-          actorId: interaction.user.id,
-          targetId: target.id,
-          details: `Auto-timeout (1 hour) applied to ${target.username} — ${totalWarnings} warnings`,
-          severity: 'warning',
-        });
-      }
-      await interaction.editReply({ content: `⚠️ Warning #${warning.id} issued to <@${target.id}>. **${totalWarnings} warnings** — auto-timeout applied for 1 hour. 🍑` });
-      return;
+    // Auto-escalation based on warning count
+    let timeoutDuration: number | null = null;
+    let timeoutLabel = '';
+    let severity: 'warning' | 'critical' = 'warning';
+
+    if (totalWarnings >= 10) {
+      timeoutDuration = 7 * 24 * 60 * 60 * 1000; // 7 days
+      timeoutLabel = '7 days';
+      severity = 'critical';
+    } else if (totalWarnings >= 7) {
+      timeoutDuration = 3 * 24 * 60 * 60 * 1000; // 3 days
+      timeoutLabel = '3 days';
+      severity = 'critical';
+    } else if (totalWarnings >= 5) {
+      timeoutDuration = 24 * 60 * 60 * 1000; // 24 hours
+      timeoutLabel = '24 hours';
+      severity = 'critical';
+    } else if (totalWarnings === 3) {
+      timeoutDuration = 60 * 60 * 1000; // 1 hour
+      timeoutLabel = '1 hour';
+      severity = 'warning';
     }
-    if (totalWarnings >= 5) {
-      const timedOut = await targetMember.timeout(24 * 60 * 60 * 1000, `Auto-timeout: ${totalWarnings} warnings`).then(() => true).catch(() => false);
+
+    if (timeoutDuration) {
+      const timedOut = await targetMember.timeout(timeoutDuration, `Auto-timeout: ${totalWarnings} warnings`).then(() => true).catch(() => false);
       if (timedOut && interaction.guild) {
         logAuditEvent(_client, interaction.guild, {
           action: 'member_timeout',
           actorId: interaction.user.id,
           targetId: target.id,
-          details: `Auto-timeout (24 hours) applied to ${target.username} — ${totalWarnings} warnings`,
-          severity: 'critical',
+          details: `Auto-timeout (${timeoutLabel}) applied to ${target.username} — ${totalWarnings} warnings`,
+          severity,
         });
       }
-      await interaction.editReply({ content: `⚠️ Warning #${warning.id} issued to <@${target.id}>. **${totalWarnings} warnings** — auto-timeout applied for 24 hours. 🍑` });
+      const timeoutMsg = timedOut ? `auto-timeout applied for ${timeoutLabel}` : 'auto-timeout **failed** (check bot permissions)';
+      await interaction.editReply({ content: `\u26A0\uFE0F Warning #${warning.id} issued to <@${target.id}>. **${totalWarnings} warnings** \u2014 ${timeoutMsg}. \uD83C\uDF51` });
       return;
     }
   }

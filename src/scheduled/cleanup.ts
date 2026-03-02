@@ -15,6 +15,7 @@ import {
 } from '../storage.js';
 import { REGION_SNAPSHOT_RETENTION_DAYS } from '../config.js';
 import { logAuditEvent } from '../features/audit-log.js';
+import { withRetry } from '../utilities/retry.js';
 
 export function scheduleCleanup(client: Client): cron.ScheduledTask {
   // ── Role removal check: every 15 minutes ──
@@ -57,6 +58,7 @@ export function scheduleCleanup(client: Client): cron.ScheduledTask {
   const purgeTask = cron.schedule('0 3 * * 0', async () => {
     if (!isBotActive()) return;
     try {
+      await withRetry(async () => {
       const tickets = await purgeClosedTickets(90);
       const suggestions = await purgeResolvedSuggestions(60);
       const lastYear = new Date().getFullYear() - 1;
@@ -119,8 +121,9 @@ export function scheduleCleanup(client: Client): cron.ScheduledTask {
           await modLogChannel.send({ embeds: [purgeEmbed] }).catch(() => {});
         }
       }
+      }, { label: 'Weekly cleanup' });
     } catch (err) {
-      console.error('[Peaches] Weekly cleanup failed:', err);
+      console.error('[Peaches] Weekly cleanup failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 

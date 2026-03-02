@@ -88,7 +88,7 @@ export async function handleSuggestCommand(interaction: ChatInputCommandInteract
   console.log(`[Peaches] Suggestion #${suggestion.id} submitted by ${interaction.user.username}`);
 }
 
-export async function handleSuggestionReview(interaction: ButtonInteraction, status: 'approved' | 'denied' | 'reviewing', _client: Client): Promise<void> {
+export async function handleSuggestionReview(interaction: ButtonInteraction, status: 'approved' | 'denied' | 'reviewing' | 'implemented' | 'in-progress', _client: Client): Promise<void> {
   // Must be staff
   if (!interaction.member || !isStaff(interaction.member as GuildMember)) {
     await interaction.reply({ content: "Only staff can review suggestions, sugar! 🍑", flags: 64 });
@@ -96,7 +96,7 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   }
 
   // Parse suggestion ID from customId (e.g. suggestion_approve_42)
-  const idMatch = interaction.customId.match(/suggestion_(?:approve|deny|reviewing)_(\d+)$/);
+  const idMatch = interaction.customId.match(/suggestion_(?:approve|deny|reviewing|inprogress|implemented)_(\d+)$/);
   const suggestionId = idMatch ? parseInt(idMatch[1], 10) : NaN;
   if (isNaN(suggestionId)) {
     await interaction.reply({ content: "Couldn't find that suggestion, sugar. 🍑", flags: 64 });
@@ -114,20 +114,24 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   // DM the suggester with the outcome
   try {
     const suggester = await interaction.client.users.fetch(suggestion.discordUserId);
-    const dmMessages = {
+    const dmMessages: Record<string, string> = {
       approved: `✅ **Your suggestion was approved!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nThanks for helping make Ridgeline better, sugar! 🍑`,
       denied: `❌ **Your suggestion was not approved this time.**\n\n> *${suggestion.content.slice(0, 500)}*\n\nDon't let that stop you — keep those ideas coming! 🍑`,
       reviewing: `🔍 **Your suggestion is under review!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nStaff are looking into it — we'll keep you posted! 🍑`,
+      'in-progress': `🔧 **Your suggestion is being worked on!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nThe team is actively building it — how exciting! 🍑`,
+      'implemented': `🚀 **Your suggestion has been implemented!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nYour idea made it into Ridgeline! Thank you, sugar! 🍑`,
     };
-    await suggester.send(dmMessages[status]).catch(() => {});
+    await suggester.send(dmMessages[status] ?? `Your suggestion #${suggestionId} status was updated to **${status}**.`).catch(() => {});
   } catch {
     // User may have DMs disabled — silently skip
   }
 
   const statusConfig = {
-    approved:  { color: 0x57F287, label: '✅ Approved',    emoji: '✅' },
-    denied:    { color: 0xED4245, label: '❌ Denied',      emoji: '❌' },
-    reviewing: { color: 0xFEE75C, label: '🔍 Under Review', emoji: '🔍' },
+    approved:      { color: 0x57F287, label: '✅ Approved',       emoji: '✅' },
+    denied:        { color: 0xED4245, label: '❌ Denied',         emoji: '❌' },
+    reviewing:     { color: 0xFEE75C, label: '🔍 Under Review',  emoji: '🔍' },
+    'implemented': { color: 0x2ECC71, label: '🚀 Implemented',   emoji: '🚀' },
+    'in-progress': { color: 0x3498DB, label: '🔧 In Progress',   emoji: '🔧' },
   };
   const cfg = statusConfig[status];
 
@@ -150,13 +154,30 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
     )
     .setFooter({ text: `Suggestion #${suggestionId} • Reviewed by ${reviewerName}` });
 
-  await interaction.update({ embeds: [updatedEmbed.toJSON()], components: [] });
+  // After approval, show follow-up status buttons; otherwise remove components
+  let components: ActionRowBuilder<ButtonBuilder>[] = [];
+  if (status === 'approved') {
+    components = [new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(`suggestion_inprogress_${suggestionId}`).setLabel('In Progress').setStyle(ButtonStyle.Primary).setEmoji('🔧'),
+      new ButtonBuilder().setCustomId(`suggestion_implemented_${suggestionId}`).setLabel('Implemented').setStyle(ButtonStyle.Success).setEmoji('🚀'),
+    )];
+  }
+
+  try {
+    await interaction.update({ embeds: [updatedEmbed.toJSON()], components });
+  } catch (err) {
+    console.error(`[Peaches] Failed to update suggestion #${suggestionId} embed:`, err);
+    // Fall back to replying if update fails (e.g. interaction expired)
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: `Suggestion #${suggestionId} has been ${status}. 🍑`, flags: 64 }).catch(() => {});
+    }
+  }
   console.log(`[Peaches] Suggestion #${suggestionId} ${status} by ${interaction.user.username}`);
 
-  const auditActionMap = { approved: 'suggestion_approve', denied: 'suggestion_deny', reviewing: 'suggestion_review' } as const;
+  const auditActionMap: Record<string, string> = { approved: 'suggestion_approve', denied: 'suggestion_deny', reviewing: 'suggestion_review', 'in-progress': 'suggestion_review', implemented: 'suggestion_approve' };
   if (interaction.guild) {
     logAuditEvent(_client, interaction.guild, {
-      action: auditActionMap[status],
+      action: (auditActionMap[status] ?? 'suggestion_review') as import('./audit-log.js').AuditAction,
       actorId: interaction.user.id,
       targetId: suggestion.discordUserId,
       details: `Suggestion #${suggestionId} ${status} by ${reviewerName}: ${suggestion.content.slice(0, 100)}`,

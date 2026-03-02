@@ -192,31 +192,41 @@ export async function handleTicketModalSubmit(
     return;
   }
 
-  const slName = interaction.fields.getTextInputValue('ticket_sl_name').trim();
-  const subject = interaction.fields.getTextInputValue('ticket_subject').trim();
-  const details = interaction.fields.getTextInputValue('ticket_details').trim();
+  // Defer immediately — field reads can throw if modal data is malformed,
+  // and DB calls below may exceed Discord's 3-second interaction timeout
+  await interaction.deferReply({ flags: 64 });
 
+  let slName: string;
+  let subject: string;
+  let details: string;
   let extraFields: Array<{ name: string; value: string }> = [];
 
-  if (department === 'rental') {
-    const location = interaction.fields.getTextInputValue('ticket_location');
-    extraFields = [{ name: '\uD83D\uDCCD Location / Parcel', value: location }];
-  } else if (department === 'events') {
-    const eventInfo = interaction.fields.getTextInputValue('ticket_event_info').trim();
-    if (eventInfo) extraFields = [{ name: '\uD83D\uDCC5 Event', value: eventInfo }];
-  } else if (department === 'marketing') {
-    const requestType = interaction.fields.getTextInputValue('ticket_request_type');
-    extraFields = [{ name: '\uD83D\uDCCB Request Type', value: requestType }];
-  } else if (department === 'roleplay') {
-    const characters = interaction.fields.getTextInputValue('ticket_characters').trim();
-    if (characters) extraFields = [{ name: '\uD83C\uDFAD Characters', value: characters }];
-  } else {
-    const location = interaction.fields.getTextInputValue('ticket_location').trim();
-    if (location) extraFields = [{ name: '\uD83D\uDCCD Location', value: location }];
-  }
+  try {
+    slName = interaction.fields.getTextInputValue('ticket_sl_name').trim();
+    subject = interaction.fields.getTextInputValue('ticket_subject').trim();
+    details = interaction.fields.getTextInputValue('ticket_details').trim();
 
-  // Defer immediately — DB calls below may exceed Discord's 3-second interaction timeout
-  await interaction.deferReply({ flags: 64 });
+    if (department === 'rental') {
+      const location = interaction.fields.getTextInputValue('ticket_location');
+      extraFields = [{ name: '\uD83D\uDCCD Location / Parcel', value: location }];
+    } else if (department === 'events') {
+      const eventInfo = interaction.fields.getTextInputValue('ticket_event_info').trim();
+      if (eventInfo) extraFields = [{ name: '\uD83D\uDCC5 Event', value: eventInfo }];
+    } else if (department === 'marketing') {
+      const requestType = interaction.fields.getTextInputValue('ticket_request_type');
+      extraFields = [{ name: '\uD83D\uDCCB Request Type', value: requestType }];
+    } else if (department === 'roleplay') {
+      const characters = interaction.fields.getTextInputValue('ticket_characters').trim();
+      if (characters) extraFields = [{ name: '\uD83C\uDFAD Characters', value: characters }];
+    } else {
+      const location = interaction.fields.getTextInputValue('ticket_location').trim();
+      if (location) extraFields = [{ name: '\uD83D\uDCCD Location', value: location }];
+    }
+  } catch (err) {
+    console.error('[Peaches] Failed to read ticket modal fields:', err);
+    await interaction.editReply({ content: 'Something went wrong reading your ticket info, sugar. Please try again! \uD83C\uDF51' });
+    return;
+  }
 
   // Per-department limit check (bypass for First Lady / Ridgeline Owner)
   if (!hasTicketLimitBypass(member)) {
@@ -245,16 +255,24 @@ export async function handleTicketModalSubmit(
   const { channel, ticketNumber } = result;
 
   // Send opening embed with all info
-  await sendTicketOpeningEmbed(client, channel, member, department, subject, ticketNumber, slName, extraFields);
+  try {
+    await sendTicketOpeningEmbed(client, channel, member, department, subject, ticketNumber, slName, extraFields);
 
-  // Send the full details as a follow-up
-  const descEmbed = new EmbedBuilder()
-    .setColor(0x4A7C59)
-    .setTitle('\uD83D\uDCDD Full Details')
-    .setDescription(details)
-    .setFooter({ text: `Submitted by ${member.displayName}` });
+    // Send the full details as a follow-up
+    const descEmbed = new EmbedBuilder()
+      .setColor(0x4A7C59)
+      .setTitle('\uD83D\uDCDD Full Details')
+      .setDescription(details)
+      .setFooter({ text: `Submitted by ${member.displayName}` });
 
-  await channel.send({ embeds: [descEmbed] });
+    await channel.send({ embeds: [descEmbed] });
+  } catch (err) {
+    console.error(`[Peaches] Failed to send opening embed for ticket #${ticketNumber}:`, err);
+    // Still usable — post a minimal fallback so staff can see the ticket
+    await channel.send(
+      `\u26A0\uFE0F Opening embed failed to post. **Ticket #${String(ticketNumber).padStart(4, '0')}** opened by ${member} for **${TICKET_CATEGORIES[department].label}**.\n**Subject:** ${subject}\n**Details:** ${details.slice(0, 500)}`
+    ).catch(() => {});
+  }
 
   // Reply to user
   await interaction.editReply({

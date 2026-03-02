@@ -11,7 +11,7 @@ import {
 } from '../config.js';
 import { getOpenTimecard, clockIn, clockOut, getTimecardSessions } from '../storage.js';
 import { logAuditEvent } from '../features/audit-log.js';
-import { formatDuration, getWeekBoundsET } from '../utilities/timecard-helpers.js';
+import { formatDuration, getWeekBoundsET, getPreviousWeekBoundsET } from '../utilities/timecard-helpers.js';
 
 function extractDepartment(customId: string, prefix: string): string {
   return customId.slice(prefix.length);
@@ -202,6 +202,64 @@ export async function handleTimecardMyHours(interaction: ButtonInteraction, clie
     .setColor(0xD4A574)
     .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 My Hours', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setTitle(`${deptConfig.emoji} ${deptConfig.label} \u2014 This Week`)
+    .setDescription(sessionLines.join('\n'))
+    .addFields(
+      { name: 'Total Hours', value: formatDuration(totalMinutes), inline: true },
+      { name: 'Sessions', value: `${completedSessions.length}`, inline: true },
+    )
+    .setFooter({ text: `Week of ${monday.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })}` })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// ─────────────────────────────────────────
+// Last Week Hours
+// ─────────────────────────────────────────
+
+export async function handleTimecardLastWeek(interaction: ButtonInteraction, client: Client): Promise<void> {
+  const dept = extractDepartment(interaction.customId, 'timecard_lastweek_');
+  if (!isValidTimecardDepartment(dept)) {
+    await interaction.reply({ content: 'Unknown department, sugar. Something went wrong! \uD83C\uDF51', flags: 64 });
+    return;
+  }
+
+  const member = interaction.member as GuildMember;
+  if (!member) {
+    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    return;
+  }
+
+  await interaction.deferReply({ flags: 64 });
+
+  const { monday, nextMonday } = getPreviousWeekBoundsET();
+  const sessions = await getTimecardSessions(member.id, dept, monday, nextMonday);
+  const deptConfig = TIMECARD_DEPARTMENTS[dept];
+
+  if (sessions.length === 0) {
+    await interaction.editReply({
+      content: `No timecard sessions last week for **${deptConfig.label}**, sugar. \uD83C\uDF51`,
+    });
+    return;
+  }
+
+  const completedSessions = sessions.filter(s => s.clock_out_at !== null);
+  const totalMinutes = completedSessions.reduce((sum, s) => sum + (s.total_minutes ?? 0), 0);
+
+  const sessionLines = sessions.map(s => {
+    const inTime = Math.floor(new Date(s.clock_in_at).getTime() / 1000);
+    if (!s.clock_out_at) {
+      return `\uD83D\uDFE2 <t:${inTime}:f> \u2014 *Still clocked in*`;
+    }
+    const dur = formatDuration(s.total_minutes ?? 0);
+    const autoFlag = s.auto_clock_out ? ' *(auto)* ' : '';
+    return `<t:${inTime}:f> \u2014 **${dur}**${autoFlag}`;
+  });
+
+  const embed = new EmbedBuilder()
+    .setColor(0x8B6F47)
+    .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 My Hours', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setTitle(`${deptConfig.emoji} ${deptConfig.label} \u2014 Last Week`)
     .setDescription(sessionLines.join('\n'))
     .addFields(
       { name: 'Total Hours', value: formatDuration(totalMinutes), inline: true },

@@ -2,14 +2,16 @@ import cron from 'node-cron';
 import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS, BIRTHDAY_ROLE } from '../config.js';
 import { getTodaysBirthdays, formatBirthdayDate } from '../features/birthdays.js';
-import { hasBirthdayPosted, recordBirthdayPost, scheduleRoleRemoval } from '../storage.js';
+import { getPostedBirthdaysForYear, recordBirthdayPost, scheduleRoleRemoval } from '../storage.js';
 import { isBotActive } from '../utilities/instance-lock.js';
+import { withRetry } from '../utilities/retry.js';
 
 export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
   // Run daily at 8 AM Eastern
   const task = cron.schedule('0 8 * * *', async () => {
     if (!isBotActive()) return;
     try {
+      await withRetry(async () => {
       const guild = client.guilds.cache.get(GUILD_ID);
       if (!guild) return;
 
@@ -24,9 +26,11 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
         const members = await guild.members.fetch({ user: birthdayPeople.map(b => b.discordUserId) });
         const currentYear = today.getFullYear();
 
+        // Batch fetch all birthday posts for this year instead of per-user queries
+        const alreadyPostedSet = await getPostedBirthdaysForYear(currentYear);
+
         for (const bp of birthdayPeople) {
-          const alreadyPosted = await hasBirthdayPosted(bp.discordUserId, currentYear);
-          if (alreadyPosted) continue;
+          if (alreadyPostedSet.has(bp.discordUserId)) continue;
 
           // Check member exists BEFORE recording the post (so left members can retry next year)
           const member = members.get(bp.discordUserId);
@@ -69,8 +73,9 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
           await new Promise(r => setTimeout(r, 2000));
         }
       }
+      }, { label: 'Birthday check' });
     } catch (err) {
-      console.error('[Peaches] Birthday check failed:', err);
+      console.error('[Peaches] Birthday check failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 

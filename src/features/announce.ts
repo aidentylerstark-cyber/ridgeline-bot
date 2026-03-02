@@ -9,6 +9,10 @@ import {
 import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
 import { logAuditEvent } from './audit-log.js';
 
+// Per-user cooldown for announcements: 5 minutes between posts
+const ANNOUNCE_COOLDOWN_MS = 5 * 60 * 1000;
+const announceCooldowns = new Map<string, number>();
+
 export async function handleAnnounceCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   // Staff-only check
   const member = interaction.member as GuildMember | null;
@@ -18,6 +22,18 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
 
   if (!isStaff) {
     await interaction.reply({ content: "Sorry sugar, only staff can post announcements! 🍑", flags: 64 });
+    return;
+  }
+
+  // Per-user cooldown to prevent spam
+  const now = Date.now();
+  const lastUsed = announceCooldowns.get(interaction.user.id);
+  if (lastUsed && now - lastUsed < ANNOUNCE_COOLDOWN_MS) {
+    const remaining = Math.ceil((ANNOUNCE_COOLDOWN_MS - (now - lastUsed)) / 1000);
+    await interaction.reply({
+      content: `Hold on, sugar! You just posted an announcement. Wait **${remaining} more seconds** before posting another. 🍑`,
+      flags: 64,
+    });
     return;
   }
 
@@ -55,6 +71,9 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
 
   const content = pingRole ? `<@&${pingRole.id}>` : undefined;
   await destChannel.send({ content, embeds: [embed] });
+
+  // Record cooldown after successful post
+  announceCooldowns.set(interaction.user.id, Date.now());
 
   if (interaction.guild) {
     logAuditEvent(_client, interaction.guild, {

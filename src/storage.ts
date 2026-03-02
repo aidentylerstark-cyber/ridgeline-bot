@@ -38,6 +38,13 @@ export async function getOpenTicketByChannelId(channelId: string): Promise<Disco
   return ticket;
 }
 
+/** Get any ticket by channel ID (including closed — used to detect zombie channels) */
+export async function getTicketByChannelId(channelId: string): Promise<DiscordTicket | undefined> {
+  const [ticket] = await db.select().from(discordTickets)
+    .where(eq(discordTickets.channelId, channelId));
+  return ticket;
+}
+
 export async function getOpenTicketsByUserDept(discordUserId: string, department: string): Promise<DiscordTicket[]> {
   return db.select().from(discordTickets)
     .where(and(
@@ -91,6 +98,12 @@ export async function closeDiscordTicket(channelId: string, closedBy: string): P
 }
 
 export async function incrementTicketNumber(): Promise<number> {
+  // Ensure the state key exists before incrementing
+  await pool.query(`
+    INSERT INTO site_content (key, value) VALUES ('discord_bot_state', '{"nextTicketNumber": 1}'::jsonb)
+    ON CONFLICT (key) DO NOTHING
+  `);
+
   // Atomic read-and-increment using a single UPDATE + RETURNING — no race condition
   const { rows } = await pool.query<{ ticket_number: number }>(`
     UPDATE site_content
@@ -100,6 +113,9 @@ export async function incrementTicketNumber(): Promise<number> {
     WHERE key = 'discord_bot_state'
     RETURNING (value->>'nextTicketNumber')::int - 1 AS ticket_number
   `);
+  if (!rows[0]) {
+    console.error('[Peaches] incrementTicketNumber: discord_bot_state key missing after INSERT — returning fallback 1');
+  }
   return rows[0]?.ticket_number ?? 1;
 }
 
@@ -122,6 +138,11 @@ export async function setBirthday(discordUserId: string, month: number, day: num
     })
     .returning();
   return row;
+}
+
+export async function deleteBirthday(discordUserId: string): Promise<boolean> {
+  const result = await db.delete(discordBirthdays).where(eq(discordBirthdays.discordUserId, discordUserId)).returning();
+  return result.length > 0;
 }
 
 export async function getBirthdaysForDate(month: number, day: number): Promise<DiscordBirthday[]> {
@@ -152,6 +173,14 @@ export async function recordMilestonePost(discordUserId: string, milestoneDays: 
   );
 }
 
+/** Fetch all posted milestones in one query — returns Set of "userId:days" keys */
+export async function getAllPostedMilestones(): Promise<Set<string>> {
+  const { rows } = await pool.query<{ discord_user_id: string; milestone_days: number }>(
+    `SELECT discord_user_id, milestone_days FROM discord_milestone_posts`
+  );
+  return new Set(rows.map(r => `${r.discord_user_id}:${r.milestone_days}`));
+}
+
 // ============================================
 // Dedup — birthday posts
 // ============================================
@@ -173,6 +202,15 @@ export async function recordBirthdayPost(discordUserId: string, year: number): P
      VALUES ($1, $2) ON CONFLICT DO NOTHING`,
     [discordUserId, year]
   );
+}
+
+/** Fetch all birthday posts for a given year — returns Set of discord user IDs */
+export async function getPostedBirthdaysForYear(year: number): Promise<Set<string>> {
+  const { rows } = await pool.query<{ discord_user_id: string }>(
+    `SELECT discord_user_id FROM discord_birthday_posts WHERE year = $1`,
+    [year]
+  );
+  return new Set(rows.map(r => r.discord_user_id));
 }
 
 // ============================================

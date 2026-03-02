@@ -13,7 +13,7 @@ import {
   handleTicketAddUserModal,
 } from '../handlers/ticket-buttons.js';
 import { handleTicketDepartmentSelect, handleTicketModalSubmit } from '../handlers/ticket-modal.js';
-import { handleTimecardClockIn, handleTimecardClockOut, handleTimecardMyHours } from '../handlers/timecard-buttons.js';
+import { handleTimecardClockIn, handleTimecardClockOut, handleTimecardMyHours, handleTimecardLastWeek } from '../handlers/timecard-buttons.js';
 import type { CooldownManager } from '../utilities/cooldowns.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { handleBirthdayCommand } from '../features/birthdays.js';
@@ -103,6 +103,8 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     { match: 'suggestion_approve_', handler: (i, c) => handleSuggestionReview(i, 'approved', c) },
     { match: 'suggestion_deny_', handler: (i, c) => handleSuggestionReview(i, 'denied', c) },
     { match: 'suggestion_reviewing_', handler: (i, c) => handleSuggestionReview(i, 'reviewing', c) },
+    { match: 'suggestion_inprogress_', handler: (i, c) => handleSuggestionReview(i, 'in-progress', c) },
+    { match: 'suggestion_implemented_', handler: (i, c) => handleSuggestionReview(i, 'implemented', c) },
     { match: 'ticket_open', exact: true, handler: (i, c) => handleTicketOpen(i, c, ticketCooldowns) },
     { match: 'ticket_claim', exact: true, handler: handleTicketClaim },
     { match: 'ticket_unclaim', exact: true, handler: handleTicketUnclaim },
@@ -115,6 +117,7 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     { match: 'timecard_clockin_', handler: handleTimecardClockIn },
     { match: 'timecard_clockout_', handler: handleTimecardClockOut },
     { match: 'timecard_myhours_', handler: handleTimecardMyHours },
+    { match: 'timecard_lastweek_', handler: handleTimecardLastWeek },
   ];
 
   client.on('interactionCreate', async (interaction: Interaction) => {

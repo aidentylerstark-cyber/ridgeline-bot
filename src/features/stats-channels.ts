@@ -25,7 +25,8 @@ export async function updateStatsChannels(client: Client): Promise<void> {
     try {
       const vc = guild.channels.cache.get(CHANNELS.statsOnlineVC) as VoiceChannel | undefined;
       if (vc && vc.type === ChannelType.GuildVoice) {
-        // Only available when GuildPresences intent is enabled
+        // Fetch all members so presence data is complete for the count
+        await guild.members.fetch();
         const onlineCount = guild.members.cache.filter(
           m => !m.user.bot && (m.presence?.status === 'online' || m.presence?.status === 'idle' || m.presence?.status === 'dnd')
         ).size;

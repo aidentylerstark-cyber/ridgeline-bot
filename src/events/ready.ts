@@ -1,4 +1,4 @@
-import { ActivityType, ChannelType, REST, Routes, type Client } from 'discord.js';
+import { ActivityType, ChannelType, EmbedBuilder, GuildVerificationLevel, REST, Routes, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 import { claimInstanceLock, startInstanceHeartbeat } from '../utilities/instance-lock.js';
 import { registerSlashCommands } from '../commands/index.js';
@@ -88,6 +88,39 @@ export function setupReadyHandler(client: Client) {
       await postTimecardPanel(client);
     } catch (err) {
       console.error('[Peaches] Failed to post timecard panels (non-fatal):', err);
+    }
+
+    // Notify mod-log that the bot has restarted + check for stale raid mode
+    try {
+      const guild = client.guilds.cache.get(GUILD_ID);
+      if (guild && CHANNELS.modLog) {
+        const modLogChannel = guild.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
+        if (modLogChannel) {
+          const restartEmbed = new EmbedBuilder()
+            .setColor(0x57F287)
+            .setTitle('\uD83D\uDD04 Bot Restarted')
+            .setDescription(`Peaches is back online and ready to serve! \uD83C\uDF51`)
+            .setFooter({ text: `Environment: ${process.env.RAILWAY_ENVIRONMENT ?? 'local'}` })
+            .setTimestamp();
+          await modLogChannel.send({ embeds: [restartEmbed] });
+
+          // Warn if verification level is High — may be stale from a raid mode that wasn't cleared before restart
+          if (guild.verificationLevel === GuildVerificationLevel.High || guild.verificationLevel === GuildVerificationLevel.VeryHigh) {
+            const raidWarnEmbed = new EmbedBuilder()
+              .setColor(0xFFA500)
+              .setTitle('\u26A0\uFE0F Verification Level is High')
+              .setDescription(
+                `Server verification level is currently **${GuildVerificationLevel[guild.verificationLevel]}**. ` +
+                `This may be left over from a previous raid mode that wasn't cleared before restart.\n\n` +
+                `If the raid is over, a moderator should lower it in **Server Settings \u2192 Safety Setup**.`
+              )
+              .setTimestamp();
+            await modLogChannel.send({ embeds: [raidWarnEmbed] });
+          }
+        }
+      }
+    } catch {
+      // Non-critical — don't block startup
     }
 
     // Start stats channel update interval (every 10 minutes)

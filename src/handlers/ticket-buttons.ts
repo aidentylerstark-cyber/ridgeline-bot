@@ -51,9 +51,6 @@ export async function handleTicketOpen(
     return;
   }
 
-  // Set cooldown immediately to prevent TOCTOU race (user spamming the button)
-  ticketCooldowns.set(member.id);
-
   // Build available department list (single pass — bypass users see all, others filtered by limit)
   const bypassLimit = hasTicketLimitBypass(member);
   const entries = Object.entries(TICKET_CATEGORIES);
@@ -85,6 +82,9 @@ export async function handleTicketOpen(
     });
     return;
   }
+
+  // Set cooldown after availability check so users don't burn cooldown when all departments are full
+  ticketCooldowns.set(member.id);
 
   const options = optionEntries.map(([key, config]) =>
     new StringSelectMenuOptionBuilder()
@@ -300,6 +300,16 @@ export async function handleTicketOwnerRequestClose(interaction: ButtonInteracti
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
   if (!ticket) return;
 
+  // Verify the clicker is the actual ticket owner
+  const member = interaction.member as GuildMember;
+  if (member.id !== ticket.discordUserId) {
+    await interaction.reply({
+      content: `Only the ticket owner can request a close, sugar. \uD83C\uDF51`,
+      flags: 64,
+    });
+    return;
+  }
+
   const channel = interaction.channel as TextChannel;
 
   const guild = interaction.guild;
@@ -419,6 +429,21 @@ export async function handleTicketDenyClose(interaction: ButtonInteraction, _cli
 // ─────────────────────────────────────────
 
 export async function handleTicketCancelClose(interaction: ButtonInteraction) {
+  // Only the person who triggered the close prompt (or staff) should cancel it
+  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
+  if (ticket && isValidDepartment(ticket.department)) {
+    const member = interaction.member as GuildMember;
+    const isStaff = isStaffForTicket(member, ticket.department);
+    const isOwner = member.id === ticket.discordUserId;
+    if (!isStaff && !isOwner) {
+      await interaction.reply({
+        content: `Only the ticket owner or staff can cancel a close request, sugar. \uD83C\uDF51`,
+        flags: 64,
+      });
+      return;
+    }
+  }
+
   await interaction.update({
     content: 'Ticket close cancelled. \uD83C\uDF51',
     components: [],
@@ -523,6 +548,15 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
   }
 
   try {
+    // Check if user already has access to avoid duplicate audit log entries
+    const existingPerms = channel.permissionOverwrites.cache.get(targetMember.id);
+    if (existingPerms?.allow.has('ViewChannel')) {
+      await interaction.editReply({
+        content: `${targetMember.displayName} already has access to this ticket, sugar! 🍑`,
+      });
+      return;
+    }
+
     await channel.permissionOverwrites.edit(targetMember.id, {
       ViewChannel: true,
       SendMessages: true,

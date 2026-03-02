@@ -10,12 +10,14 @@ import { GUILD_ID, TIMECARD_DEPARTMENTS, TIMECARD_PAYROLL_CATEGORY_NAME } from '
 import { isBotActive } from '../utilities/instance-lock.js';
 import { getAllTimecardSessions } from '../storage.js';
 import { formatDuration, getPayPeriodBoundsET } from '../utilities/timecard-helpers.js';
+import { withRetry } from '../utilities/retry.js';
 
 export function scheduleTimecardPayroll(client: Client): cron.ScheduledTask {
   // Sunday midnight ET — weekly payroll report (covers Mon 00:00 → Sun 00:00 ET)
   return cron.schedule('0 0 * * 0', async () => {
     if (!isBotActive()) return;
     try {
+      await withRetry(async () => {
       const guild = client.guilds.cache.get(GUILD_ID);
       if (!guild) return;
 
@@ -65,6 +67,15 @@ export function scheduleTimecardPayroll(client: Client): cron.ScheduledTask {
       const dateLabel = startLocal.toLocaleDateString('en-US', {
         month: '2-digit', day: '2-digit', year: 'numeric',
       }).replace(/\//g, '-');
+
+      // Check if a payroll channel for this period already exists (prevents duplicate on double-fire)
+      const existingPayroll = guild.channels.cache.find(
+        c => c.type === ChannelType.GuildText && c.name === `payroll-${dateLabel}` && c.parentId === payrollCategory.id
+      );
+      if (existingPayroll) {
+        console.log(`[Peaches] Payroll channel #payroll-${dateLabel} already exists — skipping`);
+        return;
+      }
 
       const payrollChannel = await guild.channels.create({
         name: `payroll-${dateLabel}`,
@@ -167,8 +178,9 @@ export function scheduleTimecardPayroll(client: Client): cron.ScheduledTask {
       }
 
       console.log(`[Peaches] Payroll report posted in #${payrollChannel.name}`);
+      }, { label: 'Timecard payroll' });
     } catch (err) {
-      console.error('[Peaches] Payroll report failed:', err);
+      console.error('[Peaches] Payroll report failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 }

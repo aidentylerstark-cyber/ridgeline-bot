@@ -28,6 +28,10 @@ export async function registerSlashCommands(client: Client): Promise<void> {
       .addSubcommand(sub => sub
         .setName('check')
         .setDescription('Check your registered birthday')
+      )
+      .addSubcommand(sub => sub
+        .setName('delete')
+        .setDescription('Remove your birthday from the records')
       ),
 
     // /suggest

@@ -14,7 +14,7 @@ if (dbUrl) {
 // Create PostgreSQL connection pool
 const pool = new Pool({
   connectionString: dbUrl,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+  ssl: (process.env.RAILWAY_ENVIRONMENT === "production" || process.env.NODE_ENV === "production") ? { rejectUnauthorized: false } : undefined,
   max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,

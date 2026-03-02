@@ -104,6 +104,22 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
     }
     return;
   }
+
+  if (sub === 'delete') {
+    const deleted = await storage.deleteBirthday(interaction.user.id);
+    if (deleted) {
+      await interaction.reply({
+        content: `🗑️ Your birthday has been removed from the records, sugar. You can always re-register with \`/birthday set\`! 🍑`,
+        flags: 64,
+      });
+    } else {
+      await interaction.reply({
+        content: `I don't have a birthday on file for you, sugar! Nothing to delete. 🍑`,
+        flags: 64,
+      });
+    }
+    return;
+  }
 }
 
 // ─────────────────────────────────────────
@@ -111,8 +127,9 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
 // ─────────────────────────────────────────
 
 export async function getTodaysBirthdays() {
-  const today = new Date();
-  const month = today.getMonth() + 1;
-  const day = today.getDate();
+  // Use Eastern Time to match the cron schedule timezone (server may be UTC)
+  const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const month = etNow.getMonth() + 1;
+  const day = etNow.getDate();
   return storage.getBirthdaysForDate(month, day);
 }

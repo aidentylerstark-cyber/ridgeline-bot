@@ -15,6 +15,15 @@ const RAID_THRESHOLD = 10;   // joins within the window to trigger
 const RAID_WINDOW_MS = 60_000; // 1 minute
 let raidModeActive = false;
 let raidModeTimer: ReturnType<typeof setTimeout> | null = null;
+let preRaidVerificationLevel: GuildVerificationLevel | null = null;
+
+/** Clear the raid mode auto-reset timer (called during shutdown) */
+export function clearRaidModeTimer(): void {
+  if (raidModeTimer) {
+    clearTimeout(raidModeTimer);
+    raidModeTimer = null;
+  }
+}
 
 export function setupModLog(client: Client): void {
   // ── Member joined ──────────────────────────────────────────
@@ -54,7 +63,8 @@ export function setupModLog(client: Client): void {
 
     if (!raidModeActive && recentJoins.length >= RAID_THRESHOLD) {
       raidModeActive = true;
-      console.warn(`[Peaches] Anti-raid: ${recentJoins.length} joins in 60s — activating raid mode`);
+      preRaidVerificationLevel = member.guild.verificationLevel;
+      console.warn(`[Peaches] Anti-raid: ${recentJoins.length} joins in 60s — activating raid mode (was level ${preRaidVerificationLevel})`);
 
       try {
         await member.guild.setVerificationLevel(GuildVerificationLevel.High);
@@ -76,28 +86,31 @@ export function setupModLog(client: Client): void {
 
       // Auto-reset raid mode after 10 minutes
       if (raidModeTimer) clearTimeout(raidModeTimer);
+      const restoreLevel = preRaidVerificationLevel ?? GuildVerificationLevel.Low;
+      const restoreLevelName = GuildVerificationLevel[restoreLevel] ?? String(restoreLevel);
       raidModeTimer = setTimeout(async () => {
         raidModeActive = false;
         raidModeTimer = null;
         recentJoins.length = 0; // Clear stale join timestamps
         console.log('[Peaches] Anti-raid: raid mode cleared after 10 minutes');
         try {
-          await member.guild.setVerificationLevel(GuildVerificationLevel.Low);
+          await member.guild.setVerificationLevel(restoreLevel);
           const resetEmbed = new EmbedBuilder()
             .setColor(0x57F287)
-            .setTitle('✅ Raid Mode Deactivated')
-            .setDescription('Server verification level has been restored to **Low** automatically after 10 minutes.')
+            .setTitle('\u2705 Raid Mode Deactivated')
+            .setDescription(`Server verification level has been restored to **${restoreLevelName}** automatically after 10 minutes.`)
             .setTimestamp();
           logChannel.send({ embeds: [resetEmbed] }).catch(() => {});
         } catch (err) {
           console.error('[Peaches] Anti-raid: FAILED to lower verification level — it may still be High! Manual reset needed:', err);
           const failEmbed = new EmbedBuilder()
             .setColor(0xFF0000)
-            .setTitle('⚠️ Raid Mode Reset FAILED')
-            .setDescription('**Could not lower verification level automatically.** A moderator must manually set it back to Low in Server Settings → Safety Setup.')
+            .setTitle('\u26A0\uFE0F Raid Mode Reset FAILED')
+            .setDescription(`**Could not lower verification level automatically.** A moderator must manually set it back to **${restoreLevelName}** in Server Settings \u2192 Safety Setup.`)
             .setTimestamp();
           logChannel.send({ content: '@here', embeds: [failEmbed] }).catch(() => {});
         }
+        preRaidVerificationLevel = null;
       }, 10 * 60 * 1000);
     }
   });

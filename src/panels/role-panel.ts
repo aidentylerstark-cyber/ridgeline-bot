@@ -27,8 +27,15 @@ export async function postRoleButtons(client: Client) {
   // Clear old messages from bot
   const oldMessages = await getRolesChannel.messages.fetch({ limit: 50 });
   const botMessages = oldMessages.filter(m => m.author.id === client.user?.id);
-  for (const msg of Array.from(botMessages.values())) {
-    await msg.delete().catch(() => {});
+  if (botMessages.size > 0) {
+    const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    const recent = botMessages.filter(m => m.createdTimestamp > fourteenDaysAgo);
+    const old = botMessages.filter(m => m.createdTimestamp <= fourteenDaysAgo);
+    if (recent.size > 1) await getRolesChannel.bulkDelete(recent).catch(() => {});
+    else if (recent.size === 1) await recent.first()!.delete().catch(() => {});
+    for (const msg of Array.from(old.values())) {
+      await msg.delete().catch(() => {});
+    }
   }
 
   // Header (Components V2)

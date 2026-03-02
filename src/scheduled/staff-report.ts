@@ -3,12 +3,14 @@ import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { pool } from '../db/index.js';
+import { withRetry } from '../utilities/retry.js';
 
 export function scheduleStaffReport(client: Client): cron.ScheduledTask {
   // Monday 9 AM ET — weekly staff activity report
   return cron.schedule('0 9 * * 1', async () => {
     if (!isBotActive()) return;
     try {
+      await withRetry(async () => {
       const guild = client.guilds.cache.get(GUILD_ID);
       if (!guild) return;
 
@@ -99,8 +101,9 @@ export function scheduleStaffReport(client: Client): cron.ScheduledTask {
 
       await modLogChannel.send({ embeds: [embed] }).catch(() => {});
       console.log('[Peaches] Weekly staff activity report posted');
+      }, { label: 'Staff report' });
     } catch (err) {
-      console.error('[Peaches] Staff report failed:', err);
+      console.error('[Peaches] Staff report failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 }

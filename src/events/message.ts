@@ -4,6 +4,9 @@ import { CooldownManager } from '../utilities/cooldowns.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { processChatbotMessage } from '../chatbot/pipeline.js';
 
+// Pre-computed ticket category IDs (config is static — no need to rebuild per message)
+const ticketCategoryIds = new Set(Object.values(TICKET_CATEGORIES).map(c => c.categoryId));
+
 // Per-user cooldown to prevent spam (3 second window)
 const messageCooldowns = new CooldownManager(3000);
 
@@ -23,7 +26,6 @@ export function setupMessageHandler(client: Client) {
     if (!isBotActive()) return; // Another instance took over — stop processing
 
     // Check if message is in a ticket channel (child of a ticket category)
-    const ticketCategoryIds = new Set(Object.values(TICKET_CATEGORIES).map(c => c.categoryId));
     const parentId = 'parentId' in message.channel ? message.channel.parentId : null;
     const isTicketChannel = parentId != null && ticketCategoryIds.has(parentId);
 

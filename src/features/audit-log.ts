@@ -158,21 +158,35 @@ function shouldSuppressEmbed(actorId: string): 'post' | 'summary' | 'suppress' {
   return 'suppress';
 }
 
-// Cleanup stale entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, timestamps] of embedTimestamps) {
-    const recent = timestamps.filter(t => now - t < BATCH_WINDOW_MS);
-    if (recent.length === 0) embedTimestamps.delete(key);
-    else embedTimestamps.set(key, recent);
+// Cleanup stale entries every 5 minutes (lazy-init so it only starts when needed)
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
+function ensureCleanupInterval(): void {
+  if (cleanupInterval) return;
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamps] of embedTimestamps) {
+      const recent = timestamps.filter(t => now - t < BATCH_WINDOW_MS);
+      if (recent.length === 0) embedTimestamps.delete(key);
+      else embedTimestamps.set(key, recent);
+    }
+  }, 5 * 60 * 1000);
+}
+
+/** Clear the cleanup interval (called during shutdown) */
+export function destroyAuditLogInterval(): void {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
   }
-}, 5 * 60 * 1000);
+}
 
 // ─────────────────────────────────────────
 // Log Audit Event (fire-and-forget)
 // ─────────────────────────────────────────
 
 export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData): void {
+  ensureCleanupInterval();
   // Fire-and-forget — never throws, never blocks the caller
   (async () => {
     // 1. Insert into DB
@@ -187,6 +201,24 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
       const isCritical = ['ticket_close', 'warn_issue', 'member_timeout'].includes(data.action);
       const logFn = isCritical ? console.error : console.warn;
       logFn(`[Peaches] Audit log DB insert failed (action=${data.action}, actor=${data.actorId}):`, err);
+
+      // Surface critical failures in #mod-log so staff are aware
+      if (isCritical) {
+        try {
+          const modLogChannel = guild.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
+          if (modLogChannel) {
+            const failEmbed = new EmbedBuilder()
+              .setColor(0xFF0000)
+              .setTitle('\u26A0\uFE0F Audit Log DB Failure')
+              .setDescription(`Failed to record **${data.action}** by <@${data.actorId}> to the audit log database.\n\nDetails: ${data.details.slice(0, 200)}`)
+              .setFooter({ text: 'Action may not appear in /auditlog search' })
+              .setTimestamp();
+            await modLogChannel.send({ embeds: [failEmbed] });
+          }
+        } catch {
+          // Best effort — don't let the notification failure cascade
+        }
+      }
     }
 
     // 2. Post embed to #mod-log (unless skipped)
@@ -253,31 +285,44 @@ function isStaff(member: GuildMember): boolean {
 // Date Preset Parser
 // ─────────────────────────────────────────
 
+function getETDateParts(now: Date): { year: number; month: number; day: number; dayOfWeek: number } {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+  });
+  const parts = fmt.formatToParts(now);
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0', 10);
+  const weekdayStr = parts.find(p => p.type === 'weekday')?.value ?? 'Sun';
+  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return { year: get('year'), month: get('month'), day: get('day'), dayOfWeek: dayMap[weekdayStr] ?? 0 };
+}
+
 function parseDatePreset(input: string): Date | null {
   const now = new Date();
   const lower = input.trim().toLowerCase();
 
   if (lower === 'today') {
-    const d = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const { year, month, day } = getETDateParts(now);
+    return new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00Z`);
   }
   if (lower === 'this-week') {
-    const d = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    d.setDate(d.getDate() - d.getDay()); // Start of week (Sunday)
-    d.setHours(0, 0, 0, 0);
+    const { year, month, day, dayOfWeek } = getETDateParts(now);
+    const d = new Date(Date.UTC(year, month - 1, day));
+    d.setUTCDate(d.getUTCDate() - dayOfWeek); // Start of week (Sunday)
     return d;
   }
   if (lower === 'this-month') {
-    const d = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    d.setDate(1);
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const { year, month } = getETDateParts(now);
+    return new Date(Date.UTC(year, month - 1, 1));
   }
 
   // Try YYYY-MM-DD
   const parsed = new Date(input);
-  return isNaN(parsed.getTime()) ? null : parsed;
+  if (isNaN(parsed.getTime())) return null;
+  // Guard against unreasonable years (e.g. "99999-01-01")
+  const year = parsed.getFullYear();
+  if (year < 2000 || year > 2100) return null;
+  return parsed;
 }
 
 // ─────────────────────────────────────────

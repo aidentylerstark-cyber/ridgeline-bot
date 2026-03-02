@@ -3,6 +3,7 @@ import { EmbedBuilder, type Client } from 'discord.js';
 import { TIMECARD_DEPARTMENTS, TIMECARD_AUTO_CLOCKOUT_HOURS } from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { getStaleOpenTimecards, clockOut } from '../storage.js';
+import { withRetry } from '../utilities/retry.js';
 import { findTimecardChannel } from '../panels/timecard-panel.js';
 import { formatDuration } from '../utilities/timecard-helpers.js';
 
@@ -11,6 +12,7 @@ export function scheduleTimecardAutoClockout(client: Client): cron.ScheduledTask
   return cron.schedule('*/30 * * * *', async () => {
     if (!isBotActive()) return;
     try {
+      await withRetry(async () => {
       const stale = await getStaleOpenTimecards(TIMECARD_AUTO_CLOCKOUT_HOURS);
       if (stale.length === 0) return;
 
@@ -43,8 +45,9 @@ export function scheduleTimecardAutoClockout(client: Client): cron.ScheduledTask
         await channel.send({ embeds: [embed] }).catch(() => {});
         console.log(`[Peaches] Auto clock-out: ${session.discord_user_id} from ${deptConfig.label} (${duration})`);
       }
+      }, { label: 'Auto clock-out' });
     } catch (err) {
-      console.error('[Peaches] Auto clock-out check failed:', err);
+      console.error('[Peaches] Auto clock-out check failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 }

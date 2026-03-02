@@ -19,31 +19,27 @@ export function formatDuration(totalMinutes: number): string {
  * the real UTC offset, then applying it.
  */
 function etToUTC(year: number, month: number, day: number, hour = 0, min = 0): Date {
-  // Build an approximate UTC date, then use Intl to find the real ET offset
-  const approx = new Date(Date.UTC(year, month, day, hour + 5, min)); // rough EST guess
-  const parts = new Intl.DateTimeFormat('en-US', {
+  // Construct the desired ET datetime as a string, parse via toLocaleString round-trip
+  // to find the correct UTC offset (handles EST/EDT automatically).
+  const etStr = `${String(month + 1).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year} ${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}:00`;
+  // Parse as if it were local time in ET using toLocaleString round-trip:
+  // 1. Make a rough UTC guess (EST = UTC-5)
+  const roughUtc = new Date(Date.UTC(year, month, day, hour + 5, min));
+  // 2. Format that UTC instant as ET to see what ET shows
+  const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
     hour12: false,
-  }).formatToParts(approx);
-
+  });
+  const parts = fmt.formatToParts(roughUtc);
   const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0', 10);
-  const etHour = get('hour');
-  // The offset in hours = etHour - hour (mod 24)
-  // But it's easier: compute the difference between what we wanted and what we got
-  const etDate = new Date(Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second')));
-  const offsetMs = etDate.getTime() - approx.getTime();
-
-  // The actual UTC time = target ET time + offset from UTC
-  // offsetMs = ET - UTC, so UTC = targetET - offset... but we need to think about this more carefully.
-  // approx is in UTC, etDate is what ET shows for that UTC moment.
-  // We want: the UTC moment where ET clock shows (year, month, day, hour, min).
-  // etDate shows what the ET clock shows for `approx`.
-  // Difference: etDate - target = how far off we are.
+  // What ET clock shows for roughUtc
+  const etShowing = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  // What we want ET clock to show
   const targetET = Date.UTC(year, month, day, hour, min, 0);
-  const drift = etDate.getTime() - targetET;
-  return new Date(approx.getTime() - drift);
+  // Adjust: if ET is showing too high, roughUtc is too late
+  return new Date(roughUtc.getTime() - (etShowing - targetET));
 }
 
 /**
@@ -66,6 +62,30 @@ export function getWeekBoundsET(): { monday: Date; nextMonday: Date } {
 
   const monday = etToUTC(mondayLocal.getFullYear(), mondayLocal.getMonth(), mondayLocal.getDate());
   const nextMonday = etToUTC(nextMondayLocal.getFullYear(), nextMondayLocal.getMonth(), nextMondayLocal.getDate());
+
+  return { monday, nextMonday };
+}
+
+/**
+ * Get the previous week's Monday 00:00 ET → Monday 00:00 ET boundaries.
+ */
+export function getPreviousWeekBoundsET(): { monday: Date; nextMonday: Date } {
+  const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const now = new Date(nowStr);
+
+  const dayOfWeek = now.getDay();
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+  // This week's Monday
+  const thisMonday = new Date(now);
+  thisMonday.setDate(thisMonday.getDate() - daysFromMonday);
+
+  // Last week's Monday = this Monday - 7 days
+  const lastMonday = new Date(thisMonday);
+  lastMonday.setDate(lastMonday.getDate() - 7);
+
+  const monday = etToUTC(lastMonday.getFullYear(), lastMonday.getMonth(), lastMonday.getDate());
+  const nextMonday = etToUTC(thisMonday.getFullYear(), thisMonday.getMonth(), thisMonday.getDate());
 
   return { monday, nextMonday };
 }

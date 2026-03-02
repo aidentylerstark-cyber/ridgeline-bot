@@ -13,7 +13,7 @@ const INSTANCE_ID = crypto.randomUUID();
 let active = true;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let consecutiveFailures = 0;
-const MAX_HEARTBEAT_FAILURES = 3;
+const MAX_HEARTBEAT_FAILURES = 12; // 12 failures × 5 seconds = 60 seconds tolerance for DB restarts
 
 /** Create the lock table if needed, then claim ownership. */
 export async function claimInstanceLock(): Promise<void> {

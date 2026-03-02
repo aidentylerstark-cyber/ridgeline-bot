@@ -43,10 +43,21 @@ export function isStaffForTicket(member: GuildMember, department: TicketDepartme
   return isDeptStaff || isGlobalStaff;
 }
 
+// Pre-compute merged staff role sets per department (config is static)
+const staffRoleSetsCache = new Map<TicketDepartment, string[]>();
+function getMergedStaffRoles(department: TicketDepartment): string[] {
+  let cached = staffRoleSetsCache.get(department);
+  if (!cached) {
+    const config = TICKET_CATEGORIES[department];
+    cached = Array.from(new Set([...config.staffRoles, ...GLOBAL_STAFF_ROLES]));
+    staffRoleSetsCache.set(department, cached);
+  }
+  return cached;
+}
+
 /** Get all staff role mentions (dept + global) for pinging */
 export function getStaffMentions(guild: Guild, department: TicketDepartment): string {
-  const config = TICKET_CATEGORIES[department];
-  const allStaffRoles = Array.from(new Set([...config.staffRoles, ...GLOBAL_STAFF_ROLES]));
+  const allStaffRoles = getMergedStaffRoles(department);
   const mentions = allStaffRoles
     .map(roleName => guild.roles.cache.find(r => r.name === roleName))
     .filter(Boolean)
@@ -88,7 +99,7 @@ export async function createTicketChannel(
     },
   ];
 
-  const allStaffRoles = Array.from(new Set([...config.staffRoles, ...GLOBAL_STAFF_ROLES]));
+  const allStaffRoles = getMergedStaffRoles(department);
   for (const roleName of allStaffRoles) {
     const role = guild.roles.cache.find(r => r.name === roleName);
     if (role) {
@@ -208,8 +219,18 @@ export async function closeTicket(
   channel: TextChannel,
   closedBy: GuildMember
 ) {
-  const ticket = await storage.getOpenTicketByChannelId(channel.id);
-  if (!ticket) return;
+  let ticket = await storage.getOpenTicketByChannelId(channel.id);
+  if (!ticket) {
+    // Check for zombie channel — ticket closed in DB but channel still exists
+    const closedTicket = await storage.getTicketByChannelId(channel.id);
+    if (closedTicket && closedTicket.isClosed) {
+      console.log(`[Peaches] Zombie ticket channel detected: #${closedTicket.ticketNumber} is closed in DB — deleting orphaned channel`);
+      await channel.delete('Cleaning up zombie ticket channel (already closed in DB)').catch(err =>
+        console.error('[Peaches] Failed to delete zombie ticket channel:', err)
+      );
+    }
+    return;
+  }
 
   const closingEmbed = new EmbedBuilder()
     .setColor(0xCC4444)
