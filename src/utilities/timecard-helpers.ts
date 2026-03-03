@@ -92,7 +92,7 @@ export function getPreviousWeekBoundsET(): { monday: Date; nextMonday: Date } {
 
 /**
  * Get pay period bounds: previous Monday 00:00 ET through Sunday 00:00 ET.
- * Called on Saturday night, covers Mon–Sat inclusive.
+ * Called Sunday at midnight (cron: 0 0 * * 0), covers Mon-Sun inclusive.
  */
 export function getPayPeriodBoundsET(): { start: Date; end: Date; startLocal: Date; endLocal: Date } {
   const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });

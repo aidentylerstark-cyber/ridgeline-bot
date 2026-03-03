@@ -6,8 +6,9 @@ import {
   type ChatInputCommandInteraction,
   type GuildMember,
 } from 'discord.js';
-import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
+import { CHANNELS } from '../config.js';
 import { logAuditEvent } from './audit-log.js';
+import { isStaff } from '../utilities/permissions.js';
 
 // Per-user cooldown for announcements: 5 minutes between posts
 const ANNOUNCE_COOLDOWN_MS = 5 * 60 * 1000;
@@ -16,17 +17,18 @@ const announceCooldowns = new Map<string, number>();
 export async function handleAnnounceCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   // Staff-only check
   const member = interaction.member as GuildMember | null;
-  const isStaff = member
-    ? GLOBAL_STAFF_ROLES.some(roleName => member.roles.cache.some(r => r.name === roleName))
-    : false;
+  const memberIsStaff = member ? isStaff(member) : false;
 
-  if (!isStaff) {
+  if (!memberIsStaff) {
     await interaction.reply({ content: "Sorry sugar, only staff can post announcements! 🍑", flags: 64 });
     return;
   }
 
-  // Per-user cooldown to prevent spam
+  // Per-user cooldown to prevent spam — also clean up stale entries
   const now = Date.now();
+  for (const [userId, ts] of announceCooldowns) {
+    if (now - ts >= ANNOUNCE_COOLDOWN_MS) announceCooldowns.delete(userId);
+  }
   const lastUsed = announceCooldowns.get(interaction.user.id);
   if (lastUsed && now - lastUsed < ANNOUNCE_COOLDOWN_MS) {
     const remaining = Math.ceil((ANNOUNCE_COOLDOWN_MS - (now - lastUsed)) / 1000);
@@ -47,10 +49,12 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
   // Determine destination channel
   let destChannel: TextChannel | undefined;
   if (targetChannel && targetChannel.type === ChannelType.GuildText) {
-    destChannel = interaction.guild?.channels.cache.get(targetChannel.id) as TextChannel | undefined;
+    const resolved = interaction.guild?.channels.cache.get(targetChannel.id);
+    if (resolved?.isTextBased() && !resolved.isDMBased()) destChannel = resolved as TextChannel;
   }
   if (!destChannel) {
-    destChannel = interaction.guild?.channels.cache.get(CHANNELS.communityAnnouncements) as TextChannel | undefined;
+    const fallback = interaction.guild?.channels.cache.get(CHANNELS.communityAnnouncements);
+    if (fallback?.isTextBased() && !fallback.isDMBased()) destChannel = fallback as TextChannel;
   }
 
   if (!destChannel) {

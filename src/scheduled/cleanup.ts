@@ -100,7 +100,8 @@ export function scheduleCleanup(client: Client): cron.ScheduledTask {
       const totalPurged = tickets + suggestions + birthdayPosts + milestonePosts + auditLogs + regionSnapshots;
       if (totalPurged > 0) {
         const guild = client.guilds.cache.get(GUILD_ID);
-        const modLogChannel = guild?.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
+        const rawModLogChannel = guild?.channels.cache.get(CHANNELS.modLog);
+        const modLogChannel = rawModLogChannel?.isTextBased() && !rawModLogChannel.isDMBased() ? rawModLogChannel as TextChannel : undefined;
         if (modLogChannel) {
           const lines: string[] = [];
           if (tickets > 0) lines.push(`\uD83C\uDFAB Closed tickets: **${tickets}**`);

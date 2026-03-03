@@ -83,7 +83,15 @@ export async function createTicketChannel(
 ): Promise<{ channel: TextChannel; ticketNumber: number } | null> {
   const config = TICKET_CATEGORIES[department];
   const ticketNumber = await storage.incrementTicketNumber();
-  const channelName = `ticket-${String(ticketNumber).padStart(4, '0')}`;
+  // Build descriptive channel name: {dept}-{username} (e.g., general-johndoe)
+  // Discord channel names are limited to 100 chars and are auto-lowercased
+  const sanitizedUsername = user.displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')   // Replace non-alphanumeric with dashes
+    .replace(/-+/g, '-')            // Collapse consecutive dashes
+    .replace(/^-|-$/g, '')          // Trim leading/trailing dashes
+    .slice(0, 30);                  // Cap username portion
+  const channelName = `${department}-${sanitizedUsername || 'ticket'}-${String(ticketNumber).padStart(4, '0')}`.slice(0, 100);
 
   const overwrites: OverwriteResolvable[] = [
     { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
@@ -182,7 +190,7 @@ export async function sendTicketOpeningEmbed(
       name: 'Peaches \uD83C\uDF51 \u2014 Ticket System',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
-    .setTitle(`${config.emoji}  Ticket #${String(ticketNumber).padStart(4, '0')}`)
+    .setTitle(`${config.emoji}  ${config.label} \u2014 Ticket #${String(ticketNumber).padStart(4, '0')}`)
     .setDescription(
       `> *Peaches pulls out a fresh form and clicks her pen*\n\n` +
       `Alright sugar, I've got your ticket right here. A staff member will be with you shortly!\n\n` +
@@ -198,11 +206,12 @@ export async function sendTicketOpeningEmbed(
     .setFooter({ text: 'Ridgeline Ticket System \u2014 Powered by Peaches \uD83C\uDF51' })
     .setTimestamp();
 
+  const ticketId = String(ticketNumber).padStart(4, '0');
   const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId('ticket_claim').setLabel('Claim Ticket').setStyle(ButtonStyle.Primary).setEmoji('\uD83D\uDE4B'),
-    new ButtonBuilder().setCustomId('ticket_unclaim').setLabel('Unclaim').setStyle(ButtonStyle.Secondary).setEmoji('\uD83D\uDD04'),
-    new ButtonBuilder().setCustomId('ticket_close').setLabel('Close Ticket').setStyle(ButtonStyle.Danger).setEmoji('\uD83D\uDD12'),
-    new ButtonBuilder().setCustomId('ticket_adduser').setLabel('Add User').setStyle(ButtonStyle.Secondary).setEmoji('\uD83D\uDC64'),
+    new ButtonBuilder().setCustomId(`ticket_claim_${ticketId}`).setLabel('Claim Ticket').setStyle(ButtonStyle.Primary).setEmoji('\uD83D\uDE4B'),
+    new ButtonBuilder().setCustomId(`ticket_unclaim_${ticketId}`).setLabel('Unclaim').setStyle(ButtonStyle.Secondary).setEmoji('\uD83D\uDD04'),
+    new ButtonBuilder().setCustomId(`ticket_close_${ticketId}`).setLabel('Close Ticket').setStyle(ButtonStyle.Danger).setEmoji('\uD83D\uDD12'),
+    new ButtonBuilder().setCustomId(`ticket_adduser_${ticketId}`).setLabel('Add User').setStyle(ButtonStyle.Secondary).setEmoji('\uD83D\uDC64'),
   );
 
   const staffMentions = getStaffMentions(channel.guild, department);
@@ -255,7 +264,8 @@ export async function closeTicket(
       poweredBy: false,
     });
 
-    const logChannel = channel.guild.channels.cache.get(CHANNELS.ticketLogs) as TextChannel | undefined;
+    const rawLogChannel = channel.guild.channels.cache.get(CHANNELS.ticketLogs);
+    const logChannel = rawLogChannel?.isTextBased() && !rawLogChannel.isDMBased() ? rawLogChannel as TextChannel : undefined;
     if (logChannel) {
       const dept = isValidDepartment(ticket.department) ? ticket.department : 'general';
       const config = TICKET_CATEGORIES[dept];

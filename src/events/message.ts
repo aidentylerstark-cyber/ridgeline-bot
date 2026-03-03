@@ -71,12 +71,12 @@ export function setupMessageHandler(client: Client) {
     // Strip the mention/trigger
     const query = content
       .replace(/<@!?\d+>/g, '')
-      .replace(/hey peaches|yo peaches|^peaches,?/gi, '')
+      .replace(/\b(?:hey peaches|yo peaches|peaches),?\b/gi, '')
       .trim();
 
     const cleanMessage = originalContent
       .replace(/<@!?\d+>/g, '')
-      .replace(/hey peaches|yo peaches|^peaches,?/gi, '')
+      .replace(/\b(?:hey peaches|yo peaches|peaches),?\b/gi, '')
       .trim();
 
     try {

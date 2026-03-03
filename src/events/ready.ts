@@ -94,7 +94,8 @@ export function setupReadyHandler(client: Client) {
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
       if (guild && CHANNELS.modLog) {
-        const modLogChannel = guild.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
+        const rawModLogChannel = guild.channels.cache.get(CHANNELS.modLog);
+        const modLogChannel = rawModLogChannel?.isTextBased() && !rawModLogChannel.isDMBased() ? rawModLogChannel as TextChannel : undefined;
         if (modLogChannel) {
           const restartEmbed = new EmbedBuilder()
             .setColor(0x57F287)

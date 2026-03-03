@@ -6,7 +6,9 @@ import { logAuditEvent } from './audit-log.js';
 function getModLogChannel(guild: Guild): TextChannel | null {
   if (!CHANNELS.modLog) return null;
   if (guild.id !== GUILD_ID) return null;
-  return guild.channels.cache.get(CHANNELS.modLog) as TextChannel | null ?? null;
+  const channel = guild.channels.cache.get(CHANNELS.modLog);
+  if (!channel || !channel.isTextBased() || channel.isDMBased()) return null;
+  return channel as TextChannel;
 }
 
 // ─── Anti-raid state ───────────────────────────────────────
@@ -93,14 +95,22 @@ export function setupModLog(client: Client): void {
         raidModeTimer = null;
         recentJoins.length = 0; // Clear stale join timestamps
         console.log('[Peaches] Anti-raid: raid mode cleared after 10 minutes');
+        // Re-fetch guild from client cache — the original member.guild reference may be stale after 10 minutes
+        const freshGuild = client.guilds.cache.get(GUILD_ID);
+        if (!freshGuild) {
+          console.error('[Peaches] Anti-raid: guild not found in cache during raid mode reset');
+          preRaidVerificationLevel = null;
+          return;
+        }
+        const freshLogChannel = getModLogChannel(freshGuild);
         try {
-          await member.guild.setVerificationLevel(restoreLevel);
+          await freshGuild.setVerificationLevel(restoreLevel);
           const resetEmbed = new EmbedBuilder()
             .setColor(0x57F287)
             .setTitle('\u2705 Raid Mode Deactivated')
             .setDescription(`Server verification level has been restored to **${restoreLevelName}** automatically after 10 minutes.`)
             .setTimestamp();
-          logChannel.send({ embeds: [resetEmbed] }).catch(() => {});
+          freshLogChannel?.send({ embeds: [resetEmbed] }).catch(() => {});
         } catch (err) {
           console.error('[Peaches] Anti-raid: FAILED to lower verification level — it may still be High! Manual reset needed:', err);
           const failEmbed = new EmbedBuilder()
@@ -108,7 +118,7 @@ export function setupModLog(client: Client): void {
             .setTitle('\u26A0\uFE0F Raid Mode Reset FAILED')
             .setDescription(`**Could not lower verification level automatically.** A moderator must manually set it back to **${restoreLevelName}** in Server Settings \u2192 Safety Setup.`)
             .setTimestamp();
-          logChannel.send({ content: '@here', embeds: [failEmbed] }).catch(() => {});
+          freshLogChannel?.send({ content: '@here', embeds: [failEmbed] }).catch(() => {});
         }
         preRaidVerificationLevel = null;
       }, 10 * 60 * 1000);

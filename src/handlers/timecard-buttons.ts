@@ -3,7 +3,6 @@ import {
   type ButtonInteraction,
   type Client,
   type GuildMember,
-  type TextChannel,
 } from 'discord.js';
 import {
   TIMECARD_DEPARTMENTS,
@@ -63,7 +62,8 @@ export async function handleTimecardClockIn(interaction: ButtonInteraction, clie
   });
 
   // Post public embed in channel
-  const channel = interaction.channel as TextChannel;
+  const channel = interaction.channel;
+  if (!channel?.isTextBased() || channel.isDMBased()) return;
   const embed = new EmbedBuilder()
     .setColor(0x57F287)
     .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Timecard', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
@@ -136,13 +136,14 @@ export async function handleTimecardClockOut(interaction: ButtonInteraction, cli
   });
 
   // Post public embed in channel
-  const channel = interaction.channel as TextChannel;
+  const outChannel = interaction.channel;
+  if (!outChannel?.isTextBased() || outChannel.isDMBased()) return;
   const embed = new EmbedBuilder()
     .setColor(0xED4245)
     .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Timecard', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setDescription(`\uD83D\uDD34 **${member.displayName}** clocked out \u2014 Session: **${duration}**`);
 
-  await channel.send({ embeds: [embed] }).catch(() => {});
+  await outChannel.send({ embeds: [embed] }).catch(() => {});
 
   // Audit log
   if (interaction.guild) {

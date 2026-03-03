@@ -250,15 +250,17 @@ export async function handleTicketClose(interaction: ButtonInteraction, client: 
   }
   const isStaff = isStaffForTicket(member, ticket.department);
 
+  const ticketId = String(ticket.ticketNumber).padStart(4, '0');
+
   if (isStaff) {
     const staffRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId('ticket_confirm_close')
+        .setCustomId(`ticket_confirm_close_${ticketId}`)
         .setLabel('Close Ticket')
         .setStyle(ButtonStyle.Danger)
         .setEmoji('\uD83D\uDD12'),
       new ButtonBuilder()
-        .setCustomId('ticket_cancel_close')
+        .setCustomId(`ticket_cancel_close_${ticketId}`)
         .setLabel('Nevermind')
         .setStyle(ButtonStyle.Secondary),
     );
@@ -270,12 +272,12 @@ export async function handleTicketClose(interaction: ButtonInteraction, client: 
   } else if (member.id === ticket.discordUserId) {
     const ownerRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId('ticket_owner_request_close')
+        .setCustomId(`ticket_owner_request_close_${ticketId}`)
         .setLabel('Yes, Request Close')
         .setStyle(ButtonStyle.Danger)
         .setEmoji('\uD83D\uDD12'),
       new ButtonBuilder()
-        .setCustomId('ticket_cancel_close')
+        .setCustomId(`ticket_cancel_close_${ticketId}`)
         .setLabel('Nevermind')
         .setStyle(ButtonStyle.Secondary),
     );
@@ -321,14 +323,15 @@ export async function handleTicketOwnerRequestClose(interaction: ButtonInteracti
   }
   const staffMentions = getStaffMentions(guild, ticket.department);
 
+  const ownerTicketId = String(ticket.ticketNumber).padStart(4, '0');
   const staffConfirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId('ticket_confirm_close')
+      .setCustomId(`ticket_confirm_close_${ownerTicketId}`)
       .setLabel('Approve & Close')
       .setStyle(ButtonStyle.Danger)
       .setEmoji('\uD83D\uDD12'),
     new ButtonBuilder()
-      .setCustomId('ticket_deny_close')
+      .setCustomId(`ticket_deny_close_${ownerTicketId}`)
       .setLabel('Keep Open')
       .setStyle(ButtonStyle.Success)
       .setEmoji('\u2705'),
@@ -475,8 +478,9 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
     return;
   }
 
+  const addUserTicketId = String(ticket.ticketNumber).padStart(4, '0');
   const modal = new ModalBuilder()
-    .setCustomId('ticket_adduser_modal')
+    .setCustomId(`ticket_adduser_modal_${addUserTicketId}`)
     .setTitle('Add User to Ticket');
 
   const input = new TextInputBuilder()

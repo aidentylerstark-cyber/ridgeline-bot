@@ -12,13 +12,10 @@ import {
   type GuildMember,
 } from 'discord.js';
 
-import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
+import { CHANNELS } from '../config.js';
 import { createSuggestion, getSuggestion, updateSuggestionStatus, updateSuggestionMessageId } from '../storage.js';
 import { logAuditEvent } from './audit-log.js';
-
-function isStaff(member: GuildMember): boolean {
-  return GLOBAL_STAFF_ROLES.some(roleName => member.roles.cache.some(r => r.name === roleName));
-}
+import { isStaff } from '../utilities/permissions.js';
 
 export async function handleSuggestCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   const idea = interaction.options.getString('idea', true);

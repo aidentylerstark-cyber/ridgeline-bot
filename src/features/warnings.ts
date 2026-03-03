@@ -1,11 +1,8 @@
 import { EmbedBuilder, type Client, type ChatInputCommandInteraction, type GuildMember } from 'discord.js';
-import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
+import { CHANNELS } from '../config.js';
 import { addWarning, getWarnings, getWarningCount, clearWarning } from '../storage.js';
 import { logAuditEvent } from './audit-log.js';
-
-function isStaff(member: GuildMember): boolean {
-  return GLOBAL_STAFF_ROLES.some(r => member.roles.cache.some(role => role.name === r));
-}
+import { isStaff } from '../utilities/permissions.js';
 
 export async function handleWarnCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   const member = interaction.member as GuildMember | null;

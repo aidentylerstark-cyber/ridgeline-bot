@@ -22,13 +22,14 @@ import { handleAnnounceCommand } from '../features/announce.js';
 import { handleWarnCommand, handleWarningsCommand, handleClearWarnCommand } from '../features/warnings.js';
 import { handleAuditLogCommand } from '../features/audit-log.js';
 import { handleRegionCommand } from '../features/region-monitoring.js';
-import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
+import { CHANNELS } from '../config.js';
+import { isStaff } from '../utilities/permissions.js';
 
 // ── Help command handler ──
 
 async function handleHelpCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
-  const isStaff = interaction.member
-    ? GLOBAL_STAFF_ROLES.some(r => (interaction.member as GuildMember).roles.cache.some(role => role.name === r))
+  const memberIsStaff = interaction.member
+    ? isStaff(interaction.member as GuildMember)
     : false;
 
   const embed = new EmbedBuilder()
@@ -51,7 +52,7 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
       },
       { name: '💡 Suggestions', value: '`/suggest <idea>` — Submit a suggestion for Ridgeline' },
       { name: '🎟️ Tickets', value: `Click "Open a Ticket" in <#${CHANNELS.ticketPanel}> for staff support` },
-      ...(isStaff ? [
+      ...(memberIsStaff ? [
         {
           name: '📢 Staff — Announcements',
           value: '`/announce <title> <message> [channel] [ping]` — Post an announcement',
@@ -106,14 +107,15 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     { match: 'suggestion_inprogress_', handler: (i, c) => handleSuggestionReview(i, 'in-progress', c) },
     { match: 'suggestion_implemented_', handler: (i, c) => handleSuggestionReview(i, 'implemented', c) },
     { match: 'ticket_open', exact: true, handler: (i, c) => handleTicketOpen(i, c, ticketCooldowns) },
-    { match: 'ticket_claim', exact: true, handler: handleTicketClaim },
-    { match: 'ticket_unclaim', exact: true, handler: handleTicketUnclaim },
-    { match: 'ticket_close', exact: true, handler: handleTicketClose },
-    { match: 'ticket_owner_request_close', exact: true, handler: handleTicketOwnerRequestClose },
-    { match: 'ticket_confirm_close', exact: true, handler: handleTicketConfirmClose },
-    { match: 'ticket_deny_close', exact: true, handler: handleTicketDenyClose },
-    { match: 'ticket_cancel_close', exact: true, handler: (i) => handleTicketCancelClose(i) },
-    { match: 'ticket_adduser', exact: true, handler: handleTicketAddUser },
+    // More-specific ticket prefixes MUST come before shorter ones to avoid false matches
+    { match: 'ticket_owner_request_close_', handler: handleTicketOwnerRequestClose },
+    { match: 'ticket_confirm_close_', handler: handleTicketConfirmClose },
+    { match: 'ticket_cancel_close_', handler: (i) => handleTicketCancelClose(i) },
+    { match: 'ticket_deny_close_', handler: handleTicketDenyClose },
+    { match: 'ticket_unclaim_', handler: handleTicketUnclaim },
+    { match: 'ticket_claim_', handler: handleTicketClaim },
+    { match: 'ticket_close_', handler: handleTicketClose },
+    { match: 'ticket_adduser_', handler: handleTicketAddUser },
     { match: 'timecard_clockin_', handler: handleTimecardClockIn },
     { match: 'timecard_clockout_', handler: handleTimecardClockOut },
     { match: 'timecard_myhours_', handler: handleTimecardMyHours },
@@ -155,7 +157,7 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
           await handleTicketModalSubmit(interaction, client, ticketCooldowns);
           return;
         }
-        if (interaction.customId === 'ticket_adduser_modal') {
+        if (interaction.customId.startsWith('ticket_adduser_modal_')) {
           await handleTicketAddUserModal(interaction, client);
           return;
         }
@@ -164,8 +166,12 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     } catch (err) {
       console.error('[Peaches] Interaction handler error:', err);
       try {
-        if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: `Something went sideways, sugar. Try again in a sec! 🍑`, flags: 64 });
+        if (interaction.isRepliable()) {
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: `Something went sideways, sugar. Try again in a sec! 🍑`, flags: 64 });
+          } else if (interaction.deferred && !interaction.replied) {
+            await interaction.editReply({ content: `Something went sideways, sugar. Try again in a sec! 🍑` });
+          }
         }
       } catch {
         // Interaction already timed out or handled

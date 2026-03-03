@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { Message, TextChannel } from 'discord.js';
+import type { Message } from 'discord.js';
 import { FAQ_RESPONSES } from './faq.js';
 import { PEACHES_PATTERNS, PEACHES_GREETINGS, PEACHES_FALLBACK, pick } from './keywords.js';
 import { addToMemory, getConversationHistory } from './memory.js';
@@ -69,6 +69,27 @@ const anthropic = process.env.ANTHROPIC_API_KEY
 let anthropicConcurrent = 0;
 const ANTHROPIC_MAX_CONCURRENT = 5;
 
+/** Split text into chunks that respect newline and word boundaries. */
+function splitAtWordBoundary(text: string, maxLen: number): string[] {
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > maxLen) {
+    // Try to split at the last newline within the limit
+    let splitIdx = remaining.lastIndexOf('\n', maxLen);
+    // Fall back to last space within the limit
+    if (splitIdx <= 0) splitIdx = remaining.lastIndexOf(' ', maxLen);
+    // If no word boundary found, hard-split at maxLen
+    if (splitIdx <= 0) splitIdx = maxLen;
+
+    chunks.push(remaining.slice(0, splitIdx).trimEnd());
+    remaining = remaining.slice(splitIdx).trimStart();
+  }
+
+  if (remaining.length > 0) chunks.push(remaining);
+  return chunks;
+}
+
 export async function processChatbotMessage(
   message: Message,
   query: string,
@@ -77,7 +98,8 @@ export async function processChatbotMessage(
   // 1. FAQ fast-path
   for (const faq of FAQ_RESPONSES) {
     if (faq.compiledTriggers.some(re => re.test(query))) {
-      console.log(`[Peaches] FAQ response to ${message.author.displayName} in #${(message.channel as TextChannel).name}: "${query}" \u2192 matched "${faq.triggers[0]}"`);
+      const channelName = 'name' in message.channel ? message.channel.name : message.channelId;
+      console.log(`[Peaches] FAQ response to ${message.author.displayName} in #${channelName}: "${query}" \u2192 matched "${faq.triggers[0]}"`);
       await message.reply(faq.response);
       return;
     }
@@ -200,10 +222,12 @@ export async function processChatbotMessage(
         if (reply.length <= 2000) {
           await message.reply(reply);
         } else {
-          const chunks = reply.match(/[\s\S]{1,1990}/g) ?? [reply];
+          const chunks = splitAtWordBoundary(reply, 1990);
           for (let i = 0; i < chunks.length; i++) {
             if (i === 0) await message.reply(chunks[i]!);
-            else await (message.channel as TextChannel).send(chunks[i]!);
+            else if (message.channel.isTextBased() && 'send' in message.channel) {
+              await message.channel.send(chunks[i]!);
+            }
           }
         }
         return;

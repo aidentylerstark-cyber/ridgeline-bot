@@ -27,6 +27,7 @@ import { destroyAuditLogInterval } from './features/audit-log.js';
 import { startRegionWebhookServer } from './api/region-webhook.js';
 import { scheduleRegionDailySummary } from './scheduled/region-daily-summary.js';
 import { destroyRegionCooldowns } from './features/region-monitoring.js';
+import { pool } from './db/index.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) {
@@ -58,7 +59,6 @@ async function main() {
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
-      GatewayIntentBits.GuildMessageReactions,
       GatewayIntentBits.GuildPresences,        // Required for online count in stats VCs (privileged — enable in Dev Portal)
     ],
     makeCache: Options.cacheWithLimits({
@@ -66,7 +66,7 @@ async function main() {
       GuildEmojiManager: 0,
       GuildStickerManager: 0,
       VoiceStateManager: 0,
-      ThreadManager: 0,
+      ThreadManager: 25,
     }),
     sweepers: {
       messages: { interval: 300, lifetime: 600 },
@@ -130,6 +130,7 @@ async function main() {
     clearRaidModeTimer();
     regionServer.close();
     client.destroy();
+    await pool.end().catch(err => console.error('[Peaches] Failed to close DB pool:', err));
     process.exit(0);
   };
 

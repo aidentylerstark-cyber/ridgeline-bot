@@ -11,7 +11,7 @@ import {
   type TextChannel,
 } from 'discord.js';
 import { pool } from '../db/index.js';
-import { CHANNELS, GLOBAL_STAFF_ROLES } from '../config.js';
+import { CHANNELS } from '../config.js';
 import { getContentByKey, setContentByKey } from '../storage.js';
 
 // ─────────────────────────────────────────
@@ -205,7 +205,8 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
       // Surface critical failures in #mod-log so staff are aware
       if (isCritical) {
         try {
-          const modLogChannel = guild.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
+          const rawFailChannel = guild.channels.cache.get(CHANNELS.modLog);
+          const modLogChannel = rawFailChannel?.isTextBased() && !rawFailChannel.isDMBased() ? rawFailChannel as TextChannel : undefined;
           if (modLogChannel) {
             const failEmbed = new EmbedBuilder()
               .setColor(0xFF0000)
@@ -225,7 +226,8 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
     if (SKIP_EMBED_ACTIONS.includes(data.action)) return;
 
     try {
-      const modLogChannel = guild.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
+      const rawLogChannel = guild.channels.cache.get(CHANNELS.modLog);
+      const modLogChannel = rawLogChannel?.isTextBased() && !rawLogChannel.isDMBased() ? rawLogChannel as TextChannel : undefined;
       if (!modLogChannel) return;
 
       const severity = data.severity ?? 'info';
@@ -274,12 +276,10 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
 }
 
 // ─────────────────────────────────────────
-// Staff Check
+// Staff Check (imported from shared utility)
 // ─────────────────────────────────────────
 
-function isStaff(member: GuildMember): boolean {
-  return GLOBAL_STAFF_ROLES.some(r => member.roles.cache.some(role => role.name === r));
-}
+import { isStaff } from '../utilities/permissions.js';
 
 // ─────────────────────────────────────────
 // Date Preset Parser
@@ -323,6 +323,15 @@ function parseDatePreset(input: string): Date | null {
   const year = parsed.getFullYear();
   if (year < 2000 || year > 2100) return null;
   return parsed;
+}
+
+// ─────────────────────────────────────────
+// ILIKE Escape Helper
+// ─────────────────────────────────────────
+
+/** Escape special characters in user input for use in ILIKE patterns. */
+function escapeIlike(input: string): string {
+  return input.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
 // ─────────────────────────────────────────
@@ -374,7 +383,7 @@ function buildAuditQuery(filters: AuditQueryFilters): { whereClause: string; par
 
   if (filters.reference) {
     conditions.push(`reference_id ILIKE $${paramIdx}`);
-    params.push(`%${filters.reference}%`);
+    params.push(`%${escapeIlike(filters.reference)}%`);
     paramIdx++;
   }
 

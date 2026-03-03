@@ -1,14 +1,18 @@
 import { pool } from "./index.js";
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
 import type { PoolClient } from "pg";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * One-time migration: seed discord bot tables from JSON files if they exist
  * and the tables are empty. Safe to run multiple times.
  */
 async function migrateJsonData(client: PoolClient): Promise<void> {
-  const dataDir = path.join(process.cwd(), "data");
+  // Resolve data directory relative to source file (works regardless of cwd)
+  const dataDir = path.resolve(__dirname, "../../data");
 
   // Migrate tickets
   try {

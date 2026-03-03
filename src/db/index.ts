@@ -18,6 +18,7 @@ const pool = new Pool({
   max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  statement_timeout: 10000,
 });
 
 // Handle pool errors
