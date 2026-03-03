@@ -1,0 +1,25 @@
+[Unit]
+Description=Ridgeline Website
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/apps/ridgeline-website
+ExecStart=/usr/bin/node dist/index.cjs
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ridgeline-web
+EnvironmentFile=/opt/apps/ridgeline-website/.env
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/apps/ridgeline-website
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

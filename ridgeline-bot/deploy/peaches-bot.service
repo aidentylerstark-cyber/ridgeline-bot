@@ -1,0 +1,25 @@
+[Unit]
+Description=Peaches Discord Bot
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/apps/ridgeline-bot
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=peaches-bot
+EnvironmentFile=/opt/apps/ridgeline-bot/.env
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/apps/ridgeline-bot
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

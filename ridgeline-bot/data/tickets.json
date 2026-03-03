@@ -1,0 +1,104 @@
+{
+  "nextTicketNumber": 3015,
+  "openTickets": {
+    "1473284943831367701": {
+      "ticketNumber": 180,
+      "department": "rental",
+      "userId": "964438522230636544",
+      "userName": "nevaeh.black",
+      "slName": "Not provided (migrated)",
+      "subject": "Migrated from old ticket system (rentallandscaping-support-180)",
+      "channelId": "1473284943831367701",
+      "claimedBy": "201896413444046849",
+      "createdAt": "2026-02-17T11:48:22.920Z"
+    },
+    "1465142831315419199": {
+      "ticketNumber": 137,
+      "department": "general",
+      "userId": "803814794539827271",
+      "userName": "braelin.b",
+      "slName": "Not provided (migrated)",
+      "subject": "Migrated from old ticket system (general-support-137)",
+      "channelId": "1465142831315419199",
+      "claimedBy": null,
+      "createdAt": "2026-01-26T00:34:32.023Z"
+    },
+    "1469148757235990668": {
+      "ticketNumber": 151,
+      "department": "general",
+      "userId": "179325860191535104",
+      "userName": "kai.409",
+      "slName": "Not provided (migrated)",
+      "subject": "Migrated from old ticket system (general-support-151)",
+      "channelId": "1469148757235990668",
+      "claimedBy": null,
+      "createdAt": "2026-02-06T01:52:39.189Z"
+    },
+    "1474504691416305774": {
+      "ticketNumber": 184,
+      "department": "general",
+      "userId": "372499125624766464",
+      "userName": "opheliasolace",
+      "slName": "Not provided (migrated)",
+      "subject": "Migrated from old ticket system (general-support-184)",
+      "channelId": "1474504691416305774",
+      "claimedBy": null,
+      "createdAt": "2026-02-20T20:35:13.406Z"
+    },
+    "1475216884298289262": {
+      "ticketNumber": 190,
+      "department": "rental",
+      "userId": "869057326756266044",
+      "userName": "eosinophil.",
+      "slName": "Not provided (migrated)",
+      "subject": "Migrated from old ticket system (rentallandscaping-support-190)",
+      "channelId": "1475216884298289262",
+      "claimedBy": null,
+      "createdAt": "2026-02-22T19:45:13.421Z"
+    },
+    "1474801368693735437": {
+      "ticketNumber": 188,
+      "department": "general",
+      "userId": "270363319188062208",
+      "userName": "jesiej",
+      "slName": "Not provided (migrated)",
+      "subject": "Migrated from old ticket system (general-support-188)",
+      "channelId": "1474801368693735437",
+      "claimedBy": null,
+      "createdAt": "2026-02-21T16:14:06.781Z"
+    },
+    "1410320725084213259": {
+      "ticketNumber": 3014,
+      "department": "roleplay",
+      "userId": "803814794539827271",
+      "userName": "braelin.b",
+      "slName": "Not provided (migrated)",
+      "subject": "Migrated from old ticket system (ticket-3014)",
+      "channelId": "1410320725084213259",
+      "claimedBy": null,
+      "createdAt": "2025-08-27T17:51:03.352Z"
+    },
+    "1475263986550309131": {
+      "ticketNumber": 191,
+      "department": "rental",
+      "userId": "790337948750970950",
+      "userName": "jasminerosa",
+      "slName": "Not provided (migrated)",
+      "subject": "Migrated from old ticket system (rentallandscaping-support-191)",
+      "channelId": "1475263986550309131",
+      "claimedBy": null,
+      "createdAt": "2026-02-22T22:52:23.473Z"
+    },
+    "1470573364090507437": {
+      "ticketNumber": 159,
+      "department": "events",
+      "userId": "803814794539827271",
+      "userName": "braelin.b",
+      "slName": "Not provided (migrated)",
+      "subject": "Migrated from old ticket system (events-support-159)",
+      "channelId": "1470573364090507437",
+      "claimedBy": null,
+      "createdAt": "2026-02-10T00:13:31.931Z"
+    }
+  }
+}
