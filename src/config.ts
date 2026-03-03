@@ -27,7 +27,6 @@ export const CHANNELS = {
   foodLovers: '1380939549185675344',
   botCommands: '1097051267207008327',
   // New feature channels — fill in IDs after creating channels in Discord
-  hallOfFame: '1475717471934746858',       // Starboard destination (#hall-of-fame)
   modLog: '1475717473989820489',           // Mod log channel (staff-only, #mod-log)
   statsMembersVC: '1475717469791457352',   // Voice channel showing member count (e.g. "Members: 247")
   statsOnlineVC: '1475717470936498176',    // Voice channel showing online count (e.g. "Online: 43")

@@ -154,57 +154,6 @@ export async function runMigrations(): Promise<void> {
         ON discord_tickets (closed_at) WHERE is_closed = true
     `);
 
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS discord_kudos (
-        id SERIAL PRIMARY KEY,
-        recipient_discord_id VARCHAR(30) NOT NULL,
-        giver_discord_id VARCHAR(30) NOT NULL,
-        reason TEXT NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      )
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_discord_kudos_recipient
-        ON discord_kudos (recipient_discord_id)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_discord_kudos_giver_date
-        ON discord_kudos (giver_discord_id, created_at DESC)
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS discord_member_xp (
-        id SERIAL PRIMARY KEY,
-        discord_user_id VARCHAR(30) NOT NULL UNIQUE,
-        total_xp INTEGER NOT NULL DEFAULT 0,
-        level INTEGER NOT NULL DEFAULT 0,
-        message_count INTEGER NOT NULL DEFAULT 0,
-        last_xp_awarded_at TIMESTAMP,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-      )
-    `);
-
-    // Streak columns for XP system
-    await client.query(`
-      ALTER TABLE discord_member_xp ADD COLUMN IF NOT EXISTS current_streak INTEGER NOT NULL DEFAULT 0
-    `);
-    await client.query(`
-      ALTER TABLE discord_member_xp ADD COLUMN IF NOT EXISTS last_streak_date VARCHAR(10)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_discord_member_xp_user
-      ON discord_member_xp (discord_user_id)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_discord_member_xp_leaderboard
-      ON discord_member_xp (total_xp DESC)
-    `);
-
     // Suggestions table
     await client.query(`
       CREATE TABLE IF NOT EXISTS discord_suggestions (
@@ -226,16 +175,6 @@ export async function runMigrations(): Promise<void> {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_discord_suggestions_message
         ON discord_suggestions (message_id) WHERE message_id IS NOT NULL
-    `);
-
-    // Starboard table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS discord_starboard (
-        id SERIAL PRIMARY KEY,
-        source_message_id VARCHAR(30) NOT NULL UNIQUE,
-        starboard_message_id VARCHAR(30),
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      )
     `);
 
     // Warnings table

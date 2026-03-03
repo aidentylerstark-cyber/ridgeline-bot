@@ -57,6 +57,7 @@ async function main() {
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildPresences,        // Required for online count in stats VCs (privileged — enable in Dev Portal)
+      GatewayIntentBits.GuildModeration,       // Required for guildBanAdd/guildBanRemove events (mod log)
     ],
     partials: [
       Partials.Message,  // Required so messageDelete fires for uncached messages (mod log)
