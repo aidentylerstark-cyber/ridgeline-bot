@@ -17,7 +17,7 @@ import { REGION_SNAPSHOT_RETENTION_DAYS } from '../config.js';
 import { logAuditEvent } from '../features/audit-log.js';
 import { withRetry } from '../utilities/retry.js';
 
-export function scheduleCleanup(client: Client): cron.ScheduledTask {
+export function scheduleCleanup(client: Client): { stop: () => void; start: () => void } {
   // ── Role removal check: every 15 minutes ──
   const roleTask = cron.schedule('*/15 * * * *', async () => {
     if (!isBotActive()) return;
@@ -134,5 +134,5 @@ export function scheduleCleanup(client: Client): cron.ScheduledTask {
   return {
     stop: () => { roleTask.stop(); purgeTask.stop(); },
     start: () => { roleTask.start(); purgeTask.start(); },
-  } as cron.ScheduledTask;
+  };
 }

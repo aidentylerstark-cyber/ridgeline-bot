@@ -3,7 +3,6 @@ import { GUILD_ID, CHANNELS } from '../config.js';
 import { claimInstanceLock, startInstanceHeartbeat } from '../utilities/instance-lock.js';
 import { registerSlashCommands } from '../commands/index.js';
 import { updateStatsChannels } from '../features/stats-channels.js';
-import { postTimecardPanel } from '../panels/timecard-panel.js';
 
 let _statsInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -83,13 +82,6 @@ export function setupReadyHandler(client: Client) {
       console.error('[Discord Bot] Could not pin stats category (non-fatal):', err);
     }
 
-    // Post timecard panels (creates channels if missing)
-    try {
-      await postTimecardPanel(client);
-    } catch (err) {
-      console.error('[Peaches] Failed to post timecard panels (non-fatal):', err);
-    }
-
     // Notify mod-log that the bot has restarted + check for stale raid mode
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
@@ -122,6 +114,17 @@ export function setupReadyHandler(client: Client) {
       }
     } catch {
       // Non-critical — don't block startup
+    }
+
+    // Pre-fetch all members so the cache is populated for accurate online/member counts
+    try {
+      const guild = client.guilds.cache.get(GUILD_ID);
+      if (guild) {
+        await guild.members.fetch();
+        console.log(`[Discord Bot] Pre-fetched ${guild.memberCount} members for stats`);
+      }
+    } catch (err) {
+      console.error('[Discord Bot] Failed to pre-fetch members (non-fatal):', err);
     }
 
     // Start stats channel update interval (every 10 minutes)

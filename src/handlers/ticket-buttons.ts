@@ -83,9 +83,6 @@ export async function handleTicketOpen(
     return;
   }
 
-  // Set cooldown after availability check so users don't burn cooldown when all departments are full
-  ticketCooldowns.set(member.id);
-
   const options = optionEntries.map(([key, config]) =>
     new StringSelectMenuOptionBuilder()
       .setLabel(config.label)
@@ -376,10 +373,15 @@ export async function handleTicketConfirmClose(interaction: ButtonInteraction, c
 
   const channel = interaction.channel as TextChannel;
 
-  await interaction.update({
-    content: `Ticket is being closed by ${member.displayName}... saving transcript... \uD83C\uDF51`,
-    components: [],
-  });
+  try {
+    await interaction.update({
+      content: `Ticket is being closed by ${member.displayName}... saving transcript... \uD83C\uDF51`,
+      components: [],
+    });
+  } catch (err) {
+    // Interaction token may have expired — still proceed with closing the ticket
+    console.warn('[Peaches] Ticket close interaction.update() failed (token may have expired):', err);
+  }
 
   await closeTicket(client, channel, member);
 }

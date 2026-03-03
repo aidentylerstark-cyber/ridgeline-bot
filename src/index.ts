@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Client, GatewayIntentBits, Options } from 'discord.js';
+import { Client, GatewayIntentBits, Options, Partials } from 'discord.js';
 import { runMigrations } from './db/migrate.js';
 import { TICKET_COOLDOWN_MS } from './config.js';
 import { CooldownManager } from './utilities/cooldowns.js';
@@ -17,9 +17,6 @@ import { postRoleButtons } from './panels/role-panel.js';
 import { postTicketPanel } from './panels/ticket-panel.js';
 import { postCommunityPoll } from './panels/polls.js';
 import { postTriggerReference } from './panels/trigger-reference.js';
-import { postTimecardPanel } from './panels/timecard-panel.js';
-import { scheduleTimecardPayroll } from './scheduled/timecard-payroll.js';
-import { scheduleTimecardAutoClockout } from './scheduled/timecard-auto-clockout.js';
 import { destroyMemory } from './chatbot/memory.js';
 import { reorganizeCategoryByKey } from './utilities/channel-reorg.js';
 import { setupModLog, clearRaidModeTimer } from './features/modlog.js';
@@ -61,6 +58,9 @@ async function main() {
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildPresences,        // Required for online count in stats VCs (privileged — enable in Dev Portal)
     ],
+    partials: [
+      Partials.Message,  // Required so messageDelete fires for uncached messages (mod log)
+    ],
     makeCache: Options.cacheWithLimits({
       MessageManager: 50,
       GuildEmojiManager: 0,
@@ -94,8 +94,6 @@ async function main() {
   client.postTicketPanel = () => postTicketPanel(client);
   client.postCommunityPoll = (q: string, opts: string[], dur?: number) => postCommunityPoll(client, q, opts, dur);
   client.postTriggerReference = () => postTriggerReference(client);
-  client.postTimecardPanel = (dept?: string) => postTimecardPanel(client, dept);
-
   // Login
   await client.login(token);
 
@@ -110,8 +108,6 @@ async function main() {
     scheduleStaffReport(client),
     scheduleTicketInactivityCheck(client),
     scheduleRegionDailySummary(client),
-    scheduleTimecardPayroll(client),
-    scheduleTimecardAutoClockout(client),
   ];
 
   // Graceful shutdown

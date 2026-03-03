@@ -241,8 +241,6 @@ export async function handleTicketModalSubmit(
     }
   }
 
-  // Cooldown was already set in handleTicketOpen — don't reset it here
-
   // Create the ticket channel
   const result = await createTicketChannel(client, guild, member, department, subject, slName);
   if (!result) {
@@ -253,6 +251,9 @@ export async function handleTicketModalSubmit(
   }
 
   const { channel, ticketNumber } = result;
+
+  // Set cooldown now that the ticket has been successfully created
+  ticketCooldowns.set(member.id);
 
   // Send opening embed with all info
   try {

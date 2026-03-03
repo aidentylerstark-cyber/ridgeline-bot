@@ -35,9 +35,7 @@ export type AuditAction =
   | 'role_remove'
   | 'announce_post'
   | 'member_join'
-  | 'member_leave'
-  | 'timecard_clock_in'
-  | 'timecard_clock_out';
+  | 'member_leave';
 
 export type AuditSeverity = 'info' | 'warning' | 'critical';
 
@@ -73,8 +71,6 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   announce_post:      'Announcement Posted',
   member_join:        'Member Joined',
   member_leave:       'Member Left',
-  timecard_clock_in:  'Timecard Clock In',
-  timecard_clock_out: 'Timecard Clock Out',
 };
 
 const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
@@ -95,8 +91,6 @@ const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
   announce_post:      0xD4A574,
   member_join:        0x57F287,
   member_leave:       0xED4245,
-  timecard_clock_in:  0x57F287,
-  timecard_clock_out: 0xED4245,
 };
 
 const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
@@ -117,8 +111,6 @@ const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
   announce_post:      '\uD83D\uDCE2',
   member_join:        '\uD83D\uDCE5',
   member_leave:       '\uD83D\uDCE4',
-  timecard_clock_in:  '\uD83D\uDFE2',
-  timecard_clock_out: '\uD83D\uDD34',
 };
 
 const SEVERITY_COLORS: Record<AuditSeverity, number> = {
@@ -297,23 +289,45 @@ function getETDateParts(now: Date): { year: number; month: number; day: number; 
   return { year: get('year'), month: get('month'), day: get('day'), dayOfWeek: dayMap[weekdayStr] ?? 0 };
 }
 
+/**
+ * Convert an ET date (year/month/day at midnight) to the correct UTC Date,
+ * accounting for EST (UTC-5) vs EDT (UTC-4) automatically.
+ */
+function etMidnightToUTC(year: number, month: number, day: number): Date {
+  // Rough UTC guess assuming EST (UTC-5)
+  const roughUtc = new Date(Date.UTC(year, month - 1, day, 5, 0));
+  // Check what ET clock shows for that UTC instant
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(roughUtc);
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0', 10);
+  const etShowing = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  const targetET = Date.UTC(year, month - 1, day, 0, 0, 0);
+  return new Date(roughUtc.getTime() - (etShowing - targetET));
+}
+
 function parseDatePreset(input: string): Date | null {
   const now = new Date();
   const lower = input.trim().toLowerCase();
 
   if (lower === 'today') {
     const { year, month, day } = getETDateParts(now);
-    return new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00Z`);
+    return etMidnightToUTC(year, month, day);
   }
   if (lower === 'this-week') {
     const { year, month, day, dayOfWeek } = getETDateParts(now);
+    // Calculate Sunday (start of week) in ET, then convert to UTC
     const d = new Date(Date.UTC(year, month - 1, day));
-    d.setUTCDate(d.getUTCDate() - dayOfWeek); // Start of week (Sunday)
-    return d;
+    d.setUTCDate(d.getUTCDate() - dayOfWeek);
+    return etMidnightToUTC(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
   }
   if (lower === 'this-month') {
     const { year, month } = getETDateParts(now);
-    return new Date(Date.UTC(year, month - 1, 1));
+    return etMidnightToUTC(year, month, 1);
   }
 
   // Try YYYY-MM-DD

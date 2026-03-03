@@ -16,7 +16,6 @@ export async function handleRoleButton(interaction: ButtonInteraction, client: C
   }
 
   const role = guild.roles.cache.find(r => r.name === roleName)
-    ?? guild.roles.cache.find(r => r.name.endsWith(roleName))
     ?? guild.roles.cache.find(r => r.name.replace(/[^\w\s/]/g, '').trim() === roleName);
   if (!role) {
     await interaction.reply({ content: `Could not find the role "${roleName}".`, flags: 64 });
