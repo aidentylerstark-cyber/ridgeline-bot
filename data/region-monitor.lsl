@@ -6,12 +6,23 @@
 
 string WEBHOOK_URL = "https://ridgeline-bot-production.up.railway.app/api/region-status";
 string SECRET       = "YOUR_REGION_MONITORING_SECRET";
-string REGION_NAME  = "Ridgeline North"; // Must match config: North / South / East / West
+string REGION_NAME  = "Ridgeline North"; // Must match config: Cherokee Rose / Oakley Springs / Crescent Creek / MeadowView Heights
 
 float TIMER_INTERVAL = 900.0; // 15 minutes
 integer MAX_AGENTS   = 100;
 
 key g_httpRequest;
+
+// ── Escape quotes for JSON safety ──
+
+string jsonSafe(string s)
+{
+    list parts = llParseString2List(s, ["\""], []);
+    s = llDumpList2String(parts, "'");
+    parts = llParseString2List(s, ["\\"], []);
+    s = llDumpList2String(parts, "");
+    return s;
+}
 
 // ── Build JSON payload and POST ──
 
@@ -25,7 +36,7 @@ sendUpdate(string eventType)
         count = MAX_AGENTS;
     }
 
-    // Build agent array with UUID + display name
+    // Build agent array with full details
     string agentsJson = "[";
     integer i;
     for (i = 0; i < count; i++)
@@ -36,11 +47,46 @@ sendUpdate(string eventType)
         {
             name = llKey2Name(agentKey);
         }
+
+        // Get agent details in one call
+        list details = llGetObjectDetails(agentKey, [
+            OBJECT_POS,
+            OBJECT_RUNNING_SCRIPT_COUNT,
+            OBJECT_SCRIPT_MEMORY,
+            OBJECT_SCRIPT_TIME,
+            OBJECT_BODY_SHAPE_TYPE,
+            OBJECT_GROUP_TAG
+        ]);
+
+        vector pos = llList2Vector(details, 0);
+        integer scripts = llList2Integer(details, 1);
+        integer memory = llList2Integer(details, 2);
+        float scriptTime = llList2Float(details, 3);
+        float bodyShape = llList2Float(details, 4);
+        string groupTag = llList2String(details, 5);
+
+        // Get parcel name at agent's position
+        list parcelInfo = llGetParcelDetails(pos, [PARCEL_DETAILS_NAME]);
+        string parcelName = llList2String(parcelInfo, 0);
+
+        string gender = "F";
+        if (bodyShape > 0.5)
+        {
+            gender = "M";
+        }
+
         if (i > 0)
         {
             agentsJson += ",";
         }
-        agentsJson += "{\"key\":\"" + (string)agentKey + "\",\"name\":\"" + name + "\"}";
+        agentsJson += "{\"key\":\"" + (string)agentKey
+            + "\",\"name\":\"" + jsonSafe(name)
+            + "\",\"scripts\":" + (string)scripts
+            + ",\"memory\":" + (string)memory
+            + ",\"time\":" + (string)scriptTime
+            + ",\"gender\":\"" + gender
+            + "\",\"tag\":\"" + jsonSafe(groupTag)
+            + "\",\"parcel\":\"" + jsonSafe(parcelName) + "\"}";
     }
     agentsJson += "]";
 

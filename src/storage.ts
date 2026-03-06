@@ -2,8 +2,8 @@ import { eq, and } from "drizzle-orm";
 import { db, pool } from "./db/index.js";
 import {
   siteContent, discordTickets, discordBirthdays,
-  discordSuggestions, discordWarnings,
-  type SiteContent, type DiscordTicket, type DiscordBirthday,
+  discordSuggestions, discordWarnings, discordTicketNotes,
+  type SiteContent, type DiscordTicket, type DiscordTicketNote, type DiscordBirthday,
   type DiscordSuggestion, type DiscordWarning,
 } from "./db/schema.js";
 
@@ -95,6 +95,219 @@ export async function closeDiscordTicket(channelId: string, closedBy: string): P
   await db.update(discordTickets)
     .set({ isClosed: true, closedBy, closedAt: new Date() })
     .where(and(eq(discordTickets.channelId, channelId), eq(discordTickets.isClosed, false)));
+}
+
+// ── Priority & Status ──
+
+export async function updateTicketPriority(channelId: string, priority: string): Promise<void> {
+  await db.update(discordTickets)
+    .set({ priority })
+    .where(and(eq(discordTickets.channelId, channelId), eq(discordTickets.isClosed, false)));
+}
+
+export async function updateTicketStatus(channelId: string, status: string): Promise<void> {
+  await db.update(discordTickets)
+    .set({ status })
+    .where(and(eq(discordTickets.channelId, channelId), eq(discordTickets.isClosed, false)));
+}
+
+// ── Notes ──
+
+export async function addTicketNote(ticketId: number, staffDiscordId: string, content: string): Promise<DiscordTicketNote> {
+  const [row] = await db.insert(discordTicketNotes).values({ ticketId, staffDiscordId, content }).returning();
+  return row;
+}
+
+export async function getTicketNotes(ticketId: number): Promise<DiscordTicketNote[]> {
+  return db.select().from(discordTicketNotes).where(eq(discordTicketNotes.ticketId, ticketId));
+}
+
+// ── User ticket queries ──
+
+export async function getOpenTicketsByUser(discordUserId: string): Promise<DiscordTicket[]> {
+  return db.select().from(discordTickets)
+    .where(and(eq(discordTickets.discordUserId, discordUserId), eq(discordTickets.isClosed, false)));
+}
+
+export async function getOpenTicketsClaimedBy(staffDiscordId: string): Promise<DiscordTicket[]> {
+  return db.select().from(discordTickets)
+    .where(and(eq(discordTickets.claimedBy, staffDiscordId), eq(discordTickets.isClosed, false)));
+}
+
+// ── Ticket search ──
+
+export interface TicketSearchFilters {
+  ticketNumber?: number;
+  userId?: string;
+  department?: string;
+  status?: string;
+}
+
+export interface TicketSearchRow {
+  id: number;
+  ticket_number: number;
+  department: string;
+  discord_user_id: string;
+  user_name: string;
+  subject: string;
+  channel_id: string;
+  claimed_by: string | null;
+  priority: string;
+  status: string;
+  is_closed: boolean;
+  created_at: Date;
+}
+
+export async function searchTickets(filters: TicketSearchFilters): Promise<TicketSearchRow[]> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  if (filters.ticketNumber !== undefined) {
+    conditions.push(`ticket_number = $${idx++}`);
+    params.push(filters.ticketNumber);
+  }
+  if (filters.userId) {
+    conditions.push(`discord_user_id = $${idx++}`);
+    params.push(filters.userId);
+  }
+  if (filters.department) {
+    conditions.push(`department = $${idx++}`);
+    params.push(filters.department);
+  }
+  if (filters.status) {
+    if (filters.status === 'closed') {
+      conditions.push(`is_closed = true`);
+    } else {
+      conditions.push(`status = $${idx++} AND is_closed = false`);
+      params.push(filters.status);
+    }
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const { rows } = await pool.query<TicketSearchRow>(
+    `SELECT id, ticket_number, department, discord_user_id, user_name, subject, channel_id, claimed_by, priority, status, is_closed, created_at
+     FROM discord_tickets ${where}
+     ORDER BY created_at DESC LIMIT 100`,
+    params
+  );
+  return rows;
+}
+
+// ── Ticket stats ──
+
+export interface TicketStatsRow {
+  total_open: number;
+  total_closed: number;
+}
+
+export async function getTicketCounts(since: Date): Promise<TicketStatsRow> {
+  const { rows } = await pool.query<{ total_open: string; total_closed: string }>(
+    `SELECT
+       COUNT(*) FILTER (WHERE NOT is_closed) AS total_open,
+       COUNT(*) FILTER (WHERE is_closed AND closed_at >= $1) AS total_closed
+     FROM discord_tickets
+     WHERE created_at >= $1 OR (NOT is_closed)`,
+    [since]
+  );
+  return {
+    total_open: parseInt(rows[0]?.total_open ?? '0', 10),
+    total_closed: parseInt(rows[0]?.total_closed ?? '0', 10),
+  };
+}
+
+export interface DepartmentStatsRow {
+  department: string;
+  open_count: string;
+  closed_count: string;
+}
+
+export async function getTicketStatsByDepartment(since: Date): Promise<DepartmentStatsRow[]> {
+  const { rows } = await pool.query<DepartmentStatsRow>(
+    `SELECT department,
+       COUNT(*) FILTER (WHERE NOT is_closed) AS open_count,
+       COUNT(*) FILTER (WHERE is_closed AND closed_at >= $1) AS closed_count
+     FROM discord_tickets
+     WHERE created_at >= $1 OR (NOT is_closed)
+     GROUP BY department ORDER BY department`,
+    [since]
+  );
+  return rows;
+}
+
+export interface StaffActivityRow {
+  staff_id: string;
+  action_count: string;
+}
+
+export async function getTopStaffByTicketActivity(since: Date): Promise<StaffActivityRow[]> {
+  const { rows } = await pool.query<StaffActivityRow>(
+    `SELECT actor_discord_id AS staff_id, COUNT(*) AS action_count
+     FROM discord_audit_log
+     WHERE action IN ('ticket_claim', 'ticket_close', 'ticket_priority', 'ticket_status', 'ticket_note', 'ticket_reassign', 'ticket_reopen')
+       AND created_at >= $1
+     GROUP BY actor_discord_id
+     ORDER BY action_count DESC
+     LIMIT 10`,
+    [since]
+  );
+  return rows;
+}
+
+// ── Ticket reopen ──
+
+export async function getClosedTicketByNumber(ticketNumber: number): Promise<DiscordTicket | undefined> {
+  const [ticket] = await db.select().from(discordTickets)
+    .where(and(eq(discordTickets.ticketNumber, ticketNumber), eq(discordTickets.isClosed, true)));
+  return ticket;
+}
+
+export async function reopenTicket(ticketId: number, channelId: string, reopenedBy: string): Promise<void> {
+  await db.update(discordTickets)
+    .set({
+      isClosed: false,
+      closedBy: null,
+      closedAt: null,
+      channelId,
+      reopenedBy,
+      reopenedAt: new Date(),
+      status: 'open',
+      escalationLevel: 0,
+    })
+    .where(eq(discordTickets.id, ticketId));
+}
+
+// ── Escalation ──
+
+export interface EscalationTicketRow {
+  id: number;
+  ticket_number: number;
+  department: string;
+  channel_id: string;
+  user_name: string;
+  discord_user_id: string;
+  priority: string;
+  status: string;
+  escalation_level: number;
+  claimed_by: string | null;
+  created_at: Date;
+}
+
+export async function getTicketsForEscalation(): Promise<EscalationTicketRow[]> {
+  const { rows } = await pool.query<EscalationTicketRow>(
+    `SELECT id, ticket_number, department, channel_id, user_name, discord_user_id, priority, status, escalation_level, claimed_by, created_at
+     FROM discord_tickets
+     WHERE is_closed = false AND status != 'waiting_on_user'
+     ORDER BY created_at ASC`
+  );
+  return rows;
+}
+
+export async function updateTicketEscalationLevel(ticketId: number, level: number): Promise<void> {
+  await pool.query(
+    `UPDATE discord_tickets SET escalation_level = $1 WHERE id = $2`,
+    [level, ticketId]
+  );
 }
 
 export async function incrementTicketNumber(): Promise<number> {
@@ -364,7 +577,16 @@ export async function purgeOldAuditLogs(days: number, excludeActions?: string[])
 // Region Monitoring
 // ============================================
 
-export type RegionAgent = { key: string; name: string } | string;
+export type RegionAgent = {
+  key: string;
+  name: string;
+  scripts?: number;
+  memory?: number;
+  time?: number;
+  gender?: string;
+  tag?: string;
+  parcel?: string;
+} | string;
 
 export interface RegionSnapshotRow {
   id: number;
