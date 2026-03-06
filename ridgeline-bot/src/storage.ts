@@ -577,7 +577,16 @@ export async function purgeOldAuditLogs(days: number, excludeActions?: string[])
 // Region Monitoring
 // ============================================
 
-export type RegionAgent = { key: string; name: string } | string;
+export type RegionAgent = {
+  key: string;
+  name: string;
+  scripts?: number;
+  memory?: number;
+  time?: number;
+  gender?: string;
+  tag?: string;
+  parcel?: string;
+} | string;
 
 export interface RegionSnapshotRow {
   id: number;
