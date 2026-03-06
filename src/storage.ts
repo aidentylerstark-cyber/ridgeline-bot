@@ -2,8 +2,8 @@ import { eq, and } from "drizzle-orm";
 import { db, pool } from "./db/index.js";
 import {
   siteContent, discordTickets, discordBirthdays,
-  discordSuggestions, discordWarnings, discordTicketNotes,
-  type SiteContent, type DiscordTicket, type DiscordTicketNote, type DiscordBirthday,
+  discordSuggestions, discordWarnings,
+  type SiteContent, type DiscordTicket, type DiscordBirthday,
   type DiscordSuggestion, type DiscordWarning,
 } from "./db/schema.js";
 
@@ -109,17 +109,6 @@ export async function updateTicketStatus(channelId: string, status: string): Pro
   await db.update(discordTickets)
     .set({ status })
     .where(and(eq(discordTickets.channelId, channelId), eq(discordTickets.isClosed, false)));
-}
-
-// ── Notes ──
-
-export async function addTicketNote(ticketId: number, staffDiscordId: string, content: string): Promise<DiscordTicketNote> {
-  const [row] = await db.insert(discordTicketNotes).values({ ticketId, staffDiscordId, content }).returning();
-  return row;
-}
-
-export async function getTicketNotes(ticketId: number): Promise<DiscordTicketNote[]> {
-  return db.select().from(discordTicketNotes).where(eq(discordTicketNotes.ticketId, ticketId));
 }
 
 // ── User ticket queries ──
