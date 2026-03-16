@@ -18,7 +18,8 @@ import { postTicketPanel } from './panels/ticket-panel.js';
 import { postCommunityPoll } from './panels/polls.js';
 import { postTriggerReference } from './panels/trigger-reference.js';
 import { destroyMemory } from './chatbot/memory.js';
-import { reorganizeCategoryByKey } from './utilities/channel-reorg.js';
+import { reorganizeCategoryByKey, setChannelPermissions } from './utilities/channel-reorg.js';
+import { postSuggestionPanel } from './panels/suggestion-panel.js';
 import { setupModLog, clearRaidModeTimer } from './features/modlog.js';
 import { destroyAuditLogInterval } from './features/audit-log.js';
 import { startRegionWebhookServer } from './api/region-webhook.js';
@@ -92,7 +93,9 @@ async function main() {
   // Attach admin utility methods to client for console/external access
   client.postRoleButtons = () => postRoleButtons(client);
   client.reorganizeCategory = (key: string) => reorganizeCategoryByKey(client, key);
+  client.setChannelPermissions = (key: string) => setChannelPermissions(client, key);
   client.postTicketPanel = () => postTicketPanel(client);
+  client.postSuggestionPanel = () => postSuggestionPanel(client);
   client.postCommunityPoll = (q: string, opts: string[], dur?: number) => postCommunityPoll(client, q, opts, dur);
   client.postTriggerReference = () => postTriggerReference(client);
   // Login

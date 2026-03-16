@@ -22,6 +22,7 @@ import { handleWarnCommand, handleWarningsCommand, handleClearWarnCommand } from
 import { handleAuditLogCommand } from '../features/audit-log.js';
 import { handleRegionCommand } from '../features/region-monitoring.js';
 import { handleTicketCommand } from '../features/ticket-commands.js';
+import { handleAdminCommand } from '../features/admin.js';
 import { CHANNELS } from '../config.js';
 import { isStaff } from '../utilities/permissions.js';
 
@@ -111,6 +112,7 @@ const SLASH_COMMANDS: Record<string, SlashHandler> = {
   ticket:      handleTicketCommand,
   region:      handleRegionCommand,
   help:        handleHelpCommand,
+  admin:       handleAdminCommand,
 };
 
 export function setupInteractionHandler(client: Client, ticketCooldowns: CooldownManager) {

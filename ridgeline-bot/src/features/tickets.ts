@@ -311,12 +311,16 @@ export async function closeTicket(
     await channel.send('⚠️ Transcript generation failed — the ticket will still be closed but the transcript may be incomplete.').catch(() => {});
   }
 
-  // Mark as closed in database — if this fails, do NOT delete the channel (prevents phantom open tickets)
+  // Atomically mark as closed in database — if this returns false, another close won the race
   try {
-    await storage.closeDiscordTicket(channel.id, closedBy.id);
+    const wasClosed = await storage.closeDiscordTicket(channel.id, closedBy.id);
+    if (!wasClosed) {
+      console.log(`[Peaches] Ticket #${ticket.ticketNumber} close race detected — another close already succeeded`);
+      return; // Other close handler will delete the channel
+    }
   } catch (err) {
     console.error('[Peaches] Failed to mark ticket as closed in DB — channel will NOT be deleted:', err);
-    await channel.send('⚠️ There was a database error closing this ticket. Please try again or contact a developer.').catch(() => {});
+    await channel.send('\u26A0\uFE0F There was a database error closing this ticket. Please try again or contact a developer.').catch(() => {});
     return;
   }
 

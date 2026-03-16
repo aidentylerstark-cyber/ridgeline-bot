@@ -1,4 +1,4 @@
-import { type Client, type Guild } from 'discord.js';
+import { PermissionFlagsBits, type Client, type Guild, type TextChannel, type OverwriteResolvable } from 'discord.js';
 import { GUILD_ID } from '../config.js';
 
 async function reorganizeCategory(
@@ -8,8 +8,18 @@ async function reorganizeCategory(
   categoryName: string | null,
   renames: Array<{ id: string; name: string }>
 ) {
-  if (categoryId && categoryName) {
-    const category = guild.channels.cache.get(categoryId);
+  // Resolve 'auto' categoryId from the first channel's parent
+  let resolvedCategoryId = categoryId;
+  if (categoryId === 'auto' && renames.length > 0) {
+    const firstChannel = guild.channels.cache.get(renames[0].id);
+    resolvedCategoryId = firstChannel?.parentId ?? null;
+    if (resolvedCategoryId) {
+      console.log(`[Bot] Auto-resolved category ID: ${resolvedCategoryId}`);
+    }
+  }
+
+  if (resolvedCategoryId && categoryName) {
+    const category = guild.channels.cache.get(resolvedCategoryId);
     if (category) {
       try {
         await category.setName(categoryName);
@@ -61,17 +71,17 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
       { id: '1400691265431015546', name: '\uD83D\uDCDA\u250Abook-club' },
     ],
   },
-  'welcome-center': {
-    categoryId: null,
-    categoryName: null,
+  'town-hall': {
+    categoryId: 'auto',  // Resolved from the first channel's parent category
+    categoryName: '\uD83C\uDFDB\uFE0F TOWN HALL',
     renames: [
       { id: '1096864061200793662', name: '\uD83D\uDC4B\u250Awelcome' },
-      { id: '1097039896209784863', name: '\uD83D\uDCDC\u250Arules' },
-      { id: '1097041761999786015', name: '\uD83C\uDFAD\u250Aget-roles' },
-      { id: '1388647632792064030', name: '\uD83D\uDCE3\u250Acommunity-announcements' },
-      { id: '1383987811698348063', name: '\uD83C\uDFE2\u250Adepartment-announcements' },
-      { id: '1097074925455560765', name: '\uD83D\uDCC5\u250Aupcoming-events' },
-      { id: '1378183356885504000', name: '\uD83D\uDCA1\u250Asuggestions' },
+      { id: '1097039896209784863', name: '\uD83D\uDCDC\u250Atown-rules' },
+      { id: '1097041761999786015', name: '\uD83C\uDFAD\u250Aget-your-roles' },
+      { id: '1388647632792064030', name: '\uD83D\uDCE3\u250Aannouncements' },
+      { id: '1383987811698348063', name: '\uD83C\uDFE2\u250Adepartment-news' },
+      { id: '1097074925455560765', name: '\uD83D\uDCC5\u250Aevent-board' },
+      { id: '1378183356885504000', name: '\uD83D\uDCA1\u250Asuggestion-box' },
       { id: '1466235361658404981', name: '\uD83D\uDCCA\u250Acommunity-polls' },
     ],
   },
@@ -434,4 +444,123 @@ export async function reorganizeCategoryByKey(client: Client, categoryKey: strin
   }
 
   await reorganizeCategory(guild, categoryKey, config.categoryId, config.categoryName, config.renames);
+}
+
+// ─────────────────────────────────────────
+// Channel Permission Templates
+// ─────────────────────────────────────────
+
+type PermissionPreset = 'read-only' | 'members-can-send' | 'bot-panel' | 'staff-post';
+
+const CHANNEL_PERMISSIONS: Record<string, Array<{ id: string; preset: PermissionPreset }>> = {
+  'town-hall': [
+    { id: '1096864061200793662', preset: 'read-only' },          // welcome — bot posts, members read
+    { id: '1097039896209784863', preset: 'read-only' },          // town-rules — read only
+    { id: '1097041761999786015', preset: 'bot-panel' },          // get-your-roles — bot panel with buttons
+    { id: '1388647632792064030', preset: 'staff-post' },         // announcements — staff only
+    { id: '1383987811698348063', preset: 'staff-post' },         // department-news — staff only
+    { id: '1097074925455560765', preset: 'staff-post' },         // event-board — staff only
+    { id: '1378183356885504000', preset: 'read-only' },          // suggestion-box — /suggest command, members can't type
+    { id: '1466235361658404981', preset: 'read-only' },          // community-polls — staff posts polls, members vote via native polls
+  ],
+};
+
+export async function setChannelPermissions(client: Client, categoryKey: string) {
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (!guild) { console.log('[Bot] Guild not found'); return; }
+
+  const permConfig = CHANNEL_PERMISSIONS[categoryKey];
+  if (!permConfig) {
+    console.log(`[Bot] No permission config for category: ${categoryKey}`);
+    return;
+  }
+
+  // Find staff roles for staff-post channels
+  const staffRoleNames = ['Community Manager', 'Community Moderator', 'Ridgeline Owner', 'First Lady', 'Ridgeline Management', 'Ridgeline Manager'];
+  const staffRoles = staffRoleNames
+    .map(name => guild.roles.cache.find(r => r.name === name))
+    .filter(Boolean);
+
+  for (const { id, preset } of permConfig) {
+    const channel = guild.channels.cache.get(id) as TextChannel | undefined;
+    if (!channel) {
+      console.log(`[Bot] Channel ${id} not found, skipping permissions`);
+      continue;
+    }
+
+    try {
+      const overwrites: OverwriteResolvable[] = [];
+
+      switch (preset) {
+        case 'read-only':
+          // Everyone can see but not send
+          overwrites.push({
+            id: guild.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+            deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads],
+          });
+          // Bot can send
+          if (client.user) {
+            overwrites.push({
+              id: client.user.id,
+              allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
+            });
+          }
+          break;
+
+        case 'bot-panel':
+          // Everyone can see + use buttons, but not type
+          overwrites.push({
+            id: guild.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+            deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.CreatePublicThreads],
+          });
+          // Bot can send + manage
+          if (client.user) {
+            overwrites.push({
+              id: client.user.id,
+              allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.EmbedLinks],
+            });
+          }
+          break;
+
+        case 'staff-post':
+          // Everyone can see but not send
+          overwrites.push({
+            id: guild.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+            deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.CreatePublicThreads],
+          });
+          // Staff can send
+          for (const role of staffRoles) {
+            overwrites.push({
+              id: role!.id,
+              allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ManageMessages],
+            });
+          }
+          // Bot can send
+          if (client.user) {
+            overwrites.push({
+              id: client.user.id,
+              allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
+            });
+          }
+          break;
+
+        case 'members-can-send':
+          overwrites.push({
+            id: guild.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
+          });
+          break;
+      }
+
+      await channel.permissionOverwrites.set(overwrites);
+      console.log(`[Bot] Permissions set: #${channel.name} \u2192 ${preset}`);
+      await new Promise(r => setTimeout(r, 1000)); // Rate limit buffer
+    } catch (err) {
+      console.error(`[Bot] Failed to set permissions on #${channel.name}:`, err);
+    }
+  }
+  console.log(`[Bot] ${categoryKey} permissions complete \u2705`);
 }

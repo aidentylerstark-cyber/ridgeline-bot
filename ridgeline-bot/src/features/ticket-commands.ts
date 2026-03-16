@@ -9,6 +9,7 @@ import {
   type TextChannel,
 } from 'discord.js';
 import * as storage from '../storage.js';
+import { updateTicketLastActivity } from '../storage.js';
 import {
   TICKET_CATEGORIES,
   TICKET_PRIORITY_COLORS,
@@ -59,6 +60,7 @@ async function handlePriority(interaction: ChatInputCommandInteraction, client: 
 
   const priority = interaction.options.getString('level', true);
   await storage.updateTicketPriority(interaction.channelId ?? '', priority);
+  updateTicketLastActivity(interaction.channelId ?? '').catch(() => {});
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
   const color = TICKET_PRIORITY_COLORS[priority] ?? 0xD4A574;
@@ -111,6 +113,7 @@ async function handleStatus(interaction: ChatInputCommandInteraction, client: Cl
 
   const status = interaction.options.getString('value', true);
   await storage.updateTicketStatus(interaction.channelId ?? '', status);
+  updateTicketLastActivity(interaction.channelId ?? '').catch(() => {});
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
   const statusLabels: Record<string, string> = {
@@ -168,6 +171,7 @@ async function handleNote(interaction: ChatInputCommandInteraction, client: Clie
 
   const content = interaction.options.getString('text', true);
   await storage.addTicketNote(ticket.id, member.id, content);
+  updateTicketLastActivity(interaction.channelId ?? '').catch(() => {});
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
   await interaction.reply({
@@ -402,6 +406,7 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
 
   const previousClaimer = ticket.claimedBy;
   await storage.updateTicketClaim(interaction.channelId ?? '', targetMember.id);
+  updateTicketLastActivity(interaction.channelId ?? '').catch(() => {});
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
 
@@ -497,7 +502,7 @@ async function handleReopen(interaction: ChatInputCommandInteraction, client: Cl
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
   await interaction.editReply({ content: `\uD83D\uDD13 Ticket #${ticketId} has been reopened! Channel: <#${result.channel.id}> \uD83C\uDF51` });
 
-  // Post opening message in the new channel
+  // Post opening message in the new channel with action buttons
   const reopenEmbed = new EmbedBuilder()
     .setColor(0x57F287)
     .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Reopened', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
@@ -510,8 +515,15 @@ async function handleReopen(interaction: ChatInputCommandInteraction, client: Cl
     .setFooter({ text: `Ticket #${ticketId}` })
     .setTimestamp();
 
+  const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`ticket_claim_${ticketId}`).setLabel('Claim Ticket').setStyle(ButtonStyle.Primary).setEmoji('\uD83D\uDE4B'),
+    new ButtonBuilder().setCustomId(`ticket_unclaim_${ticketId}`).setLabel('Unclaim').setStyle(ButtonStyle.Secondary).setEmoji('\uD83D\uDD04'),
+    new ButtonBuilder().setCustomId(`ticket_close_${ticketId}`).setLabel('Close Ticket').setStyle(ButtonStyle.Danger).setEmoji('\uD83D\uDD12'),
+    new ButtonBuilder().setCustomId(`ticket_adduser_${ticketId}`).setLabel('Add User').setStyle(ButtonStyle.Secondary).setEmoji('\uD83D\uDC64'),
+  );
+
   const staffMentions = getStaffMentions(guild, ticket.department as TicketDepartment);
-  await result.channel.send({ content: `<@${ticket.discordUserId}> ${staffMentions}`, embeds: [reopenEmbed] });
+  await result.channel.send({ content: `<@${ticket.discordUserId}> ${staffMentions}`, embeds: [reopenEmbed], components: [actionRow] });
 
   logAuditEvent(client, guild, {
     action: 'ticket_reopen',

@@ -3,6 +3,7 @@ import { GUILD_ID, CHANNELS, TICKET_CATEGORIES } from '../config.js';
 import { CooldownManager } from '../utilities/cooldowns.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { processChatbotMessage } from '../chatbot/pipeline.js';
+import { updateTicketLastActivity } from '../storage.js';
 
 // Pre-computed ticket category IDs (config is static — no need to rebuild per message)
 const ticketCategoryIds = new Set(Object.values(TICKET_CATEGORIES).map(c => c.categoryId));
@@ -28,6 +29,11 @@ export function setupMessageHandler(client: Client) {
     // Check if message is in a ticket channel (child of a ticket category)
     const parentId = 'parentId' in message.channel ? message.channel.parentId : null;
     const isTicketChannel = parentId != null && ticketCategoryIds.has(parentId);
+
+    // Update last activity timestamp for ticket channels (fire-and-forget)
+    if (isTicketChannel) {
+      updateTicketLastActivity(message.channel.id).catch(() => {});
+    }
 
     // Auto-thread every post in #character-intros (keep channel tidy)
     if (

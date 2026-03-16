@@ -292,6 +292,9 @@ export async function runMigrations(): Promise<void> {
     await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS escalation_level INTEGER NOT NULL DEFAULT 0`);
     await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS reopened_by VARCHAR(30)`);
     await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMP`);
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP NOT NULL DEFAULT NOW()`);
+    // Backfill: set last_activity_at to created_at for existing rows where it wasn't explicitly set
+    await client.query(`UPDATE discord_tickets SET last_activity_at = created_at WHERE last_activity_at = created_at`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS discord_ticket_notes (
@@ -306,6 +309,20 @@ export async function runMigrations(): Promise<void> {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_discord_ticket_notes_ticket
         ON discord_ticket_notes (ticket_id)
+    `);
+
+    // Add FK constraint with CASCADE so notes are auto-deleted when tickets are purged
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'fk_ticket_notes_ticket_id'
+        ) THEN
+          ALTER TABLE discord_ticket_notes
+            ADD CONSTRAINT fk_ticket_notes_ticket_id
+            FOREIGN KEY (ticket_id) REFERENCES discord_tickets(id) ON DELETE CASCADE;
+        END IF;
+      END $$
     `);
 
     await client.query(`

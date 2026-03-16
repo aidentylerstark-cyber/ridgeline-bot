@@ -30,7 +30,7 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
         const now = Date.now();
 
         for (const ticket of tickets) {
-          const ageHours = (now - new Date(ticket.created_at).getTime()) / 3_600_000;
+          const ageHours = (now - new Date(ticket.last_activity_at).getTime()) / 3_600_000;
           const isUrgent = ticket.priority === 'urgent';
           const divisor = isUrgent ? ESCALATION_URGENT_DIVISOR : 1;
 

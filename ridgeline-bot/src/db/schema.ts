@@ -33,6 +33,7 @@ export const discordTickets = pgTable("discord_tickets", {
   closedAt: timestamp("closed_at"),
   reopenedBy: varchar("reopened_by", { length: 30 }),
   reopenedAt: timestamp("reopened_at"),
+  lastActivityAt: timestamp("last_activity_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

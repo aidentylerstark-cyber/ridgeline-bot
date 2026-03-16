@@ -365,6 +365,59 @@ export async function registerSlashCommands(client: Client): Promise<void> {
       .setName('help')
       .setDescription('Get help with Peaches and server features'),
 
+    // /admin (owner only — server management utilities)
+    new SlashCommandBuilder()
+      .setName('admin')
+      .setDescription('[Owner] Server management utilities')
+      .addSubcommand(sub => sub
+        .setName('reorg')
+        .setDescription('Rename a category and its channels')
+        .addStringOption(opt =>
+          opt.setName('category')
+            .setDescription('Category key to reorganize')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Town Hall', value: 'town-hall' },
+              { name: 'In Character', value: 'in-character' },
+              { name: 'Ridgeline News', value: 'breaking-news' },
+              { name: 'Community Hub', value: 'community-hub' },
+              { name: 'Gaming Corner', value: 'gaming-corner' },
+              { name: 'Get Support', value: 'get-support' },
+              { name: 'Kiddies Corner', value: 'kiddies-corner' },
+              { name: 'Staff', value: 'staff' },
+              { name: 'Community Management', value: 'community-management' },
+              { name: 'Admin Garbage', value: 'admin-garbage' },
+            )
+        )
+      )
+      .addSubcommand(sub => sub
+        .setName('permissions')
+        .setDescription('Set channel permissions for a category')
+        .addStringOption(opt =>
+          opt.setName('category')
+            .setDescription('Category key to set permissions on')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Town Hall', value: 'town-hall' },
+            )
+        )
+      )
+      .addSubcommand(sub => sub
+        .setName('panel')
+        .setDescription('Post or refresh a bot panel')
+        .addStringOption(opt =>
+          opt.setName('type')
+            .setDescription('Which panel to post')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Role Selection', value: 'roles' },
+              { name: 'Ticket Panel', value: 'tickets' },
+              { name: 'Suggestion Box', value: 'suggestions' },
+              { name: 'Trigger Reference', value: 'triggers' },
+            )
+        )
+      ),
+
   ];
 
   await guild.commands.set(commands.map(c => c.toJSON()));

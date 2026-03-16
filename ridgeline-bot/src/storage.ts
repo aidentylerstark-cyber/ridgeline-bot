@@ -91,10 +91,24 @@ export async function atomicClaimTicket(channelId: string, claimedBy: string): P
   return (rowCount ?? 0) > 0;
 }
 
-export async function closeDiscordTicket(channelId: string, closedBy: string): Promise<void> {
-  await db.update(discordTickets)
-    .set({ isClosed: true, closedBy, closedAt: new Date() })
-    .where(and(eq(discordTickets.channelId, channelId), eq(discordTickets.isClosed, false)));
+/** Atomically close a ticket. Returns true if a row was actually updated (prevents double-close races). */
+export async function closeDiscordTicket(channelId: string, closedBy: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE discord_tickets SET is_closed = true, closed_by = $1, closed_at = NOW()
+     WHERE channel_id = $2 AND is_closed = false`,
+    [closedBy, channelId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+// ── Last Activity ──
+
+/** Touch the last_activity_at timestamp on a ticket (by channel ID). Fire-and-forget safe. */
+export async function updateTicketLastActivity(channelId: string): Promise<void> {
+  await pool.query(
+    `UPDATE discord_tickets SET last_activity_at = NOW() WHERE channel_id = $1 AND is_closed = false`,
+    [channelId]
+  );
 }
 
 // ── Priority & Status ──
@@ -291,11 +305,12 @@ export interface EscalationTicketRow {
   escalation_level: number;
   claimed_by: string | null;
   created_at: Date;
+  last_activity_at: Date;
 }
 
 export async function getTicketsForEscalation(): Promise<EscalationTicketRow[]> {
   const { rows } = await pool.query<EscalationTicketRow>(
-    `SELECT id, ticket_number, department, channel_id, user_name, discord_user_id, priority, status, escalation_level, claimed_by, created_at
+    `SELECT id, ticket_number, department, channel_id, user_name, discord_user_id, priority, status, escalation_level, claimed_by, created_at, last_activity_at
      FROM discord_tickets
      WHERE is_closed = false AND status != 'waiting_on_user'
      ORDER BY created_at ASC`
@@ -523,6 +538,13 @@ export async function getDueRoleRemovals(): Promise<Array<{ discordUserId: strin
 
 export async function purgeClosedTickets(days: number): Promise<number> {
   const cutoff = new Date(Date.now() - days * 86_400_000);
+  // Delete orphaned notes first (tickets about to be purged), then delete the tickets
+  await pool.query(
+    `DELETE FROM discord_ticket_notes WHERE ticket_id IN (
+       SELECT id FROM discord_tickets WHERE is_closed = true AND closed_at < $1
+     )`,
+    [cutoff]
+  );
   const { rowCount } = await pool.query(
     `DELETE FROM discord_tickets WHERE is_closed = true AND closed_at < $1`,
     [cutoff]
