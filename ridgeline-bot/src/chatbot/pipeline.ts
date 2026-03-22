@@ -130,7 +130,7 @@ export async function processChatbotMessage(
   const charNameMatch = query.match(/my (?:character(?:'s)? )?name is (.+)/i);
   if (charNameMatch) {
     // Sanitize: strip trailing punctuation, collapse whitespace, remove Discord markdown/mentions
-    const charName = charNameMatch[1]
+    let charName = charNameMatch[1]
       .replace(/[.!?]+$/, '')
       .replace(/<@!?\d+>/g, '')    // strip user mentions
       .replace(/<#\d+>/g, '')      // strip channel mentions
@@ -138,7 +138,15 @@ export async function processChatbotMessage(
       .replace(/[*_~`|]/g, '')     // strip markdown formatting
       .replace(/\s+/g, ' ')        // collapse whitespace
       .trim();
-    if (charName.length > 0 && charName.length <= 100) {
+
+    // Strip common filler words from the start
+    charName = charName.replace(/^(actually|really|just|like|so|well|um|uh)\s+/i, '').trim();
+
+    const wordCount = charName.split(/\s+/).length;
+    // Must be 1-5 words, start with a capital letter (looks like a proper name), and not be empty
+    const looksLikeName = /^[A-Z]/.test(charName);
+
+    if (charName.length > 0 && charName.length <= 100 && wordCount <= 5 && looksLikeName) {
       await setCharacterName(message.author.id, charName);
       console.log(`[Peaches] Character name set: ${message.author.displayName} → "${charName}"`);
       await message.reply(

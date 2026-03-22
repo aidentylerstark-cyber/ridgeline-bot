@@ -11,8 +11,10 @@ import {
   handleTicketCancelClose,
   handleTicketAddUser,
   handleTicketAddUserModal,
+  handleTicketResolutionModal,
 } from '../handlers/ticket-buttons.js';
 import { handleTicketDepartmentSelect, handleTicketModalSubmit } from '../handlers/ticket-modal.js';
+import { handleTicketRate, handleTicketCommentButton, handleTicketFeedbackCommentModal } from '../handlers/ticket-feedback.js';
 import type { CooldownManager } from '../utilities/cooldowns.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { handleBirthdayCommand } from '../features/birthdays.js';
@@ -23,6 +25,16 @@ import { handleAuditLogCommand } from '../features/audit-log.js';
 import { handleRegionCommand } from '../features/region-monitoring.js';
 import { handleTicketCommand } from '../features/ticket-commands.js';
 import { handleAdminCommand } from '../features/admin.js';
+import { handleUserInfoCommand } from '../features/userinfo.js';
+import { handleWelcomeCommand } from '../features/welcome-resend.js';
+import { handleServerStatsCommand } from '../features/serverstats.js';
+import {
+  handleOnboardStart,
+  handleOnboardRulesAck,
+  handleOnboardDetailsModal,
+  handleOnboardSkipDetails,
+  handleOnboardModalSubmit,
+} from '../handlers/onboarding-buttons.js';
 import { CHANNELS } from '../config.js';
 import { isStaff } from '../utilities/permissions.js';
 
@@ -49,7 +61,9 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
         name: '🎂 Birthday',
         value:
           '`/birthday set <date>` — Register your birthday\n' +
-          '`/birthday check` — See your registered birthday',
+          '`/birthday check` — See your registered birthday\n' +
+          '`/birthday delete` — Remove your birthday from the records\n' +
+          '`/birthday upcoming` — See birthdays in the next 7 days',
       },
       { name: '💡 Suggestions', value: '`/suggest <idea>` — Submit a suggestion for Ridgeline' },
       {
@@ -58,6 +72,8 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
           `Click "Open a Ticket" in <#${CHANNELS.ticketPanel}> for staff support\n` +
           '`/ticket mine` \u2014 View your open tickets',
       },
+      { name: '\uD83D\uDCEC Welcome', value: '`/welcome` \u2014 Resend your welcome DM packet' },
+      { name: '\uD83D\uDCCA Server Stats', value: '`/serverstats` \u2014 View community statistics' },
       ...(memberIsStaff ? [
         {
           name: '📢 Staff — Announcements',
@@ -68,7 +84,8 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
           value:
             '`/warn <user> <reason>` — Issue a warning\n' +
             '`/warnings <user>` — View all warnings for a member\n' +
-            '`/clearwarn <id>` — Remove a specific warning',
+            '`/clearwarn <id>` — Remove a specific warning\n' +
+            '`/clearwarn user:<user>` \u2014 Clear all warnings for a user',
         },
         {
           name: '\uD83C\uDFAB Staff \u2014 Tickets',
@@ -79,7 +96,10 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
             '`/ticket status` \u2014 Set status\n' +
             '`/ticket note` / `notes` \u2014 Staff notes\n' +
             '`/ticket assign` \u2014 Reassign ticket\n' +
-            '`/ticket reopen` \u2014 Reopen closed ticket',
+            '`/ticket transfer` \u2014 Transfer to another department\n' +
+            '`/ticket quickreply` \u2014 Send a quick reply template\n' +
+            '`/ticket reopen` \u2014 Reopen closed ticket\n' +
+            '`/ticket feedback` \u2014 View satisfaction ratings',
         },
         {
           name: '\uD83D\uDCCB Staff — Audit Log',
@@ -88,6 +108,14 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
             '`/auditlog export` \u2014 Export as text file\n' +
             '`/auditlog stats` \u2014 Action breakdown\n' +
             '`/auditlog config` \u2014 Set retention period',
+        },
+        {
+          name: '\uD83D\uDDFA\uFE0F Staff — Regions',
+          value: '`/region` \u2014 Check current SL region status',
+        },
+        {
+          name: '\uD83D\uDC64 Staff \u2014 Member Info',
+          value: '`/userinfo <user>` \u2014 View detailed member overview',
         },
       ] : []),
     )
@@ -102,7 +130,7 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
 type SlashHandler = (i: ChatInputCommandInteraction, c: Client) => Promise<void>;
 
 const SLASH_COMMANDS: Record<string, SlashHandler> = {
-  birthday:    (i) => handleBirthdayCommand(i),
+  birthday:    (i, c) => handleBirthdayCommand(i, c),
   suggest:     handleSuggestCommand,
   announce:    handleAnnounceCommand,
   warn:        handleWarnCommand,
@@ -113,6 +141,9 @@ const SLASH_COMMANDS: Record<string, SlashHandler> = {
   region:      handleRegionCommand,
   help:        handleHelpCommand,
   admin:       handleAdminCommand,
+  userinfo:    handleUserInfoCommand,
+  welcome:     handleWelcomeCommand,
+  serverstats: handleServerStatsCommand,
 };
 
 export function setupInteractionHandler(client: Client, ticketCooldowns: CooldownManager) {
@@ -135,6 +166,14 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     { match: 'ticket_claim_', handler: handleTicketClaim },
     { match: 'ticket_close_', handler: handleTicketClose },
     { match: 'ticket_adduser_', handler: handleTicketAddUser },
+    // Ticket feedback buttons
+    { match: 'ticket_rate_', handler: handleTicketRate },
+    { match: 'ticket_comment_', handler: handleTicketCommentButton },
+    // Onboarding flow buttons
+    { match: 'onboard_start', exact: true, handler: handleOnboardStart },
+    { match: 'onboard_rules_ack', exact: true, handler: handleOnboardRulesAck },
+    { match: 'onboard_details_modal', exact: true, handler: (i, c) => handleOnboardDetailsModal(i) },
+    { match: 'onboard_skip_details', exact: true, handler: handleOnboardSkipDetails },
   ];
 
   client.on('interactionCreate', async (interaction: Interaction) => {
@@ -174,6 +213,18 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
         }
         if (interaction.customId.startsWith('ticket_adduser_modal_')) {
           await handleTicketAddUserModal(interaction, client);
+          return;
+        }
+        if (interaction.customId.startsWith('ticket_resolution_modal_')) {
+          await handleTicketResolutionModal(interaction, client);
+          return;
+        }
+        if (interaction.customId.startsWith('ticket_feedback_comment_modal_')) {
+          await handleTicketFeedbackCommentModal(interaction, client);
+          return;
+        }
+        if (interaction.customId === 'onboard_details_modal') {
+          await handleOnboardModalSubmit(interaction, client);
           return;
         }
         return;

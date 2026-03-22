@@ -1,6 +1,6 @@
 import { EmbedBuilder, type Client, type ChatInputCommandInteraction, type GuildMember } from 'discord.js';
 import { CHANNELS } from '../config.js';
-import { addWarning, getWarnings, getWarningCount, clearWarning } from '../storage.js';
+import { addWarning, getWarnings, getWarningCount, clearWarning, clearAllWarnings } from '../storage.js';
 import { logAuditEvent } from './audit-log.js';
 import { isStaff } from '../utilities/permissions.js';
 
@@ -23,6 +23,15 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
     return;
   }
 
+  // Role hierarchy check — can't warn someone with equal or higher role
+  const targetMemberForCheck = interaction.guild?.members.cache.get(target.id);
+  if (targetMemberForCheck && member) {
+    if (targetMemberForCheck.roles.highest.position >= member.roles.highest.position) {
+      await interaction.reply({ content: "You can't warn someone with an equal or higher role than yours, sugar! 🍑", flags: 64 });
+      return;
+    }
+  }
+
   await interaction.deferReply({ flags: 64 });
 
   const warning = await addWarning(target.id, interaction.user.id, reason);
@@ -34,7 +43,7 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
     const logEmbed = new EmbedBuilder()
       .setColor(0xFEE75C)
       .setTitle('⚠️ Member Warned')
-      .setDescription(`<@${target.id}> — \`${target.tag}\``)
+      .setDescription(`<@${target.id}> — \`${target.displayName}\``)
       .addFields(
         { name: 'Reason', value: reason },
         { name: '👮 Issued By', value: member.displayName, inline: true },
@@ -86,7 +95,7 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
       timeoutDuration = 24 * 60 * 60 * 1000; // 24 hours
       timeoutLabel = '24 hours';
       severity = 'critical';
-    } else if (totalWarnings === 3) {
+    } else if (totalWarnings >= 3) {
       timeoutDuration = 60 * 60 * 1000; // 1 hour
       timeoutLabel = '1 hour';
       severity = 'warning';
@@ -150,28 +159,62 @@ export async function handleWarningsCommand(interaction: ChatInputCommandInterac
 export async function handleClearWarnCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   const member = interaction.member as GuildMember | null;
   if (!member || !isStaff(member)) {
-    await interaction.reply({ content: "Only staff can clear warnings, sugar! 🍑", flags: 64 });
+    await interaction.reply({ content: "Only staff can clear warnings, sugar! \uD83C\uDF51", flags: 64 });
     return;
   }
 
-  const id = interaction.options.getInteger('id', true);
+  const targetUser = interaction.options.getUser('user');
+  const id = interaction.options.getInteger('id');
+
+  // If user option provided, clear all warnings for that user
+  if (targetUser) {
+    await interaction.deferReply({ flags: 64 });
+
+    const count = await clearAllWarnings(targetUser.id);
+
+    if (count === 0) {
+      await interaction.editReply({ content: `<@${targetUser.id}> doesn't have any warnings to clear, sugar. \uD83C\uDF51` });
+      return;
+    }
+
+    await interaction.editReply({ content: `\u2705 Cleared **${count}** warning(s) from <@${targetUser.id}>'s record. Clean slate! \uD83C\uDF51` });
+    console.log(`[Peaches] All warnings (${count}) cleared for ${targetUser.username} by ${interaction.user.username}`);
+
+    if (interaction.guild) {
+      logAuditEvent(_client, interaction.guild, {
+        action: 'warning_clear_all',
+        actorId: interaction.user.id,
+        targetId: targetUser.id,
+        details: `All ${count} warning(s) cleared for ${targetUser.username} by ${interaction.user.username}`,
+      });
+    }
+    return;
+  }
+
+  // Single warning by ID
+  if (id === null) {
+    await interaction.reply({ content: "You need to provide either a warning `id` or a `user` to clear all, sugar! \uD83C\uDF51", flags: 64 });
+    return;
+  }
+
   await interaction.deferReply({ flags: 64 });
 
-  const deleted = await clearWarning(id);
+  const deletedWarning = await clearWarning(id);
 
-  if (!deleted) {
-    await interaction.editReply({ content: `Couldn't find warning #${id}, sugar. Double-check the ID with \`/warnings\`. 🍑` });
+  if (!deletedWarning) {
+    await interaction.editReply({ content: `Couldn't find warning #${id}, sugar. Double-check the ID with \`/warnings\`. \uD83C\uDF51` });
     return;
   }
 
-  await interaction.editReply({ content: `✅ Warning #${id} has been cleared from the record. 🍑` });
+  await interaction.editReply({ content: `\u2705 Warning #${id} has been cleared from the record. \uD83C\uDF51` });
   console.log(`[Peaches] Warning #${id} cleared by ${interaction.user.username}`);
 
   if (interaction.guild) {
     logAuditEvent(_client, interaction.guild, {
       action: 'warn_clear',
       actorId: interaction.user.id,
-      details: `Warning #${id} cleared by ${interaction.user.username}`,
+      targetId: deletedWarning.discordUserId,
+      details: `Warning #${id} cleared by ${interaction.user.username} (was for <@${deletedWarning.discordUserId}>: ${deletedWarning.reason})`,
       referenceId: `warning-${id}`,
     });
   }

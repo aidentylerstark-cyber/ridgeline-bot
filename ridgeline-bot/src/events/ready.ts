@@ -57,7 +57,6 @@ export function setupReadyHandler(client: Client) {
       const guild = client.guilds.cache.get(GUILD_ID);
       const token = process.env.DISCORD_BOT_TOKEN;
       if (guild && token && CHANNELS.statsMembersVC) {
-        await guild.channels.fetch();
         const statsVC = guild.channels.cache.get(CHANNELS.statsMembersVC);
         const statsCategoryId = statsVC?.parentId;
         if (statsCategoryId) {

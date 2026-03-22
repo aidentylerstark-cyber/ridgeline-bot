@@ -1,5 +1,4 @@
 import {
-  EmbedBuilder,
   MessageFlags,
   SeparatorSpacingSize,
   type Client,
@@ -16,6 +15,31 @@ import {
 import { CHANNELS, CITIZEN_ROLE, NEW_ARRIVAL_ROLE } from '../config.js';
 import { scheduleRoleRemoval } from '../storage.js';
 import { isBotActive } from '../utilities/instance-lock.js';
+import {
+  getRandomGreeting,
+  getRandomReturningGreeting,
+  buildWelcomeButtons,
+  buildAccountAgeWarningEmbed,
+  sendOnboardingDM,
+} from '../features/onboarding.js';
+import { getOnboardingRecord } from '../storage.js';
+
+// ── Raid guard for welcome messages ──
+// Track recent join timestamps; if too many join in a short window, skip welcome messages/DMs
+const recentJoinTimestamps: number[] = [];
+const WELCOME_RAID_THRESHOLD = 5;    // max joins in window before suppressing
+const WELCOME_RAID_WINDOW_MS = 30_000; // 30 seconds
+const NEW_ACCOUNT_THRESHOLD_DAYS = 7;
+
+function isWelcomeRaid(): boolean {
+  const now = Date.now();
+  // Prune old timestamps
+  while (recentJoinTimestamps.length > 0 && recentJoinTimestamps[0]! < now - WELCOME_RAID_WINDOW_MS) {
+    recentJoinTimestamps.shift();
+  }
+  recentJoinTimestamps.push(now);
+  return recentJoinTimestamps.length > WELCOME_RAID_THRESHOLD;
+}
 
 export function setupMemberJoinHandler(client: Client) {
   client.on('guildMemberAdd', async (member: GuildMember) => {
@@ -45,23 +69,58 @@ export function setupMemberJoinHandler(client: Client) {
         }
       }
 
+      // Raid guard: skip welcome message and DM if too many joins in a short window
+      if (isWelcomeRaid()) {
+        console.warn(`[Discord Bot] Welcome raid guard triggered — suppressing welcome message/DM for ${member.displayName}`);
+        return;
+      }
+
+      // ── Check if returning member ──
+      let isReturning = false;
+      try {
+        const onboardingRecord = await getOnboardingRecord(member.id);
+        if (onboardingRecord && onboardingRecord.completed_at) {
+          isReturning = true;
+        }
+      } catch (err) {
+        console.error(`[Discord Bot] Failed to check onboarding record for ${member.displayName}:`, err);
+      }
+
       // 2. Post welcome message in #welcome channel
       const welcomeChannel = member.guild.channels.cache.get(CHANNELS.welcome) as TextChannel | undefined;
 
       if (welcomeChannel) {
+        const greeting = isReturning
+          ? getRandomReturningGreeting()
+          : getRandomGreeting();
+
+        const title = isReturning
+          ? `Welcome Back, ${member.displayName}!`
+          : `Welcome to Ridgeline, ${member.displayName}!`;
+
+        const body = isReturning
+          ? (
+            `> *${greeting}*\n\n` +
+            `Hey there, sugar \u2014 I'm **Peaches**, and I remember you! ` +
+            `Welcome back to **Ridgeline, Georgia**. We missed ya around here. ` +
+            `Your **Ridgeline Citizen** badge is right back where it belongs. \uD83C\uDF51`
+          )
+          : (
+            `> *${greeting}*\n\n` +
+            `Hey there, sugar \u2014 I'm **Peaches**, the town secretary. ` +
+            `Welcome to **Ridgeline, Georgia** \u2014 a close-knit community nestled in the hills ` +
+            `where neighbors look out for each other and there's always a story waiting to unfold.\n\n` +
+            `I went ahead and pinned that shiny **Ridgeline Citizen** badge on ya \u2014 ` +
+            `you're officially one of us now. You're resident **#${member.guild.memberCount}**! \uD83C\uDF51`
+          );
+
         const welcomeContainer = new ContainerBuilder()
           .setAccentColor(0xD4A574);
 
         const welcomeHeader = new SectionBuilder()
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-              `## \uD83C\uDFE1 Welcome to Ridgeline, ${member.displayName}!\n` +
-              `> *Well, ring the porch bell! We got ourselves a new neighbor!*\n\n` +
-              `Hey there, sugar \u2014 I'm **Peaches**, the town secretary. ` +
-              `Welcome to **Ridgeline, Georgia** \u2014 a close-knit community nestled in the hills ` +
-              `where neighbors look out for each other and there's always a story waiting to unfold.\n\n` +
-              `I went ahead and pinned that shiny **Ridgeline Citizen** badge on ya \u2014 ` +
-              `you're officially one of us now. You're resident **#${member.guild.memberCount}**! \uD83C\uDF51`
+              `## \uD83C\uDFE1 ${title}\n${body}`
             )
           )
           .setThumbnailAccessory(
@@ -71,95 +130,58 @@ export function setupMemberJoinHandler(client: Client) {
         welcomeContainer.addSectionComponents(welcomeHeader);
         welcomeContainer.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-        welcomeContainer.addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            `### \uD83D\uDDFA\uFE0F Your First Steps\n` +
-            `**Step 1** \u2014 Read the Rules in <#${CHANNELS.rules}>\n` +
-            `**Step 2** \u2014 Pick Your Roles in <#${CHANNELS.getRoles}>\n` +
-            `**Step 3** \u2014 Introduce Yourself in <#${CHANNELS.characterIntros}>\n` +
-            `**Step 4** \u2014 Explore <#${CHANNELS.realEstate}>, <#${CHANNELS.upcomingEvents}>, or <#${CHANNELS.generalChat}>`
-          )
-        );
-
-        welcomeContainer.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+        if (!isReturning) {
+          welcomeContainer.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              `### \uD83D\uDDFA\uFE0F Your First Steps\n` +
+              `**Step 1** \u2014 Read the Rules in <#${CHANNELS.rules}>\n` +
+              `**Step 2** \u2014 Pick Your Roles in <#${CHANNELS.getRoles}>\n` +
+              `**Step 3** \u2014 Introduce Yourself in <#${CHANNELS.characterIntros}>\n` +
+              `**Step 4** \u2014 Explore <#${CHANNELS.realEstate}>, <#${CHANNELS.upcomingEvents}>, or <#${CHANNELS.generalChat}>`
+            )
+          );
+          welcomeContainer.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+        }
 
         welcomeContainer.addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
             `\uD83C\uDF10 **[ridgelinesl.com](https://ridgelinesl.com)** \u2014 Town website, property listings, & more\n` +
             `\uD83C\uDF51 **Need help?** Just say "hey Peaches" in any channel\n` +
             `\uD83C\uDD98 **Staff help?** Click "Open a Ticket" in <#${CHANNELS.ticketPanel}>\n\n` +
-            `-# \uD83C\uDF51 A new face in town! Welcome, <@${member.id}>!`
+            `-# \uD83C\uDF51 ${isReturning ? 'A familiar face returns!' : 'A new face in town!'} Welcome, <@${member.id}>!`
           )
         );
 
+        // Build message with quick-action URL buttons
+        const welcomeButtons = buildWelcomeButtons();
+
         await welcomeChannel.send({
-          components: [welcomeContainer],
+          components: [welcomeContainer, welcomeButtons],
           flags: MessageFlags.IsComponentsV2,
         });
-        console.log(`[Peaches] Welcome message posted for ${member.displayName} in #${welcomeChannel.name}`);
+        console.log(`[Peaches] Welcome message posted for ${member.displayName} in #${welcomeChannel.name}${isReturning ? ' (returning)' : ''}`);
       }
 
-      // 3. Send DM — Full Orientation Packet
-      try {
-        const dmBanner = new EmbedBuilder()
-          .setColor(0xD4A574)
-          .setAuthor({
-            name: 'Peaches \uD83C\uDF51 \u2014 Town Secretary',
-            iconURL: client.user?.displayAvatarURL({ size: 128 }),
-          })
-          .setTitle('\uD83D\uDCEC Your New Resident Packet')
-          .setDescription(
-            `> *Peaches slips an envelope across the desk with a warm smile*\n\n` +
-            `Hey ${member.displayName}! I put together everything you need to get settled in. ` +
-            `Think of this as your welcome folder straight from the town office \u2014 ` +
-            `all the essentials in one place, sugar.`
-          );
+      // 3. Account age warning — post to mod-log if account < 7 days old
+      const accountAgeMs = Date.now() - member.user.createdTimestamp;
+      const accountAgeDays = Math.floor(accountAgeMs / (1000 * 60 * 60 * 24));
 
-        const dmGuide = new EmbedBuilder()
-          .setColor(0x8B6F47)
-          .setTitle('\u2501\u2501\u2501 \uD83D\uDCCB Resident Quick Guide \u2501\u2501\u2501')
-          .addFields(
-            {
-              name: '\uD83D\uDCDC Community Rules',
-              value: `Review our guidelines in <#${CHANNELS.rules}> \u2014 they keep Ridgeline safe and welcoming for everyone.`,
-              inline: false,
-            },
-            {
-              name: '\uD83C\uDFAD Customize Your Experience',
-              value:
-                `Visit <#${CHANNELS.getRoles}> to pick up:\n` +
-                `> \uD83D\uDD14 **Notifications** \u2014 Event alerts, job postings\n` +
-                `> \uD83C\uDFF7\uFE0F **Pronouns** \u2014 Let folks know how to address you\n` +
-                `> \uD83C\uDFE1 **Community tags** \u2014 Business owner, roleplayer, adult`,
-              inline: false,
-            },
-            {
-              name: '\uD83D\uDDFA\uFE0F Key Channels',
-              value:
-                `> <#${CHANNELS.generalChat}> \u2014 Hang out with the community\n` +
-                `> <#${CHANNELS.characterIntros}> \u2014 Tell us about your character\n` +
-                `> <#${CHANNELS.roleplayChat}> \u2014 Jump into the action\n` +
-                `> <#${CHANNELS.realEstate}> \u2014 Find a place to call home\n` +
-                `> <#${CHANNELS.upcomingEvents}> \u2014 See what's happening in town`,
-              inline: false,
-            },
-          );
-
-        const dmFooter = new EmbedBuilder()
-          .setColor(0xD4A574)
-          .setDescription(
-            `\uD83C\uDF10 **[ridgelinesl.com](https://ridgelinesl.com)** \u2014 Property listings, community news, business directory\n\n` +
-            `\uD83C\uDD98 **Need help?** Click "Open a Ticket" in <#${CHANNELS.ticketPanel}> or find any **Community Manager** / **Community Moderator**\n\n` +
-            `\uD83C\uDF51 **Talk to Peaches** \u2014 Just say "hey Peaches" in any channel and I'll come runnin'!`
-          )
-          .setFooter({ text: '\uD83C\uDFE1 Ridgeline, Georgia \u2014 Where Every Story Matters' })
-          .setTimestamp();
-
-        await member.send({ embeds: [dmBanner, dmGuide, dmFooter] });
-        console.log(`[Discord Bot] Sent welcome DM to ${member.displayName}`);
-      } catch {
-        console.log(`[Discord Bot] Could not DM ${member.displayName} (DMs likely disabled)`);
+      if (accountAgeDays < NEW_ACCOUNT_THRESHOLD_DAYS) {
+        const modLogChannel = member.guild.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
+        if (modLogChannel) {
+          try {
+            const warningEmbed = buildAccountAgeWarningEmbed(member, accountAgeDays);
+            await modLogChannel.send({ embeds: [warningEmbed] });
+            console.log(`[Discord Bot] Posted new account alert for ${member.displayName} (${accountAgeDays} days old)`);
+          } catch (err) {
+            console.error(`[Discord Bot] Failed to post account age warning:`, err);
+          }
+        }
       }
+
+      // 4. Send interactive onboarding DM
+      await sendOnboardingDM(client, member);
+
     } catch (err) {
       console.error(`[Discord Bot] Error handling new member ${member.displayName}:`, err);
     }

@@ -1,8 +1,34 @@
 import {
   SlashCommandBuilder,
+  PermissionFlagsBits,
   type Client,
 } from 'discord.js';
 import { GUILD_ID } from '../config.js';
+
+const AUDIT_LOG_ACTION_CHOICES = [
+  { name: 'Ticket Created', value: 'ticket_create' },
+  { name: 'Ticket Claimed', value: 'ticket_claim' },
+  { name: 'Ticket Unclaimed', value: 'ticket_unclaim' },
+  { name: 'Ticket Closed', value: 'ticket_close' },
+  { name: 'User Added to Ticket', value: 'ticket_add_user' },
+  { name: 'Ticket Close Denied', value: 'ticket_deny_close' },
+  { name: 'Ticket Priority Changed', value: 'ticket_priority' },
+  { name: 'Ticket Status Changed', value: 'ticket_status' },
+  { name: 'Ticket Note Added', value: 'ticket_note' },
+  { name: 'Ticket Reassigned', value: 'ticket_reassign' },
+  { name: 'Ticket Reopened', value: 'ticket_reopen' },
+  { name: 'Warning Issued', value: 'warn_issue' },
+  { name: 'Warning Cleared', value: 'warn_clear' },
+  { name: 'Suggestion Approved', value: 'suggestion_approve' },
+  { name: 'Suggestion Denied', value: 'suggestion_deny' },
+  { name: 'Suggestion Under Review', value: 'suggestion_review' },
+  { name: 'Member Timed Out', value: 'member_timeout' },
+  { name: 'Role Assigned', value: 'role_assign' },
+  { name: 'Role Removed', value: 'role_remove' },
+  { name: 'Announcement Posted', value: 'announce_post' },
+  { name: 'Member Joined', value: 'member_join' },
+  { name: 'Member Left', value: 'member_leave' },
+] as const;
 
 export async function registerSlashCommands(client: Client): Promise<void> {
   const guild = client.guilds.cache.get(GUILD_ID);
@@ -32,6 +58,10 @@ export async function registerSlashCommands(client: Client): Promise<void> {
       .addSubcommand(sub => sub
         .setName('delete')
         .setDescription('Remove your birthday from the records')
+      )
+      .addSubcommand(sub => sub
+        .setName('upcoming')
+        .setDescription('See birthdays in the next 7 days')
       ),
 
     // /suggest
@@ -70,7 +100,8 @@ export async function registerSlashCommands(client: Client): Promise<void> {
         opt.setName('ping')
           .setDescription('Role to ping with the announcement')
           .setRequired(false)
-      ),
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
     // /warn (staff only)
     new SlashCommandBuilder()
@@ -86,7 +117,8 @@ export async function registerSlashCommands(client: Client): Promise<void> {
           .setDescription('Reason for the warning')
           .setRequired(true)
           .setMaxLength(500)
-      ),
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
     // /warnings (staff only)
     new SlashCommandBuilder()
@@ -96,18 +128,25 @@ export async function registerSlashCommands(client: Client): Promise<void> {
         opt.setName('user')
           .setDescription('Member to look up')
           .setRequired(true)
-      ),
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
     // /clearwarn (staff only)
     new SlashCommandBuilder()
       .setName('clearwarn')
-      .setDescription('[Staff] Remove a specific warning by ID')
+      .setDescription('[Staff] Remove a warning by ID, or all warnings for a user')
       .addIntegerOption(opt =>
         opt.setName('id')
-          .setDescription('Warning ID (from /warnings)')
-          .setRequired(true)
+          .setDescription('Warning ID (from /warnings) — clears one warning')
+          .setRequired(false)
           .setMinValue(1)
-      ),
+      )
+      .addUserOption(opt =>
+        opt.setName('user')
+          .setDescription('Clear ALL warnings for this user')
+          .setRequired(false)
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
     // /auditlog (staff only) — subcommands
     new SlashCommandBuilder()
@@ -125,30 +164,7 @@ export async function registerSlashCommands(client: Client): Promise<void> {
           opt.setName('action')
             .setDescription('Filter by action type')
             .setRequired(false)
-            .addChoices(
-              { name: 'Ticket Created', value: 'ticket_create' },
-              { name: 'Ticket Claimed', value: 'ticket_claim' },
-              { name: 'Ticket Unclaimed', value: 'ticket_unclaim' },
-              { name: 'Ticket Closed', value: 'ticket_close' },
-              { name: 'User Added to Ticket', value: 'ticket_add_user' },
-              { name: 'Ticket Close Denied', value: 'ticket_deny_close' },
-              { name: 'Ticket Priority Changed', value: 'ticket_priority' },
-              { name: 'Ticket Status Changed', value: 'ticket_status' },
-              { name: 'Ticket Note Added', value: 'ticket_note' },
-              { name: 'Ticket Reassigned', value: 'ticket_reassign' },
-              { name: 'Ticket Reopened', value: 'ticket_reopen' },
-              { name: 'Warning Issued', value: 'warn_issue' },
-              { name: 'Warning Cleared', value: 'warn_clear' },
-              { name: 'Suggestion Approved', value: 'suggestion_approve' },
-              { name: 'Suggestion Denied', value: 'suggestion_deny' },
-              { name: 'Suggestion Under Review', value: 'suggestion_review' },
-              { name: 'Member Timed Out', value: 'member_timeout' },
-              { name: 'Role Assigned', value: 'role_assign' },
-              { name: 'Role Removed', value: 'role_remove' },
-              { name: 'Announcement Posted', value: 'announce_post' },
-              { name: 'Member Joined', value: 'member_join' },
-              { name: 'Member Left', value: 'member_leave' },
-            )
+            .addChoices(...AUDIT_LOG_ACTION_CHOICES)
         )
         .addStringOption(opt =>
           opt.setName('after')
@@ -178,30 +194,7 @@ export async function registerSlashCommands(client: Client): Promise<void> {
           opt.setName('action')
             .setDescription('Filter by action type')
             .setRequired(false)
-            .addChoices(
-              { name: 'Ticket Created', value: 'ticket_create' },
-              { name: 'Ticket Claimed', value: 'ticket_claim' },
-              { name: 'Ticket Unclaimed', value: 'ticket_unclaim' },
-              { name: 'Ticket Closed', value: 'ticket_close' },
-              { name: 'User Added to Ticket', value: 'ticket_add_user' },
-              { name: 'Ticket Close Denied', value: 'ticket_deny_close' },
-              { name: 'Ticket Priority Changed', value: 'ticket_priority' },
-              { name: 'Ticket Status Changed', value: 'ticket_status' },
-              { name: 'Ticket Note Added', value: 'ticket_note' },
-              { name: 'Ticket Reassigned', value: 'ticket_reassign' },
-              { name: 'Ticket Reopened', value: 'ticket_reopen' },
-              { name: 'Warning Issued', value: 'warn_issue' },
-              { name: 'Warning Cleared', value: 'warn_clear' },
-              { name: 'Suggestion Approved', value: 'suggestion_approve' },
-              { name: 'Suggestion Denied', value: 'suggestion_deny' },
-              { name: 'Suggestion Under Review', value: 'suggestion_review' },
-              { name: 'Member Timed Out', value: 'member_timeout' },
-              { name: 'Role Assigned', value: 'role_assign' },
-              { name: 'Role Removed', value: 'role_remove' },
-              { name: 'Announcement Posted', value: 'announce_post' },
-              { name: 'Member Joined', value: 'member_join' },
-              { name: 'Member Left', value: 'member_leave' },
-            )
+            .addChoices(...AUDIT_LOG_ACTION_CHOICES)
         )
         .addStringOption(opt =>
           opt.setName('after')
@@ -228,7 +221,8 @@ export async function registerSlashCommands(client: Client): Promise<void> {
             .setMinValue(7)
             .setMaxValue(730)
         )
-      ),
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
     // /ticket (staff + user subcommands)
     new SlashCommandBuilder()
@@ -353,12 +347,70 @@ export async function registerSlashCommands(client: Client): Promise<void> {
       .addSubcommand(sub => sub
         .setName('mine')
         .setDescription('View your open tickets')
+      )
+      .addSubcommand(sub => sub
+        .setName('quickreply')
+        .setDescription('[Staff] Send a quick reply template')
+      )
+      .addSubcommand(sub => sub
+        .setName('transfer')
+        .setDescription('[Staff] Transfer this ticket to a different department')
+        .addStringOption(opt =>
+          opt.setName('department')
+            .setDescription('Department to transfer to')
+            .setRequired(true)
+            .addChoices(
+              { name: 'General Support', value: 'general' },
+              { name: 'Rental / Landscaping', value: 'rental' },
+              { name: 'Events', value: 'events' },
+              { name: 'Marketing', value: 'marketing' },
+              { name: 'Roleplay Support', value: 'roleplay' },
+            )
+        )
+      )
+      .addSubcommand(sub => sub
+        .setName('feedback')
+        .setDescription('[Staff] View ticket satisfaction ratings and comments')
+        .addStringOption(opt =>
+          opt.setName('department')
+            .setDescription('Filter by department')
+            .setRequired(false)
+            .addChoices(
+              { name: 'General Support', value: 'general' },
+              { name: 'Rental / Landscaping', value: 'rental' },
+              { name: 'Events', value: 'events' },
+              { name: 'Marketing', value: 'marketing' },
+              { name: 'Roleplay Support', value: 'roleplay' },
+            )
+        )
       ),
 
     // /region (staff only)
     new SlashCommandBuilder()
       .setName('region')
-      .setDescription('[Staff] Check current SL region status'),
+      .setDescription('[Staff] Check current SL region status')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+    // /userinfo (staff only)
+    new SlashCommandBuilder()
+      .setName('userinfo')
+      .setDescription('[Staff] View detailed member information')
+      .addUserOption(opt =>
+        opt.setName('user')
+          .setDescription('Member to look up')
+          .setRequired(true)
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+    // /welcome
+    new SlashCommandBuilder()
+      .setName('welcome')
+      .setDescription('Resend your welcome DM packet'),
+
+    // /serverstats (public)
+    new SlashCommandBuilder()
+      .setName('serverstats')
+      .setDescription('View community statistics for Ridgeline'),
 
     // /help
     new SlashCommandBuilder()
@@ -416,7 +468,8 @@ export async function registerSlashCommands(client: Client): Promise<void> {
               { name: 'Trigger Reference', value: 'triggers' },
             )
         )
-      ),
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   ];
 

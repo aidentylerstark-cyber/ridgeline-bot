@@ -12,7 +12,7 @@ import { GLOBAL_STAFF_ROLES } from '../config.js';
 
 /** Only Ridgeline Owner / First Lady can use /admin */
 function isOwner(member: GuildMember): boolean {
-  const ownerRoles = ['Ridgeline Owner', 'First Lady'];
+  const ownerRoles = GLOBAL_STAFF_ROLES.filter(r => r === 'Ridgeline Owner' || r === 'First Lady');
   return ownerRoles.some(name => member.roles.cache.some(r => r.name === name));
 }
 
@@ -34,7 +34,7 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
         await interaction.editReply({ content: `\u2705 **${category}** reorganization complete! Channels have been renamed. \uD83C\uDF51` });
       } catch (err) {
         console.error('[Peaches] Admin reorg failed:', err);
-        await interaction.editReply({ content: `\u274C Reorganization failed. Check the logs for details.` });
+        await interaction.editReply({ content: `Well shoot, sugar \u2014 that reorganization didn't go as planned. Check the logs for details, hon! \uD83C\uDF51` });
       }
       return;
     }
@@ -47,7 +47,7 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
         await interaction.editReply({ content: `\u2705 **${category}** permissions set! \uD83C\uDF51` });
       } catch (err) {
         console.error('[Peaches] Admin permissions failed:', err);
-        await interaction.editReply({ content: `\u274C Permission setup failed. Check the logs for details.` });
+        await interaction.editReply({ content: `Darn it, sugar \u2014 those permissions didn't take. Check the logs and we'll figure it out! \uD83C\uDF51` });
       }
       return;
     }
@@ -78,7 +78,7 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
         }
       } catch (err) {
         console.error('[Peaches] Admin panel failed:', err);
-        await interaction.editReply({ content: `\u274C Panel posting failed. Check the logs for details.` });
+        await interaction.editReply({ content: `Oh honey, that panel didn't want to cooperate. Check the logs for what went wrong! \uD83C\uDF51` });
       }
       return;
     }

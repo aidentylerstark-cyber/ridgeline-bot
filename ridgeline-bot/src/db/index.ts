@@ -23,7 +23,7 @@ const pool = new Pool({
 
 // Handle pool errors
 pool.on("error", (err) => {
-  console.error("Unexpected PostgreSQL pool error:", err);
+  console.error("[Discord Bot] Unexpected PostgreSQL pool error:", err);
 });
 
 // Create Drizzle ORM instance

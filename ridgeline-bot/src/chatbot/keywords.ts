@@ -250,7 +250,7 @@ export const PEACHES_PATTERNS: Array<{ patterns: RegExp[]; responses: string[] }
     ],
   },
   {
-    patterns: [/\btell me (a secret|a story|some gossip)\b/, /\bgossip\b/, /\bspill\b/, /\btea\b(?!\w)/, /\bwhat(?:'s| is) the tea\b/],
+    patterns: [/\btell me (a secret|a story|some gossip)\b/, /\bgossip\b/, /\bspill\b/, /\b(spill the tea|got tea|any tea|the tea|hot tea)\b/, /\bwhat(?:'s| is) the tea\b/],
     responses: [
       "A lady *never* tells... but somebody's been sneakin' extra servings at the potluck. I won't say who, but their initials rhyme with *everyone*. \uD83D\uDC40\u2615",
       "Ooh, the TEA? Someone on the town council has been secretly learning to line dance. For MONTHS. That's all I'm sayin'. \uD83D\uDC83\uD83D\uDC40",

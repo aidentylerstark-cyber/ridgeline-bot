@@ -75,10 +75,14 @@ export async function createDiscordTicket(data: {
   return ticket;
 }
 
-export async function updateTicketClaim(channelId: string, claimedBy: string | null): Promise<void> {
-  await db.update(discordTickets)
-    .set({ claimedBy })
-    .where(and(eq(discordTickets.channelId, channelId), eq(discordTickets.isClosed, false)));
+/** Atomically update ticket claim. Returns true if a row was actually updated. */
+export async function updateTicketClaim(channelId: string, claimedBy: string | null): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE discord_tickets SET claimed_by = $1
+     WHERE channel_id = $2 AND is_closed = false`,
+    [claimedBy, channelId]
+  );
+  return (rowCount ?? 0) > 0;
 }
 
 /** Atomically claim a ticket only if it is currently unclaimed. Returns true if claimed. */
@@ -318,6 +322,58 @@ export async function getTicketsForEscalation(): Promise<EscalationTicketRow[]> 
   return rows;
 }
 
+/** Get tickets with status 'waiting_on_user' that have been inactive for the given number of hours */
+export async function getStaleWaitingOnUserTickets(hoursThreshold: number): Promise<EscalationTicketRow[]> {
+  const { rows } = await pool.query<EscalationTicketRow>(
+    `SELECT id, ticket_number, department, channel_id, user_name, discord_user_id, priority, status, escalation_level, claimed_by, created_at, last_activity_at
+     FROM discord_tickets
+     WHERE is_closed = false AND status = 'waiting_on_user'
+       AND last_activity_at < NOW() - INTERVAL '1 hour' * $1
+     ORDER BY last_activity_at ASC`,
+    [hoursThreshold]
+  );
+  return rows;
+}
+
+/** Update ticket department (for transfers) */
+export async function updateTicketDepartment(channelId: string, department: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE discord_tickets SET department = $1, last_activity_at = NOW()
+     WHERE channel_id = $2 AND is_closed = false`,
+    [department, channelId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+/** Get count of open tickets for a user */
+export async function getOpenTicketCountByUser(discordUserId: string): Promise<number> {
+  const { rows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) FROM discord_tickets WHERE discord_user_id = $1 AND is_closed = false`,
+    [discordUserId]
+  );
+  return parseInt(rows[0]?.count ?? '0', 10);
+}
+
+/** Get upcoming birthdays within a date range (month/day pairs) */
+export async function getUpcomingBirthdays(dates: Array<{ month: number; day: number }>): Promise<DiscordBirthday[]> {
+  if (dates.length === 0) return [];
+  const conditions = dates.map((_, i) => `(month = $${i * 2 + 1} AND day = $${i * 2 + 2})`).join(' OR ');
+  const params = dates.flatMap(d => [d.month, d.day]);
+  const { rows } = await pool.query<{ id: number; discord_user_id: string; month: number; day: number; character_name: string | null; created_at: Date; updated_at: Date }>(
+    `SELECT id, discord_user_id, month, day, character_name, created_at, updated_at FROM discord_birthdays WHERE ${conditions} ORDER BY month, day`,
+    params
+  );
+  return rows.map(r => ({
+    id: r.id,
+    discordUserId: r.discord_user_id,
+    month: r.month,
+    day: r.day,
+    characterName: r.character_name,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }));
+}
+
 export async function updateTicketEscalationLevel(ticketId: number, level: number): Promise<void> {
   await pool.query(
     `UPDATE discord_tickets SET escalation_level = $1 WHERE id = $2`,
@@ -404,7 +460,7 @@ export async function recordMilestonePost(discordUserId: string, milestoneDays: 
 /** Fetch all posted milestones in one query — returns Set of "userId:days" keys */
 export async function getAllPostedMilestones(): Promise<Set<string>> {
   const { rows } = await pool.query<{ discord_user_id: string; milestone_days: number }>(
-    `SELECT discord_user_id, milestone_days FROM discord_milestone_posts`
+    `SELECT discord_user_id, milestone_days FROM discord_milestone_posts WHERE created_at > NOW() - INTERVAL '2 years'`
   );
   return new Set(rows.map(r => `${r.discord_user_id}:${r.milestone_days}`));
 }
@@ -508,9 +564,9 @@ export async function getWarningCount(discordUserId: string): Promise<number> {
   return parseInt(rows[0]?.count ?? '0', 10);
 }
 
-export async function clearWarning(id: number): Promise<boolean> {
+export async function clearWarning(id: number): Promise<DiscordWarning | null> {
   const result = await db.delete(discordWarnings).where(eq(discordWarnings.id, id)).returning();
-  return result.length > 0;
+  return result[0] ?? null;
 }
 
 // ============================================
@@ -538,13 +594,7 @@ export async function getDueRoleRemovals(): Promise<Array<{ discordUserId: strin
 
 export async function purgeClosedTickets(days: number): Promise<number> {
   const cutoff = new Date(Date.now() - days * 86_400_000);
-  // Delete orphaned notes first (tickets about to be purged), then delete the tickets
-  await pool.query(
-    `DELETE FROM discord_ticket_notes WHERE ticket_id IN (
-       SELECT id FROM discord_tickets WHERE is_closed = true AND closed_at < $1
-     )`,
-    [cutoff]
-  );
+  // Notes and feedback are deleted automatically via ON DELETE CASCADE
   const { rowCount } = await pool.query(
     `DELETE FROM discord_tickets WHERE is_closed = true AND closed_at < $1`,
     [cutoff]
@@ -668,6 +718,93 @@ export async function purgeOldRegionSnapshots(days: number): Promise<number> {
   return rowCount ?? 0;
 }
 
+// ============================================
+// Ticket Feedback (satisfaction survey)
+// ============================================
+
+export async function saveTicketFeedback(ticketId: number, rating: number, comment?: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO discord_ticket_feedback (ticket_id, rating, comment)
+     VALUES ($1, $2, $3)
+     ON CONFLICT DO NOTHING`,
+    [ticketId, rating, comment ?? null]
+  );
+}
+
+export interface TicketFeedbackRow {
+  id: number;
+  ticket_id: number;
+  rating: number;
+  comment: string | null;
+  created_at: Date;
+}
+
+export async function getTicketFeedback(ticketId: number): Promise<TicketFeedbackRow | null> {
+  const { rows } = await pool.query<TicketFeedbackRow>(
+    `SELECT * FROM discord_ticket_feedback WHERE ticket_id = $1 LIMIT 1`,
+    [ticketId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function getAverageRating(department?: string): Promise<{ avg_rating: number; total_responses: number }> {
+  let query: string;
+  let params: unknown[];
+  if (department) {
+    query = `SELECT COALESCE(AVG(f.rating), 0) AS avg_rating, COUNT(f.id) AS total_responses
+             FROM discord_ticket_feedback f
+             JOIN discord_tickets t ON f.ticket_id = t.id
+             WHERE t.department = $1`;
+    params = [department];
+  } else {
+    query = `SELECT COALESCE(AVG(rating), 0) AS avg_rating, COUNT(id) AS total_responses
+             FROM discord_ticket_feedback`;
+    params = [];
+  }
+  const { rows } = await pool.query<{ avg_rating: string; total_responses: string }>(query, params);
+  return {
+    avg_rating: parseFloat(rows[0]?.avg_rating ?? '0'),
+    total_responses: parseInt(rows[0]?.total_responses ?? '0', 10),
+  };
+}
+
+// ============================================
+// Ticket Resolution
+// ============================================
+
+export async function updateTicketResolution(ticketId: number, resolution: string, resolutionType: string): Promise<void> {
+  await pool.query(
+    `UPDATE discord_tickets SET resolution = $1, resolution_type = $2 WHERE id = $3`,
+    [resolution, resolutionType, ticketId]
+  );
+}
+
+// ============================================
+// First Response Time
+// ============================================
+
+/** Atomically set first_response_at only if currently NULL. Returns true if updated. */
+export async function updateFirstResponseTime(channelId: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE discord_tickets SET first_response_at = NOW()
+     WHERE channel_id = $1 AND is_closed = false AND first_response_at IS NULL`,
+    [channelId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+/** Get average first response time in minutes for a given period */
+export async function getAverageFirstResponseTime(since: Date): Promise<number | null> {
+  const { rows } = await pool.query<{ avg_minutes: string | null }>(
+    `SELECT AVG(EXTRACT(EPOCH FROM (first_response_at - created_at)) / 60) AS avg_minutes
+     FROM discord_tickets
+     WHERE first_response_at IS NOT NULL AND created_at >= $1`,
+    [since]
+  );
+  const val = rows[0]?.avg_minutes;
+  return val ? parseFloat(val) : null;
+}
+
 export async function purgeAuditLogsByAction(action: string, days: number): Promise<number> {
   const cutoff = new Date(Date.now() - days * 86_400_000);
   const { rowCount } = await pool.query(
@@ -675,4 +812,226 @@ export async function purgeAuditLogsByAction(action: string, days: number): Prom
     [action, cutoff]
   );
   return rowCount ?? 0;
+}
+
+// ============================================
+// Onboarding
+// ============================================
+
+export interface OnboardingRow {
+  user_id: string;
+  character_name: string | null;
+  interests: string | null;
+  step: number;
+  started_at: Date;
+  completed_at: Date | null;
+}
+
+/** Create or reset an onboarding record for a user. */
+export async function createOnboardingRecord(userId: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO discord_onboarding (user_id, step, started_at)
+     VALUES ($1, 1, NOW())
+     ON CONFLICT (user_id) DO UPDATE SET step = 1, started_at = NOW(), completed_at = NULL`,
+    [userId]
+  );
+}
+
+/** Update the onboarding step for a user. */
+export async function updateOnboardingStep(userId: string, step: number): Promise<void> {
+  await pool.query(
+    `UPDATE discord_onboarding SET step = $1 WHERE user_id = $2`,
+    [step, userId]
+  );
+}
+
+/** Get the onboarding record for a user, or null if none exists. */
+export async function getOnboardingRecord(userId: string): Promise<OnboardingRow | null> {
+  const { rows } = await pool.query<OnboardingRow>(
+    `SELECT user_id, character_name, interests, step, started_at, completed_at FROM discord_onboarding WHERE user_id = $1`,
+    [userId]
+  );
+  return rows[0] ?? null;
+}
+
+/** Mark onboarding as complete with optional character name and interests. */
+export async function completeOnboarding(userId: string, characterName: string | null, interests: string | null): Promise<void> {
+  await pool.query(
+    `UPDATE discord_onboarding SET step = 4, completed_at = NOW(), character_name = $1, interests = $2 WHERE user_id = $3`,
+    [characterName, interests, userId]
+  );
+}
+
+// ============================================
+// Userinfo — enriched queries
+// ============================================
+
+/** Get average satisfaction rating for a specific user's tickets */
+export async function getUserAverageRating(userId: string): Promise<{ avg_rating: number; total_responses: number }> {
+  const { rows } = await pool.query<{ avg_rating: string; total_responses: string }>(
+    `SELECT COALESCE(AVG(f.rating), 0) AS avg_rating, COUNT(f.id) AS total_responses
+     FROM discord_ticket_feedback f
+     JOIN discord_tickets t ON f.ticket_id = t.id
+     WHERE t.discord_user_id = $1`,
+    [userId]
+  );
+  return {
+    avg_rating: parseFloat(rows[0]?.avg_rating ?? '0'),
+    total_responses: parseInt(rows[0]?.total_responses ?? '0', 10),
+  };
+}
+
+/** Get count of closed tickets for a user */
+export async function getClosedTicketCountByUser(userId: string): Promise<number> {
+  const { rows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) FROM discord_tickets WHERE discord_user_id = $1 AND is_closed = true`,
+    [userId]
+  );
+  return parseInt(rows[0]?.count ?? '0', 10);
+}
+
+// ============================================
+// Ticket Feedback — reporting queries
+// ============================================
+
+export interface RecentFeedbackRow {
+  ticket_number: number;
+  department: string;
+  rating: number;
+  comment: string | null;
+  created_at: Date;
+}
+
+/** Get recent feedback entries, optionally filtered by department */
+export async function getRecentFeedback(limit: number, department?: string): Promise<RecentFeedbackRow[]> {
+  let query: string;
+  let params: unknown[];
+  if (department) {
+    query = `SELECT t.ticket_number, t.department, f.rating, f.comment, f.created_at
+             FROM discord_ticket_feedback f
+             JOIN discord_tickets t ON f.ticket_id = t.id
+             WHERE t.department = $1
+             ORDER BY f.created_at DESC LIMIT $2`;
+    params = [department, limit];
+  } else {
+    query = `SELECT t.ticket_number, t.department, f.rating, f.comment, f.created_at
+             FROM discord_ticket_feedback f
+             JOIN discord_tickets t ON f.ticket_id = t.id
+             ORDER BY f.created_at DESC LIMIT $1`;
+    params = [limit];
+  }
+  const { rows } = await pool.query<RecentFeedbackRow>(query, params);
+  return rows;
+}
+
+export interface RatingDistributionRow {
+  rating: number;
+  count: number;
+}
+
+/** Get count of ratings at each level (1-5), optionally filtered by department */
+export async function getRatingDistribution(department?: string): Promise<RatingDistributionRow[]> {
+  let query: string;
+  let params: unknown[];
+  if (department) {
+    query = `SELECT f.rating, COUNT(*)::int AS count
+             FROM discord_ticket_feedback f
+             JOIN discord_tickets t ON f.ticket_id = t.id
+             WHERE t.department = $1
+             GROUP BY f.rating ORDER BY f.rating`;
+    params = [department];
+  } else {
+    query = `SELECT rating, COUNT(*)::int AS count
+             FROM discord_ticket_feedback
+             GROUP BY rating ORDER BY rating`;
+    params = [];
+  }
+  const { rows } = await pool.query<RatingDistributionRow>(query, params);
+  return rows;
+}
+
+// ============================================
+// Warnings — clear all for user
+// ============================================
+
+/** Delete all warnings for a user, returns the count deleted */
+export async function clearAllWarnings(userId: string): Promise<number> {
+  const { rowCount } = await pool.query(
+    `DELETE FROM discord_warnings WHERE discord_user_id = $1`,
+    [userId]
+  );
+  return rowCount ?? 0;
+}
+
+// ============================================
+// Staff Report — time-bounded queries
+// ============================================
+
+/** Get average satisfaction rating for tickets closed within a date range */
+export async function getAverageRatingSince(since: Date): Promise<{ avg_rating: number; total_responses: number }> {
+  const { rows } = await pool.query<{ avg_rating: string; total_responses: string }>(
+    `SELECT COALESCE(AVG(f.rating), 0) AS avg_rating, COUNT(f.id) AS total_responses
+     FROM discord_ticket_feedback f
+     JOIN discord_tickets t ON f.ticket_id = t.id
+     WHERE f.created_at >= $1`,
+    [since]
+  );
+  return {
+    avg_rating: parseFloat(rows[0]?.avg_rating ?? '0'),
+    total_responses: parseInt(rows[0]?.total_responses ?? '0', 10),
+  };
+}
+
+export interface StaffSatisfactionRow {
+  staff_id: string;
+  avg_rating: number;
+  total_responses: number;
+}
+
+/** Get per-staff satisfaction ratings for tickets they claimed, since a given date */
+export async function getStaffSatisfactionSince(since: Date): Promise<StaffSatisfactionRow[]> {
+  const { rows } = await pool.query<{ staff_id: string; avg_rating: string; total_responses: string }>(
+    `SELECT t.claimed_by AS staff_id, AVG(f.rating) AS avg_rating, COUNT(f.id) AS total_responses
+     FROM discord_ticket_feedback f
+     JOIN discord_tickets t ON f.ticket_id = t.id
+     WHERE t.claimed_by IS NOT NULL AND f.created_at >= $1
+     GROUP BY t.claimed_by
+     ORDER BY avg_rating DESC`,
+    [since]
+  );
+  return rows.map(r => ({
+    staff_id: r.staff_id,
+    avg_rating: parseFloat(r.avg_rating),
+    total_responses: parseInt(r.total_responses, 10),
+  }));
+}
+
+// ============================================
+// Server Stats — community queries
+// ============================================
+
+/** Get total count of registered birthdays */
+export async function getBirthdayCount(): Promise<number> {
+  const { rows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) FROM discord_birthdays`
+  );
+  return parseInt(rows[0]?.count ?? '0', 10);
+}
+
+/** Get total count of closed tickets */
+export async function getTotalClosedTicketCount(): Promise<number> {
+  const { rows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) FROM discord_tickets WHERE is_closed = true`
+  );
+  return parseInt(rows[0]?.count ?? '0', 10);
+}
+
+// ============================================
+// Birthday — monthly summary
+// ============================================
+
+/** Get all birthdays for a given month */
+export async function getBirthdaysByMonth(month: number): Promise<DiscordBirthday[]> {
+  return db.select().from(discordBirthdays)
+    .where(eq(discordBirthdays.month, month));
 }

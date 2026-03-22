@@ -26,19 +26,26 @@ src/
     interaction.ts             — Slash commands, buttons, modals, select menus dispatch
   features/
     tickets.ts                 — Core ticket CRUD: create, close (atomic), reopen, staff mentions
-    ticket-commands.ts         — /ticket subcommands: search, stats, priority, status, notes, assign, reopen, mine
+    ticket-commands.ts         — /ticket subcommands: search, stats, priority, status, notes, assign, reopen, mine, transfer, quickreply, feedback
+    ticket-quickreplies.ts     — Quick reply templates for staff in ticket channels
     announce.ts                — /announce — staff announcements with optional pings
-    birthdays.ts               — /birthday set/check/delete — birthday registration & celebrations
+    birthdays.ts               — /birthday set/check/delete/upcoming — birthday registration & celebrations
     suggestions.ts             — /suggest — suggestion board with approve/deny/reviewing workflow
     warnings.ts                — /warn, /warnings, /clearwarn — user warning system
     audit-log.ts               — /auditlog search/export/stats/config — comprehensive audit trail
     region-monitoring.ts       — /region — SL region FPS/dilation alerts & daily summary
+    userinfo.ts                — /userinfo — staff-only member overview (roles, warnings, tickets, onboarding, birthday, satisfaction)
+    serverstats.ts             — /serverstats — public community stats (members, birthdays, tickets, satisfaction)
+    welcome-resend.ts          — /welcome — resend welcome DM packet + shared DM builder
+    onboarding.ts              — Interactive onboarding DM flow, rotating greetings, account age alerts
     modlog.ts                  — Auto-raid detection, verification level management
     stats-channels.ts          — Voice channel member/online count (every 10 min)
   handlers/
-    ticket-buttons.ts          — Ticket button interactions (open, claim, close, add user)
-    ticket-modal.ts            — Ticket creation modal & department selection
+    ticket-buttons.ts          — Ticket button interactions (open, claim, close, add user, resolution modal)
+    ticket-modal.ts            — Ticket creation modal & department selection (w/ priority auto-detection)
+    ticket-feedback.ts         — Satisfaction survey DM, rating buttons, comment modal
     role-buttons.ts            — Self-assign role button handler
+    onboarding-buttons.ts      — Onboarding DM button & modal handlers (4-step flow)
   panels/
     ticket-panel.ts            — Posts "Open a Ticket" button panel
     role-panel.ts              — Posts role selection panels (Notifications, Pronouns, Community)
@@ -49,8 +56,9 @@ src/
     milestone-check.ts         — Daily 9 AM ET: member anniversary milestones
     ticket-inactivity.ts       — Every 3h: escalate stale tickets (3 tiers)
     cleanup.ts                 — Every 15m: role removals; Sunday 3 AM: data purge
-    staff-report.ts            — Monday 9 AM ET: weekly staff activity report
+    staff-report.ts            — Monday 9 AM ET: weekly staff activity report (+ satisfaction, FRT, per-staff ratings)
     region-daily-summary.ts    — Daily 11 PM ET: SL region summary
+    birthday-monthly-summary.ts — 1st of each month 8 AM ET: birthday summary for the month
   utilities/
     instance-lock.ts           — Redis-based single-instance lock
     cooldowns.ts               — Per-user cooldown manager
@@ -95,7 +103,7 @@ Global staff (all depts): Ridgeline Owner, First Lady, Ridgeline Management, Rid
 | Table | Purpose | Key Columns |
 |---|---|---|
 | siteContent | Key-value JSON store | key (PK), value (JSONB) |
-| discordTickets | Support tickets | ticketNumber, department, channelId (UNIQUE), isClosed, priority, status, escalationLevel |
+| discordTickets | Support tickets | ticketNumber, department, channelId (UNIQUE), isClosed, priority, status, escalationLevel, resolution, resolutionType, firstResponseAt |
 | discordTicketNotes | Staff notes on tickets | ticketId (FK), staffDiscordId, content |
 | discordBirthdays | Birthday registry | discordUserId (UNIQUE), month, day |
 | discordSuggestions | Community suggestions | discordUserId, content, messageId, status |
@@ -105,6 +113,8 @@ Global staff (all depts): Ridgeline Owner, First Lady, Ridgeline Management, Rid
 | discordScheduledRoleRemovals | Auto role removal | discordUserId + roleName, removeAt |
 | discordAuditLog | Full audit trail | action, actorDiscordId, targetDiscordId, referenceId |
 | regionSnapshots | SL region history | regionName, fps, dilation, agentCount, eventType |
+| discordTicketFeedback | Satisfaction surveys | ticketId (FK), rating (1-5), comment |
+| discordOnboarding | Interactive DM onboarding state | userId (PK), characterName, interests, step, completedAt |
 
 ## Chatbot Pipeline (pipeline.ts)
 
@@ -121,10 +131,11 @@ Runs in order, returns at first match:
 
 1. User clicks "Close Ticket" → `handleTicketClose` (ticket-buttons.ts)
 2. Staff → confirm/cancel buttons; Owner → request close (staff must approve)
-3. `handleTicketConfirmClose` → `interaction.update()` → `closeTicket()` (tickets.ts)
-4. `closeTicket()`: send closing embed → generate transcript → atomic DB close → audit log → delete channel
-5. Race protection: `closeDiscordTicket()` returns boolean (atomic UPDATE with `is_closed = false` WHERE)
-6. Zombie detection: if ticket closed in DB but channel exists, auto-cleanup
+3. `handleTicketConfirmClose` → shows resolution modal (type + summary)
+4. `handleTicketResolutionModal` → saves resolution → `closeTicket()` (tickets.ts)
+5. `closeTicket()`: send closing embed → transcript → atomic DB close → send satisfaction survey DM → audit log → delete channel
+6. Race protection: `closeDiscordTicket()` returns boolean (atomic UPDATE with `is_closed = false` WHERE)
+7. Zombie detection: if ticket closed in DB but channel exists, auto-cleanup
 
 ## Escalation Thresholds
 

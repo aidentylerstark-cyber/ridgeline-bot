@@ -37,7 +37,7 @@ export function setupModLog(client: Client): void {
     const embed = new EmbedBuilder()
       .setColor(0x57F287)
       .setTitle('📥 Member Joined')
-      .setDescription(`${member} — \`${member.user.tag}\``)
+      .setDescription(`${member} — \`${member.user.displayName}\``)
       .addFields(
         { name: '🆔 User ID', value: member.id, inline: true },
         { name: '📅 Account Created', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true },
@@ -52,7 +52,7 @@ export function setupModLog(client: Client): void {
       action: 'member_join',
       actorId: member.id,
       targetId: member.id,
-      details: `${member.user.tag} joined the server`,
+      details: `${member.user.displayName} joined the server`,
     });
 
     // Anti-raid: track join rate (in-memory — resets on restart, which is acceptable
@@ -134,7 +134,7 @@ export function setupModLog(client: Client): void {
     const embed = new EmbedBuilder()
       .setColor(0xED4245)
       .setTitle('📤 Member Left')
-      .setDescription(`\`${member.user.tag}\``)
+      .setDescription(`\`${member.user.displayName}\``)
       .addFields({ name: '🆔 User ID', value: member.id, inline: true })
       .setThumbnail(member.user.displayAvatarURL({ size: 64 }))
       .setTimestamp();
@@ -146,7 +146,7 @@ export function setupModLog(client: Client): void {
       action: 'member_leave',
       actorId: member.id,
       targetId: member.id,
-      details: `${member.user.tag} left the server`,
+      details: `${member.user.displayName} left the server`,
     });
   });
 
@@ -207,13 +207,13 @@ export function setupModLog(client: Client): void {
       await new Promise(r => setTimeout(r, 500)); // slight delay for audit log propagation
       const logs = await ban.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberBanAdd });
       const entry = logs.entries.first();
-      if (entry && entry.targetId === ban.user.id) executor = entry.executor?.tag ?? 'Unknown';
+      if (entry && entry.targetId === ban.user.id) executor = entry.executor?.displayName ?? 'Unknown';
     } catch {}
 
     const embed = new EmbedBuilder()
       .setColor(0xED4245)
       .setTitle('🔨 Member Banned')
-      .setDescription(`\`${ban.user.tag}\` (${ban.user.id})`)
+      .setDescription(`\`${ban.user.displayName}\` (${ban.user.id})`)
       .addFields(
         { name: 'Reason', value: ban.reason ?? 'No reason provided' },
         { name: '👮 Banned By', value: executor, inline: true },
@@ -234,13 +234,13 @@ export function setupModLog(client: Client): void {
       await new Promise(r => setTimeout(r, 500));
       const logs = await ban.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberBanRemove });
       const entry = logs.entries.first();
-      if (entry && entry.targetId === ban.user.id) executor = entry.executor?.tag ?? 'Unknown';
+      if (entry && entry.targetId === ban.user.id) executor = entry.executor?.displayName ?? 'Unknown';
     } catch {}
 
     const embed = new EmbedBuilder()
       .setColor(0x57F287)
       .setTitle('✅ Member Unbanned')
-      .setDescription(`\`${ban.user.tag}\` (${ban.user.id})`)
+      .setDescription(`\`${ban.user.displayName}\` (${ban.user.id})`)
       .addFields({ name: '👮 Unbanned By', value: executor, inline: true })
       .setTimestamp();
 

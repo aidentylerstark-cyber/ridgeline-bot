@@ -34,12 +34,15 @@ export const discordTickets = pgTable("discord_tickets", {
   reopenedBy: varchar("reopened_by", { length: 30 }),
   reopenedAt: timestamp("reopened_at"),
   lastActivityAt: timestamp("last_activity_at").notNull().defaultNow(),
+  resolution: text("resolution"),
+  resolutionType: varchar("resolution_type", { length: 20 }),
+  firstResponseAt: timestamp("first_response_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const discordTicketNotes = pgTable("discord_ticket_notes", {
   id: serial("id").primaryKey(),
-  ticketId: integer("ticket_id").notNull(),
+  ticketId: integer("ticket_id").notNull().references(() => discordTickets.id),
   staffDiscordId: varchar("staff_discord_id", { length: 30 }).notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -140,6 +143,31 @@ export const regionSnapshots = pgTable('region_snapshots', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// ============================================
+// Ticket Feedback (satisfaction surveys)
+// ============================================
+
+export const discordTicketFeedback = pgTable("discord_ticket_feedback", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").notNull().references(() => discordTickets.id, { onDelete: 'cascade' }),
+  rating: integer("rating").notNull(), // 1-5
+  comment: text("comment"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ============================================
+// Onboarding
+// ============================================
+
+export const discordOnboarding = pgTable("discord_onboarding", {
+  userId: varchar("user_id", { length: 30 }).primaryKey(),
+  characterName: varchar("character_name", { length: 200 }),
+  interests: varchar("interests", { length: 200 }),
+  step: integer("step").notNull().default(1),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
 export type SiteContent = typeof siteContent.$inferSelect;
 export type DiscordTicket = typeof discordTickets.$inferSelect;
 export type DiscordTicketNote = typeof discordTicketNotes.$inferSelect;
@@ -149,4 +177,6 @@ export type DiscordWarning = typeof discordWarnings.$inferSelect;
 export type DiscordAuditLog = typeof discordAuditLog.$inferSelect;
 export type DiscordScheduledRoleRemoval = typeof discordScheduledRoleRemovals.$inferSelect;
 export type RegionSnapshot = typeof regionSnapshots.$inferSelect;
+export type DiscordTicketFeedback = typeof discordTicketFeedback.$inferSelect;
+export type DiscordOnboarding = typeof discordOnboarding.$inferSelect;
 

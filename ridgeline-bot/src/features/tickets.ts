@@ -16,6 +16,7 @@ import * as storage from '../storage.js';
 import { TICKET_CATEGORIES, CHANNELS, TICKET_LIMIT_BYPASS_ROLES, GLOBAL_STAFF_ROLES, TICKET_PRIORITY_COLORS, isValidDepartment, type TicketDepartment } from '../config.js';
 import type { DiscordTicket } from '../db/schema.js';
 import { logAuditEvent } from './audit-log.js';
+import { sendTicketSurveyDM } from '../handlers/ticket-feedback.js';
 
 // ─────────────────────────────────────────
 // Utility Checks
@@ -280,6 +281,26 @@ export async function closeTicket(
         ? notes.map((n, i) => `${i + 1}. <@${n.staffDiscordId}>: ${n.content.slice(0, 100)}`).join('\n').slice(0, 1024)
         : 'None';
 
+      // Compute first response time if available
+      let firstResponseField = 'N/A';
+      if (ticket.firstResponseAt) {
+        const responseMs = new Date(ticket.firstResponseAt).getTime() - new Date(ticket.createdAt).getTime();
+        const responseMinutes = Math.floor(responseMs / 60000);
+        if (responseMinutes < 60) {
+          firstResponseField = `${responseMinutes}m`;
+        } else {
+          const hours = Math.floor(responseMinutes / 60);
+          const mins = responseMinutes % 60;
+          firstResponseField = `${hours}h ${mins}m`;
+        }
+      }
+
+      // Resolution info
+      const resolutionField = ticket.resolution || 'Not specified';
+      const resolutionTypeField = ticket.resolutionType
+        ? ticket.resolutionType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        : 'Resolved';
+
       const logEmbed = new EmbedBuilder()
         .setColor(0x8B6F47)
         .setAuthor({
@@ -296,8 +317,13 @@ export async function closeTicket(
           { name: '\uD83D\uDCCB Status', value: ticket.status.replace(/_/g, ' '), inline: true },
           { name: '\uD83D\uDCDD Subject', value: ticket.subject, inline: false },
           { name: '\uD83D\uDE4B Claimed By', value: ticket.claimedBy ? `<@${ticket.claimedBy}>` : 'Unclaimed', inline: true },
+          { name: '\u23F1\uFE0F First Response', value: firstResponseField, inline: true },
+          { name: '\u200b', value: '\u200b', inline: true },
           { name: '\uD83D\uDCC5 Opened', value: `<t:${Math.floor(new Date(ticket.createdAt).getTime() / 1000)}:F>`, inline: true },
           { name: '\uD83D\uDCC5 Closed', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
+          { name: '\u200b', value: '\u200b', inline: true },
+          { name: '\uD83D\uDCCB Resolution Type', value: resolutionTypeField, inline: true },
+          { name: '\uD83D\uDCDD Resolution', value: resolutionField.slice(0, 1024), inline: false },
           { name: `\uD83D\uDCDD Staff Notes (${notes.length})`, value: notesSummary, inline: false },
         )
         .setFooter({ text: 'Ridgeline Ticket System \u2014 Powered by Peaches \uD83C\uDF51' })
@@ -333,12 +359,31 @@ export async function closeTicket(
     referenceId: `ticket-${String(ticket.ticketNumber).padStart(4, '0')}`,
   });
 
+  // Send satisfaction survey DM to ticket owner (fire-and-forget)
+  // Re-fetch ticket to get resolution fields that may have been set just before close
+  const updatedTicket = await storage.getTicketByChannelId(channel.id);
+  sendTicketSurveyDM(client, updatedTicket ?? ticket).catch(err =>
+    console.error('[Peaches] Failed to send survey DM:', err)
+  );
+
   // Delete channel immediately after transcript send resolves (no artificial delay)
   try {
     await channel.delete('Ticket closed');
     console.log(`[Peaches] Ticket #${ticket.ticketNumber} closed by ${closedBy.displayName}`);
   } catch (err) {
     console.error('[Peaches] Failed to delete ticket channel:', err);
+    // Alert staff about orphaned channel — ticket is closed in DB but channel remains
+    try {
+      const rawModLog = channel.guild.channels.cache.get(CHANNELS.modLog);
+      const modLogChannel = rawModLog?.isTextBased() && !rawModLog.isDMBased() ? rawModLog as TextChannel : undefined;
+      if (modLogChannel) {
+        await modLogChannel.send(
+          `\u26A0\uFE0F **Orphaned Ticket Channel** — Ticket #${String(ticket.ticketNumber).padStart(4, '0')} was closed in the database but the channel <#${channel.id}> (\`${channel.name}\`, ID: \`${channel.id}\`) could not be deleted. Please remove it manually. \uD83C\uDF51`
+        );
+      }
+    } catch (modLogErr) {
+      console.error('[Peaches] Failed to notify mod-log about orphaned channel:', modLogErr);
+    }
   }
 }
 

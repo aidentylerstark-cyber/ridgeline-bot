@@ -1,6 +1,7 @@
 import {
   EmbedBuilder,
   ChannelType,
+  PermissionFlagsBits,
   type Client,
   type TextChannel,
   type ChatInputCommandInteraction,
@@ -9,10 +10,15 @@ import {
 import { CHANNELS } from '../config.js';
 import { logAuditEvent } from './audit-log.js';
 import { isStaff } from '../utilities/permissions.js';
+import { CooldownManager } from '../utilities/cooldowns.js';
 
 // Per-user cooldown for announcements: 5 minutes between posts
 const ANNOUNCE_COOLDOWN_MS = 5 * 60 * 1000;
-const announceCooldowns = new Map<string, number>();
+const announceCooldowns = new CooldownManager(ANNOUNCE_COOLDOWN_MS);
+
+export function destroyAnnounceCooldowns(): void {
+  announceCooldowns.destroy();
+}
 
 export async function handleAnnounceCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   // Staff-only check
@@ -24,14 +30,9 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
     return;
   }
 
-  // Per-user cooldown to prevent spam — also clean up stale entries
-  const now = Date.now();
-  for (const [userId, ts] of announceCooldowns) {
-    if (now - ts >= ANNOUNCE_COOLDOWN_MS) announceCooldowns.delete(userId);
-  }
-  const lastUsed = announceCooldowns.get(interaction.user.id);
-  if (lastUsed && now - lastUsed < ANNOUNCE_COOLDOWN_MS) {
-    const remaining = Math.ceil((ANNOUNCE_COOLDOWN_MS - (now - lastUsed)) / 1000);
+  // Per-user cooldown to prevent spam
+  if (announceCooldowns.isOnCooldown(interaction.user.id)) {
+    const remaining = Math.ceil(announceCooldowns.getRemainingMs(interaction.user.id) / 1000);
     await interaction.reply({
       content: `Hold on, sugar! You just posted an announcement. Wait **${remaining} more seconds** before posting another. 🍑`,
       flags: 64,
@@ -62,6 +63,15 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
     return;
   }
 
+  // Verify the invoking member has permissions in the target channel
+  if (member) {
+    const memberPerms = destChannel.permissionsFor(member);
+    if (!memberPerms?.has(PermissionFlagsBits.ViewChannel) || !memberPerms?.has(PermissionFlagsBits.SendMessages)) {
+      await interaction.editReply({ content: "You don't have permission to post in that channel, sugar! Pick one you can access. 🍑" });
+      return;
+    }
+  }
+
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
     .setTitle(`📢 ${title}`)
@@ -77,7 +87,7 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
   await destChannel.send({ content, embeds: [embed] });
 
   // Record cooldown after successful post
-  announceCooldowns.set(interaction.user.id, Date.now());
+  announceCooldowns.set(interaction.user.id);
 
   if (interaction.guild) {
     logAuditEvent(_client, interaction.guild, {

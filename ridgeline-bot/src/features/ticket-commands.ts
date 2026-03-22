@@ -3,28 +3,33 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  PermissionFlagsBits,
   type Client,
   type ChatInputCommandInteraction,
   type GuildMember,
   type TextChannel,
+  type OverwriteResolvable,
 } from 'discord.js';
 import * as storage from '../storage.js';
 import { updateTicketLastActivity } from '../storage.js';
 import {
   TICKET_CATEGORIES,
   TICKET_PRIORITY_COLORS,
+  GLOBAL_STAFF_ROLES,
   isValidDepartment,
   type TicketDepartment,
 } from '../config.js';
 import { isStaffForTicket, getStaffMentions, recreateTicketChannel } from './tickets.js';
 import { logAuditEvent } from './audit-log.js';
 import { isStaff } from '../utilities/permissions.js';
+import { handleQuickReply } from './ticket-quickreplies.js';
 
 // ─────────────────────────────────────────
 // /ticket command router
 // ─────────────────────────────────────────
 
 export async function handleTicketCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
+  if (!interaction.channelId) return;
   const sub = interaction.options.getSubcommand();
 
   switch (sub) {
@@ -36,7 +41,10 @@ export async function handleTicketCommand(interaction: ChatInputCommandInteracti
     case 'stats':    return handleStats(interaction, client);
     case 'assign':   return handleAssign(interaction, client);
     case 'reopen':   return handleReopen(interaction, client);
-    case 'mine':     return handleMine(interaction, client);
+    case 'mine':       return handleMine(interaction, client);
+    case 'transfer':   return handleTransfer(interaction, client);
+    case 'quickreply': return handleQuickReply(interaction, client);
+    case 'feedback':   return handleFeedback(interaction, client);
     default:
       await interaction.reply({ content: "Unknown subcommand, sugar! \uD83C\uDF51", flags: 64 });
   }
@@ -48,7 +56,7 @@ export async function handleTicketCommand(interaction: ChatInputCommandInteracti
 
 async function handlePriority(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
-  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
+  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
     await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
     return;
@@ -59,8 +67,8 @@ async function handlePriority(interaction: ChatInputCommandInteraction, client: 
   }
 
   const priority = interaction.options.getString('level', true);
-  await storage.updateTicketPriority(interaction.channelId ?? '', priority);
-  updateTicketLastActivity(interaction.channelId ?? '').catch(() => {});
+  await storage.updateTicketPriority(interaction.channelId, priority);
+  updateTicketLastActivity(interaction.channelId).catch(() => {});
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
   const color = TICKET_PRIORITY_COLORS[priority] ?? 0xD4A574;
@@ -89,7 +97,7 @@ async function handlePriority(interaction: ChatInputCommandInteraction, client: 
       actorId: member.id,
       targetId: ticket.discordUserId,
       details: `Ticket #${ticketId} priority set to **${priority}** by ${member.displayName}`,
-      channelId: interaction.channelId ?? undefined,
+      channelId: interaction.channelId,
       referenceId: `ticket-${ticketId}`,
     });
   }
@@ -101,7 +109,7 @@ async function handlePriority(interaction: ChatInputCommandInteraction, client: 
 
 async function handleStatus(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
-  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
+  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
     await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
     return;
@@ -112,8 +120,8 @@ async function handleStatus(interaction: ChatInputCommandInteraction, client: Cl
   }
 
   const status = interaction.options.getString('value', true);
-  await storage.updateTicketStatus(interaction.channelId ?? '', status);
-  updateTicketLastActivity(interaction.channelId ?? '').catch(() => {});
+  await storage.updateTicketStatus(interaction.channelId, status);
+  updateTicketLastActivity(interaction.channelId).catch(() => {});
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
   const statusLabels: Record<string, string> = {
@@ -147,7 +155,7 @@ async function handleStatus(interaction: ChatInputCommandInteraction, client: Cl
       actorId: member.id,
       targetId: ticket.discordUserId,
       details: `Ticket #${ticketId} status set to **${status}** by ${member.displayName}`,
-      channelId: interaction.channelId ?? undefined,
+      channelId: interaction.channelId,
       referenceId: `ticket-${ticketId}`,
     });
   }
@@ -159,7 +167,7 @@ async function handleStatus(interaction: ChatInputCommandInteraction, client: Cl
 
 async function handleNote(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
-  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
+  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
     await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
     return;
@@ -171,7 +179,7 @@ async function handleNote(interaction: ChatInputCommandInteraction, client: Clie
 
   const content = interaction.options.getString('text', true);
   await storage.addTicketNote(ticket.id, member.id, content);
-  updateTicketLastActivity(interaction.channelId ?? '').catch(() => {});
+  updateTicketLastActivity(interaction.channelId).catch(() => {});
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
   await interaction.reply({
@@ -185,7 +193,7 @@ async function handleNote(interaction: ChatInputCommandInteraction, client: Clie
       actorId: member.id,
       targetId: ticket.discordUserId,
       details: `Note added to Ticket #${ticketId} by ${member.displayName}`,
-      channelId: interaction.channelId ?? undefined,
+      channelId: interaction.channelId,
       referenceId: `ticket-${ticketId}`,
     });
   }
@@ -197,7 +205,7 @@ async function handleNote(interaction: ChatInputCommandInteraction, client: Clie
 
 async function handleNotes(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
-  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
+  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
     await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
     return;
@@ -312,11 +320,22 @@ async function handleSearch(interaction: ChatInputCommandInteraction, client: Cl
   collector.on('collect', async (i) => {
     if (i.customId === 'tsearch_prev') page = Math.max(0, page - 1);
     if (i.customId === 'tsearch_next') page = Math.min(pages.length - 1, page + 1);
-    await i.update({ embeds: [pages[page]!], components: [buildRow()] });
+    try {
+      await i.update({ embeds: [pages[page]!], components: [buildRow()] });
+    } catch {
+      console.warn('[Peaches] Ticket search pagination update failed (token may have expired)');
+    }
   });
 
   collector.on('end', async () => {
-    await reply.edit({ components: [] }).catch(() => {});
+    try {
+      const expiredEmbed = EmbedBuilder.from(pages[page]!).setFooter({
+        text: `Page ${page + 1} of ${pages.length} • ${rows.length} result(s) • Pagination expired`,
+      });
+      await reply.edit({ embeds: [expiredEmbed], components: [] });
+    } catch {
+      console.warn('[Peaches] Ticket search pagination expired edit failed');
+    }
   });
 }
 
@@ -338,10 +357,12 @@ async function handleStats(interaction: ChatInputCommandInteraction, client: Cli
   const days = periodDays[periodStr] ?? 30;
   const since = new Date(Date.now() - days * 86_400_000);
 
-  const [counts, deptStats, topStaff] = await Promise.all([
+  const [counts, deptStats, topStaff, avgRating, avgResponseTime] = await Promise.all([
     storage.getTicketCounts(since),
     storage.getTicketStatsByDepartment(since),
     storage.getTopStaffByTicketActivity(since),
+    storage.getAverageRating(),
+    storage.getAverageFirstResponseTime(since),
   ]);
 
   const deptLines = deptStats.map(d => {
@@ -353,12 +374,33 @@ async function handleStats(interaction: ChatInputCommandInteraction, client: Cli
     `\u2003${i + 1}. <@${s.staff_id}> \u2014 ${s.action_count} actions`
   );
 
+  // Format satisfaction rating
+  let satisfactionLine = 'No ratings yet';
+  if (avgRating.total_responses > 0) {
+    const stars = '\u2B50'.repeat(Math.round(avgRating.avg_rating));
+    satisfactionLine = `${stars} **${avgRating.avg_rating.toFixed(1)}/5** (${avgRating.total_responses} responses)`;
+  }
+
+  // Format avg first response time
+  let responseTimeLine = 'No data';
+  if (avgResponseTime !== null) {
+    if (avgResponseTime < 60) {
+      responseTimeLine = `**${Math.round(avgResponseTime)}m**`;
+    } else {
+      const hours = Math.floor(avgResponseTime / 60);
+      const mins = Math.round(avgResponseTime % 60);
+      responseTimeLine = `**${hours}h ${mins}m**`;
+    }
+  }
+
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
     .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Stats', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setTitle(`\uD83D\uDCCA Ticket Statistics \u2014 ${periodStr === 'all' ? 'All Time' : `Last ${days} Days`}`)
     .addFields(
       { name: '\uD83D\uDCCB Overview', value: `\u2003Open: **${counts.total_open}**\n\u2003Closed: **${counts.total_closed}**`, inline: false },
+      { name: '\u2B50 Satisfaction', value: `\u2003${satisfactionLine}`, inline: true },
+      { name: '\u23F1\uFE0F Avg First Response', value: `\u2003${responseTimeLine}`, inline: true },
       ...(deptLines.length > 0 ? [{ name: '\uD83C\uDFE2 By Department', value: deptLines.join('\n'), inline: false }] : []),
       ...(staffLines.length > 0 ? [{ name: '\uD83C\uDFC6 Top Staff', value: staffLines.join('\n'), inline: false }] : []),
     )
@@ -374,7 +416,7 @@ async function handleStats(interaction: ChatInputCommandInteraction, client: Cli
 
 async function handleAssign(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
-  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId ?? '');
+  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
     await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
     return;
@@ -405,8 +447,12 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
   }
 
   const previousClaimer = ticket.claimedBy;
-  await storage.updateTicketClaim(interaction.channelId ?? '', targetMember.id);
-  updateTicketLastActivity(interaction.channelId ?? '').catch(() => {});
+  const assigned = await storage.updateTicketClaim(interaction.channelId, targetMember.id);
+  if (!assigned) {
+    await interaction.reply({ content: "Couldn't assign this ticket — it may have been closed or modified, sugar. 🍑", flags: 64 });
+    return;
+  }
+  updateTicketLastActivity(interaction.channelId).catch(() => {});
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
 
@@ -444,7 +490,7 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
     targetId: targetMember.id,
     details: `Ticket #${ticketId} reassigned to ${targetMember.displayName} by ${member.displayName}` +
       (previousClaimer ? ` (was <@${previousClaimer}>)` : ''),
-    channelId: interaction.channelId ?? undefined,
+    channelId: interaction.channelId,
     referenceId: `ticket-${ticketId}`,
   });
 }
@@ -468,10 +514,12 @@ async function handleReopen(interaction: ChatInputCommandInteraction, client: Cl
     return;
   }
 
-  // Check 48h window
+  // Check 48h window — Owner/First Lady bypass this limit
   const closedAt = ticket.closedAt ? new Date(ticket.closedAt).getTime() : 0;
   const hoursSinceClosed = (Date.now() - closedAt) / 3_600_000;
-  if (hoursSinceClosed > 48) {
+  const ownerRoles = ['Ridgeline Owner', 'First Lady'];
+  const hasOwnerOverride = ownerRoles.some(name => member.roles.cache.some(r => r.name === name));
+  if (hoursSinceClosed > 48 && !hasOwnerOverride) {
     await interaction.reply({ content: `Ticket #${ticketNumber} was closed more than 48 hours ago and can't be reopened, sugar. \uD83C\uDF51`, flags: 64 });
     return;
   }
@@ -559,7 +607,8 @@ async function handleMine(interaction: ChatInputCommandInteraction, _client: Cli
       const ticketNum = String(t.ticketNumber).padStart(4, '0');
       const priorityTag = t.priority !== 'normal' ? ` [${t.priority.toUpperCase()}]` : '';
       const claimed = t.claimedBy ? ` \u2192 <@${t.claimedBy}>` : ' \u2014 *unclaimed*';
-      lines.push(`\u2003\uD83C\uDFAB **#${ticketNum}**${priorityTag} \u2014 ${t.department} \u2014 ${t.status.replace(/_/g, ' ')}${claimed}\n\u2003\u2003<#${t.channelId}>`);
+      const channelRef = interaction.guild!.channels.cache.has(t.channelId) ? `<#${t.channelId}>` : '*Channel unavailable*';
+      lines.push(`\u2003\uD83C\uDFAB **#${ticketNum}**${priorityTag} \u2014 ${t.department} \u2014 ${t.status.replace(/_/g, ' ')}${claimed}\n\u2003\u2003${channelRef}`);
     }
   }
 
@@ -569,7 +618,8 @@ async function handleMine(interaction: ChatInputCommandInteraction, _client: Cli
     for (const t of claimedTickets) {
       const ticketNum = String(t.ticketNumber).padStart(4, '0');
       const priorityTag = t.priority !== 'normal' ? ` [${t.priority.toUpperCase()}]` : '';
-      lines.push(`\u2003\uD83C\uDFAB **#${ticketNum}**${priorityTag} \u2014 ${t.department} \u2014 <@${t.discordUserId}>\n\u2003\u2003<#${t.channelId}>`);
+      const channelRef = interaction.guild!.channels.cache.has(t.channelId) ? `<#${t.channelId}>` : '*Channel unavailable*';
+      lines.push(`\u2003\uD83C\uDFAB **#${ticketNum}**${priorityTag} \u2014 ${t.department} \u2014 <@${t.discordUserId}>\n\u2003\u2003${channelRef}`);
     }
   }
 
@@ -579,6 +629,223 @@ async function handleMine(interaction: ChatInputCommandInteraction, _client: Cli
     .setDescription(lines.join('\n'))
     .setFooter({ text: `${myTickets.length} owned \u2022 ${claimedTickets.length} claimed` })
     .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+// ─────────────────────────────────────────
+// /ticket transfer <department>
+// ─────────────────────────────────────────
+
+async function handleTransfer(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
+  const member = interaction.member as GuildMember;
+  const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
+  if (!ticket) {
+    await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
+    return;
+  }
+
+  if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
+    await interaction.reply({ content: "Only staff can transfer tickets, sugar! \uD83C\uDF51", flags: 64 });
+    return;
+  }
+
+  const newDept = interaction.options.getString('department', true);
+  if (!isValidDepartment(newDept)) {
+    await interaction.reply({ content: "That's not a valid department, sugar! \uD83C\uDF51", flags: 64 });
+    return;
+  }
+
+  if (newDept === ticket.department) {
+    await interaction.reply({ content: "This ticket is already in that department, sugar! \uD83C\uDF51", flags: 64 });
+    return;
+  }
+
+  const guild = interaction.guild;
+  if (!guild) {
+    await interaction.reply({ content: "Something went wrong, sugar. \uD83C\uDF51", flags: 64 });
+    return;
+  }
+
+  await interaction.deferReply();
+
+  const newConfig = TICKET_CATEGORIES[newDept];
+  const oldConfig = TICKET_CATEGORIES[ticket.department as TicketDepartment];
+
+  const updated = await storage.updateTicketDepartment(interaction.channelId, newDept);
+  if (!updated) {
+    await interaction.editReply({ content: "Couldn't transfer this ticket \u2014 it may have been closed, sugar. \uD83C\uDF51" });
+    return;
+  }
+
+  // Clear the claim — new department staff should re-claim
+  await storage.updateTicketClaim(interaction.channelId, null);
+
+  const channel = interaction.channel as TextChannel;
+
+  try {
+    await channel.setParent(newConfig.categoryId, { lockPermissions: false });
+  } catch (err) {
+    console.error('[Peaches] Failed to move ticket channel to new category:', err);
+  }
+
+  const allNewStaffRoles = Array.from(new Set([...newConfig.staffRoles, ...GLOBAL_STAFF_ROLES]));
+  const overwrites: OverwriteResolvable[] = [
+    { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+    {
+      id: ticket.discordUserId,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.AttachFiles,
+        PermissionFlagsBits.EmbedLinks,
+      ],
+    },
+  ];
+
+  for (const roleName of allNewStaffRoles) {
+    const role = guild.roles.cache.find(r => r.name === roleName);
+    if (role) {
+      overwrites.push({
+        id: role.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.AttachFiles,
+          PermissionFlagsBits.EmbedLinks,
+          PermissionFlagsBits.ManageMessages,
+        ],
+      });
+    }
+  }
+
+  if (client.user) {
+    overwrites.push({
+      id: client.user.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.AttachFiles,
+        PermissionFlagsBits.EmbedLinks,
+      ],
+    });
+  }
+
+  try {
+    await channel.permissionOverwrites.set(overwrites);
+  } catch (err) {
+    console.error('[Peaches] Failed to update ticket channel permissions after transfer:', err);
+  }
+
+  try {
+    await channel.setTopic(
+      `${newConfig.emoji} ${newConfig.label} | Priority: ${ticket.priority.toUpperCase()} | Status: ${ticket.status.replace(/_/g, ' ')} | Opened by ${ticket.userName} | ${ticket.subject}`
+    );
+  } catch { /* best effort */ }
+
+  const ticketId = String(ticket.ticketNumber).padStart(4, '0');
+
+  const embed = new EmbedBuilder()
+    .setColor(0x5865F2)
+    .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Transfer', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setDescription(
+      `This ticket has been transferred to **${newConfig.label}** by ${member}.\n\n` +
+      `Previously: ${oldConfig.emoji} ${oldConfig.label}`
+    )
+    .setFooter({ text: `Ticket #${ticketId}` })
+    .setTimestamp();
+
+  const staffMentions = getStaffMentions(guild, newDept);
+
+  await interaction.editReply({ content: staffMentions ? `${staffMentions}` : undefined, embeds: [embed] });
+
+  logAuditEvent(client, guild, {
+    action: 'ticket_reassign',
+    actorId: member.id,
+    targetId: ticket.discordUserId,
+    details: `Ticket #${ticketId} transferred from ${oldConfig.label} to ${newConfig.label} by ${member.displayName}`,
+    channelId: interaction.channelId,
+    referenceId: `ticket-${ticketId}`,
+  });
+}
+
+// ─────────────────────────────────────────
+// /ticket feedback [department]
+// ─────────────────────────────────────────
+
+async function handleFeedback(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
+  const member = interaction.member as GuildMember;
+  if (!isStaff(member)) {
+    await interaction.reply({ content: "Only staff can view feedback reports, sugar! \uD83C\uDF51", flags: 64 });
+    return;
+  }
+
+  await interaction.deferReply({ flags: 64 });
+
+  const department = interaction.options.getString('department') ?? undefined;
+  const deptLabel = department && isValidDepartment(department)
+    ? TICKET_CATEGORIES[department].label
+    : 'All Departments';
+
+  const [avgRating, distribution, recentComments] = await Promise.all([
+    storage.getAverageRating(department),
+    storage.getRatingDistribution(department),
+    storage.getRecentFeedback(10, department),
+  ]);
+
+  // Build star display for overall rating
+  let overallLine = 'No ratings yet';
+  if (avgRating.total_responses > 0) {
+    const fullStars = Math.round(avgRating.avg_rating);
+    const stars = '\u2B50'.repeat(fullStars) + '\u2606'.repeat(5 - fullStars);
+    overallLine = `${stars}\n**${avgRating.avg_rating.toFixed(1)}/5** from ${avgRating.total_responses} response(s)`;
+  }
+
+  // Build distribution chart
+  const distMap = new Map(distribution.map(d => [d.rating, d.count]));
+  const maxCount = Math.max(...distribution.map(d => d.count), 1);
+  const distLines: string[] = [];
+  for (let i = 5; i >= 1; i--) {
+    const count = distMap.get(i) ?? 0;
+    const barLen = Math.round((count / maxCount) * 10);
+    const bar = '\u2588'.repeat(barLen) + '\u2591'.repeat(10 - barLen);
+    distLines.push(`${'★'.repeat(i)}${'☆'.repeat(5 - i)} ${bar} ${count}`);
+  }
+
+  // Build recent comments
+  const commentLines: string[] = [];
+  for (const fb of recentComments) {
+    const ticketNum = String(fb.ticket_number).padStart(4, '0');
+    const ts = Math.floor(new Date(fb.created_at).getTime() / 1000);
+    const stars = '\u2B50'.repeat(fb.rating);
+    const commentText = fb.comment ? `\n\u2003*"${fb.comment.slice(0, 150)}"*` : '';
+    commentLines.push(`**#${ticketNum}** ${stars} \u2014 <t:${ts}:R>${commentText}`);
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0xD4A574)
+    .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Feedback', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setTitle(`\u2B50 Satisfaction Report \u2014 ${deptLabel}`)
+    .addFields(
+      { name: '\uD83D\uDCCA Overall Rating', value: overallLine, inline: false },
+      { name: '\uD83D\uDCCA Rating Distribution', value: distLines.length > 0 ? distLines.join('\n') : 'No data', inline: false },
+    );
+
+  if (commentLines.length > 0) {
+    let commentsText = commentLines.join('\n');
+    if (commentsText.length > 1000) {
+      commentsText = commentsText.slice(0, 990) + '\n\u2026 *(truncated)*';
+    }
+    embed.addFields({ name: '\uD83D\uDCAC Recent Feedback', value: commentsText, inline: false });
+  } else {
+    embed.addFields({ name: '\uD83D\uDCAC Recent Feedback', value: 'No feedback with comments yet, sugar.', inline: false });
+  }
+
+  embed.setFooter({ text: 'Ridgeline Ticket Feedback' }).setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
 }

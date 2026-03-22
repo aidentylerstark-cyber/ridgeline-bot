@@ -24,7 +24,10 @@ import { setupModLog, clearRaidModeTimer } from './features/modlog.js';
 import { destroyAuditLogInterval } from './features/audit-log.js';
 import { startRegionWebhookServer } from './api/region-webhook.js';
 import { scheduleRegionDailySummary } from './scheduled/region-daily-summary.js';
+import { scheduleBirthdayMonthlySummary } from './scheduled/birthday-monthly-summary.js';
 import { destroyRegionCooldowns } from './features/region-monitoring.js';
+import { destroySuggestCooldowns } from './features/suggestions.js';
+import { destroyAnnounceCooldowns } from './features/announce.js';
 import { pool } from './db/index.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
@@ -112,6 +115,7 @@ async function main() {
     scheduleStaffReport(client),
     scheduleTicketInactivityCheck(client),
     scheduleRegionDailySummary(client),
+    scheduleBirthdayMonthlySummary(client),
   ];
 
   // Graceful shutdown
@@ -125,6 +129,8 @@ async function main() {
     ticketCooldowns.destroy();
     destroyMessageCooldowns();
     destroyRegionCooldowns();
+    destroySuggestCooldowns();
+    destroyAnnounceCooldowns();
     destroyStatsInterval();
     destroyAuditLogInterval();
     clearRaidModeTimer();

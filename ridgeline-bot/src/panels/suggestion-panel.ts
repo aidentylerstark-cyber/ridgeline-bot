@@ -48,7 +48,7 @@ export async function postSuggestionPanel(client: Client) {
       `Type \`/suggest\` followed by your idea in **any channel**.\n` +
       `Your suggestion will appear here for the community to see and staff to review.\n\n` +
       `### \uD83D\uDCCB Status Tags\n` +
-      `\uD83D\uDFE2 **Open** \u2014 Submitted, awaiting review\n` +
+      `\uD83D\uDFE1 **Open** \u2014 Submitted, awaiting review\n` +
       `\uD83D\uDD35 **Reviewing** \u2014 Staff is looking into it\n` +
       `\uD83D\uDFE0 **In Progress** \u2014 Being worked on\n` +
       `\u2705 **Approved** \u2014 Accepted & implemented\n` +
@@ -60,7 +60,7 @@ export async function postSuggestionPanel(client: Client) {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `-# \uD83C\uDF51 All suggestions are anonymous to the community \u2014 only staff can see who submitted. Keep it constructive, sugar!`
+      `-# \uD83C\uDF51 Your suggestion will be posted in the suggestions channel for community feedback. Keep it constructive, sugar!`
     )
   );
 

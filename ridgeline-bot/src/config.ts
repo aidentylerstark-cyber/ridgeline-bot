@@ -34,6 +34,24 @@ export const CHANNELS = {
 };
 
 // ─────────────────────────────────────────
+// Chatbot Channel Denylist
+// ─────────────────────────────────────────
+
+/** Channels where Peaches should NOT respond to chatbot triggers */
+export const CHATBOT_DENIED_CHANNELS = new Set([
+  CHANNELS.rules,
+  CHANNELS.communityAnnouncements,
+  CHANNELS.deptAnnouncements,
+  CHANNELS.ticketLogs,
+  CHANNELS.modLog,
+  CHANNELS.ticketPanel,
+  CHANNELS.welcome,
+  CHANNELS.regionMonitoring,
+  CHANNELS.statsMembersVC,
+  CHANNELS.statsOnlineVC,
+]);
+
+// ─────────────────────────────────────────
 // Roles
 // ─────────────────────────────────────────
 

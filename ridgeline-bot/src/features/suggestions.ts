@@ -16,9 +16,28 @@ import { CHANNELS } from '../config.js';
 import { createSuggestion, getSuggestion, updateSuggestionStatus, updateSuggestionMessageId } from '../storage.js';
 import { logAuditEvent } from './audit-log.js';
 import { isStaff } from '../utilities/permissions.js';
+import { CooldownManager } from '../utilities/cooldowns.js';
+
+// Per-user cooldown to prevent suggestion spam (5 minute window)
+const suggestCooldowns = new CooldownManager(5 * 60 * 1000);
+
+export function destroySuggestCooldowns(): void {
+  suggestCooldowns.destroy();
+}
 
 export async function handleSuggestCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   const idea = interaction.options.getString('idea', true);
+
+  // Rate limit check (5 minutes between suggestions)
+  if (suggestCooldowns.isOnCooldown(interaction.user.id)) {
+    const remainingMs = suggestCooldowns.getRemainingMs(interaction.user.id);
+    const remainingMin = Math.ceil(remainingMs / 60_000);
+    await interaction.reply({
+      content: `Hold your horses, sugar! You can submit another suggestion in about ${remainingMin} minute${remainingMin !== 1 ? 's' : ''}. \uD83C\uDF51`,
+      flags: 64,
+    });
+    return;
+  }
 
   if (idea.length < 10) {
     await interaction.reply({ content: "That suggestion's a little short, sugar! Give us some details. 🍑", flags: 64 });
@@ -29,6 +48,9 @@ export async function handleSuggestCommand(interaction: ChatInputCommandInteract
     await interaction.reply({ content: "Whoa there, darlin'! That suggestion's too long. Keep it under 1,000 characters. 🍑", flags: 64 });
     return;
   }
+
+  // Set cooldown after validation passes but before processing
+  suggestCooldowns.set(interaction.user.id);
 
   await interaction.deferReply({ flags: 64 });
 
@@ -127,7 +149,7 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
     approved:      { color: 0x57F287, label: '✅ Approved',       emoji: '✅' },
     denied:        { color: 0xED4245, label: '❌ Denied',         emoji: '❌' },
     reviewing:     { color: 0xFEE75C, label: '🔍 Under Review',  emoji: '🔍' },
-    'implemented': { color: 0x2ECC71, label: '🚀 Implemented',   emoji: '🚀' },
+    'implemented': { color: 0xF1C40F, label: '🚀 Implemented',   emoji: '🚀' },
     'in-progress': { color: 0x3498DB, label: '🔧 In Progress',   emoji: '🔧' },
   };
   const cfg = statusConfig[status];

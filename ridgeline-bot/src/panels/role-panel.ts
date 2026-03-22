@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   MessageFlags,
+  SeparatorSpacingSize,
   type Client,
   type TextChannel,
 } from 'discord.js';
@@ -10,7 +11,6 @@ import {
   TextDisplayBuilder,
   SeparatorBuilder,
 } from '@discordjs/builders';
-import { SeparatorSpacingSize } from 'discord.js';
 import { GUILD_ID, CHANNELS, SELF_ASSIGN_ROLES, ROLE_CATEGORY_STYLE } from '../config.js';
 
 export async function postRoleButtons(client: Client) {

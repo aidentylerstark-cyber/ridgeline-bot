@@ -17,8 +17,6 @@ export function scheduleMilestoneCheck(client: Client): cron.ScheduledTask {
       const celebChannel = guild.channels.cache.get(CHANNELS.celebrationCorner) as TextChannel | undefined;
       if (!celebChannel) return;
 
-      // Fetch all members so cache is complete
-      await guild.members.fetch();
       const members = guild.members.cache;
 
       const today = new Date();
@@ -32,6 +30,7 @@ export function scheduleMilestoneCheck(client: Client): cron.ScheduledTask {
       let postsThisRun = 0;
 
       for (const member of Array.from(members.values())) {
+        if (!isBotActive()) return; // Re-check after retry delay
         if (member.user.bot || !member.joinedAt) continue;
         if (postsThisRun >= MAX_POSTS_PER_RUN) break;
 

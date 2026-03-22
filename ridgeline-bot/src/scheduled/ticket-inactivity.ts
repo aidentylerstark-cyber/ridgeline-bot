@@ -10,6 +10,7 @@ import {
 } from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import * as storage from '../storage.js';
+import { closeTicket } from '../features/tickets.js';
 import { withRetry } from '../utilities/retry.js';
 
 export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTask {
@@ -30,6 +31,7 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
         const now = Date.now();
 
         for (const ticket of tickets) {
+          if (!isBotActive()) return; // Re-check after retry delay
           const ageHours = (now - new Date(ticket.last_activity_at).getTime()) / 3_600_000;
           const isUrgent = ticket.priority === 'urgent';
           const divisor = isUrgent ? ESCALATION_URGENT_DIVISOR : 1;
@@ -131,6 +133,34 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
         }
 
         console.log(`[Peaches] Ticket escalation check complete: ${tickets.length} ticket(s) reviewed`);
+
+        // ── Auto-close stale "waiting_on_user" tickets (7 days / 168 hours) ──
+        const staleTickets = await storage.getStaleWaitingOnUserTickets(168);
+        for (const staleTicket of staleTickets) {
+          if (!isBotActive()) return;
+          try {
+            const ticketChannel = guild.channels.cache.get(staleTicket.channel_id) as TextChannel | undefined;
+            if (!ticketChannel) {
+              // Channel gone — just close in DB
+              await storage.closeDiscordTicket(staleTicket.channel_id, client.user?.id ?? 'system');
+              continue;
+            }
+
+            await ticketChannel.send(
+              "This ticket has been automatically closed after 7 days of waiting for a response. If you still need help, please open a new ticket! \uD83C\uDF51"
+            ).catch(() => {});
+
+            const botMember = guild.members.cache.get(client.user?.id ?? '');
+            if (botMember) {
+              await closeTicket(client, ticketChannel, botMember);
+            }
+          } catch (err) {
+            console.error(`[Peaches] Failed to auto-close stale ticket #${staleTicket.ticket_number}:`, err);
+          }
+        }
+        if (staleTickets.length > 0) {
+          console.log(`[Peaches] Auto-closed ${staleTickets.length} stale waiting_on_user ticket(s)`);
+        }
       }, { label: 'Ticket inactivity check' });
     } catch (err) {
       console.error('[Peaches] Ticket inactivity check failed after retries:', err);

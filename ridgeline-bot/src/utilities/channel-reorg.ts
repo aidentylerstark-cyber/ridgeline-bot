@@ -14,7 +14,7 @@ async function reorganizeCategory(
     const firstChannel = guild.channels.cache.get(renames[0].id);
     resolvedCategoryId = firstChannel?.parentId ?? null;
     if (resolvedCategoryId) {
-      console.log(`[Bot] Auto-resolved category ID: ${resolvedCategoryId}`);
+      console.log(`[Discord Bot] Auto-resolved category ID: ${resolvedCategoryId}`);
     }
   }
 
@@ -23,9 +23,9 @@ async function reorganizeCategory(
     if (category) {
       try {
         await category.setName(categoryName);
-        console.log(`[Bot] Category renamed \u2192 ${categoryName}`);
+        console.log(`[Discord Bot] Category renamed \u2192 ${categoryName}`);
       } catch (err) {
-        console.error(`[Bot] Failed to rename category:`, err);
+        console.error(`[Discord Bot] Failed to rename category:`, err);
       }
       await new Promise(r => setTimeout(r, 2000));
     }
@@ -35,21 +35,21 @@ async function reorganizeCategory(
     const { id, name } = renames[i];
     const channel = guild.channels.cache.get(id);
     if (!channel) {
-      console.log(`[Bot] Channel ${id} not found, skipping`);
+      console.log(`[Discord Bot] Channel ${id} not found, skipping`);
       continue;
     }
     try {
       const oldName = channel.name;
       await channel.setName(name);
-      console.log(`[Bot] Renamed: #${oldName} \u2192 #${name}`);
+      console.log(`[Discord Bot] Renamed: #${oldName} \u2192 #${name}`);
     } catch (err) {
-      console.error(`[Bot] Failed to rename ${id}:`, err);
+      console.error(`[Discord Bot] Failed to rename ${id}:`, err);
     }
     if (i < renames.length - 1) {
       await new Promise(r => setTimeout(r, 2000));
     }
   }
-  console.log(`[Bot] ${label} reorganization complete \u2705`);
+  console.log(`[Discord Bot] ${label} reorganization complete \u2705`);
 }
 
 const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName: string | null; renames: Array<{ id: string; name: string }> }> = {
@@ -435,11 +435,11 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
 
 export async function reorganizeCategoryByKey(client: Client, categoryKey: string) {
   const guild = client.guilds.cache.get(GUILD_ID);
-  if (!guild) { console.log('[Bot] Guild not found'); return; }
+  if (!guild) { console.log('[Discord Bot] Guild not found'); return; }
 
   const config = CATEGORY_CONFIGS[categoryKey];
   if (!config) {
-    console.log(`[Bot] Unknown category key: ${categoryKey}`);
+    console.log(`[Discord Bot] Unknown category key: ${categoryKey}`);
     return;
   }
 
@@ -467,11 +467,11 @@ const CHANNEL_PERMISSIONS: Record<string, Array<{ id: string; preset: Permission
 
 export async function setChannelPermissions(client: Client, categoryKey: string) {
   const guild = client.guilds.cache.get(GUILD_ID);
-  if (!guild) { console.log('[Bot] Guild not found'); return; }
+  if (!guild) { console.log('[Discord Bot] Guild not found'); return; }
 
   const permConfig = CHANNEL_PERMISSIONS[categoryKey];
   if (!permConfig) {
-    console.log(`[Bot] No permission config for category: ${categoryKey}`);
+    console.log(`[Discord Bot] No permission config for category: ${categoryKey}`);
     return;
   }
 
@@ -484,7 +484,7 @@ export async function setChannelPermissions(client: Client, categoryKey: string)
   for (const { id, preset } of permConfig) {
     const channel = guild.channels.cache.get(id) as TextChannel | undefined;
     if (!channel) {
-      console.log(`[Bot] Channel ${id} not found, skipping permissions`);
+      console.log(`[Discord Bot] Channel ${id} not found, skipping permissions`);
       continue;
     }
 
@@ -556,11 +556,11 @@ export async function setChannelPermissions(client: Client, categoryKey: string)
       }
 
       await channel.permissionOverwrites.set(overwrites);
-      console.log(`[Bot] Permissions set: #${channel.name} \u2192 ${preset}`);
+      console.log(`[Discord Bot] Permissions set: #${channel.name} \u2192 ${preset}`);
       await new Promise(r => setTimeout(r, 1000)); // Rate limit buffer
     } catch (err) {
-      console.error(`[Bot] Failed to set permissions on #${channel.name}:`, err);
+      console.error(`[Discord Bot] Failed to set permissions on #${channel.name}:`, err);
     }
   }
-  console.log(`[Bot] ${categoryKey} permissions complete \u2705`);
+  console.log(`[Discord Bot] ${categoryKey} permissions complete \u2705`);
 }
