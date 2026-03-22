@@ -180,8 +180,45 @@ export const TICKET_PRIORITY_COLORS: Record<string, number> = {
 };
 
 // ─────────────────────────────────────────
-// Milestones
+// Business Locations
 // ─────────────────────────────────────────
+
+export const BUSINESS_CATEGORIES = {
+  vetClinic: {
+    label: 'Pawsome Vet Clinic',
+    categoryId: '1485397337902678257',
+    staffRoles: ['Vet Clinic Director', 'Vet Clinic Staff'],
+    channels: {
+      staffChat: '1485396496282157128',
+      announcements: '1485396504033231032',
+      staffRoster: '1485396512283427007',
+      handBook: '1485396520042758255',
+      timeClock: '1485397848928550912',
+      appointments: '1485396534773284954',
+      patientRecords: '1485396542088155136',
+      emergencyCases: '1485396549864395013',
+      resources: '1382372809296187442',
+      vetMeetingVC: '1485396567853764668',
+    },
+  },
+  postOffice: {
+    label: 'Ridgeline Post Office',
+    categoryId: '1485397422791463072',
+    staffRoles: ['Postmaster', 'Post Office Staff'],
+    channels: {
+      staffChat: '1485396595196563526',
+      announcements: '1485396602645381200',
+      staffRoster: '1485396609947930796',
+      handBook: '1485396617405272135',
+      timeClock: '1485396527491973321',
+      packageTracking: '1485396632643047474',
+      mailroom: '1485396640264356020',
+      deliveryRoutes: '1485396647465848975',
+      resources: '1485396557963595816',
+      postalMeetingVC: '1485396662229663827',
+    },
+  },
+};
 
 // ─────────────────────────────────────────
 // Region Monitoring (Second Life)

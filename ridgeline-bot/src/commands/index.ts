@@ -439,6 +439,8 @@ export async function registerSlashCommands(client: Client): Promise<void> {
               { name: 'Staff', value: 'staff' },
               { name: 'Community Management', value: 'community-management' },
               { name: 'Admin Garbage', value: 'admin-garbage' },
+              { name: 'Vet Clinic', value: 'vet-clinic' },
+              { name: 'Post Office', value: 'post-office' },
             )
         )
       )
