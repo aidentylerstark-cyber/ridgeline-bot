@@ -8,6 +8,7 @@ import { postRoleButtons } from '../panels/role-panel.js';
 import { postTicketPanel } from '../panels/ticket-panel.js';
 import { postSuggestionPanel } from '../panels/suggestion-panel.js';
 import { postTriggerReference } from '../panels/trigger-reference.js';
+import { handleSetupBusinesses } from './setup-business.js';
 import { GLOBAL_STAFF_ROLES } from '../config.js';
 
 /** Only Ridgeline Owner / First Lady can use /admin */
@@ -48,6 +49,18 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
       } catch (err) {
         console.error('[Peaches] Admin permissions failed:', err);
         await interaction.editReply({ content: `Darn it, sugar \u2014 those permissions didn't take. Check the logs and we'll figure it out! \uD83C\uDF51` });
+      }
+      return;
+    }
+
+    case 'setup': {
+      await interaction.deferReply({ flags: 64 });
+      try {
+        const result = await handleSetupBusinesses(client);
+        await interaction.editReply({ content: `✅ **Business setup complete!**\n${result} 🍑` });
+      } catch (err) {
+        console.error('[Peaches] Admin setup failed:', err);
+        await interaction.editReply({ content: `Well shoot, sugar — that setup didn't go as planned. Check the logs for details, hon! 🍑` });
       }
       return;
     }

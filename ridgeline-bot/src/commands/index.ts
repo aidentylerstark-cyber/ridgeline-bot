@@ -455,6 +455,10 @@ export async function registerSlashCommands(client: Client): Promise<void> {
         )
       )
       .addSubcommand(sub => sub
+        .setName('setup')
+        .setDescription('One-time setup: create Vet Clinic & Post Office categories, channels, roles')
+      )
+      .addSubcommand(sub => sub
         .setName('panel')
         .setDescription('Post or refresh a bot panel')
         .addStringOption(opt =>
