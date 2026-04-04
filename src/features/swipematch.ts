@@ -38,6 +38,7 @@ import {
   getSwipematchPhotos,
 } from '../storage.js';
 import { pool } from '../db/index.js';
+import { renderProfileCard, invalidateCardCache, type CardData } from './swipematch-card.js';
 import { logAuditEvent } from './audit-log.js';
 import { isStaff } from '../utilities/permissions.js';
 
@@ -437,19 +438,25 @@ export async function handleStartSwipingButton(interaction: ButtonInteraction, c
 
   const candidatePhotos = (candidate.photos as string[]) ?? [];
   const viewerInterests = (profile.interests as string[]) ?? [];
-  const embed = buildProfileEmbed(candidate, avatarUrl, false, candidatePhotos, 0, viewerInterests, profile.interestedIn ?? undefined);
-  embed.setFooter({ text: `${remaining} swipes left today | Ridgeline Connections 💘` });
+
+  // Render canvas card
+  const cardData = await buildCardData(candidate, {
+    avatarUrl,
+    viewerInterests,
+    viewerInterestedIn: profile.interestedIn ?? undefined,
+    swipesRemaining: remaining,
+  });
+  const attachment = await renderProfileCard(cardData);
 
   const buttons = buildSwipeButtons(candidate.discordUserId, superRemaining);
   const components: ActionRowBuilder<ButtonBuilder>[] = [buttons];
 
-  // Add photo carousel if multiple photos
   if (candidatePhotos.length > 1) {
     components.push(buildPhotoNavRow(candidate.discordUserId, candidatePhotos.length, 0));
   }
 
   await interaction.editReply({
-    embeds: [embed],
+    files: [attachment],
     components,
   });
 }
@@ -468,18 +475,18 @@ export async function handleViewProfileButton(interaction: ButtonInteraction, _c
     return;
   }
 
+  await interaction.deferReply({ flags: 64 });
+
   const photos = (profile.photos as string[]) ?? [];
-  const embed = buildProfileEmbed(
-    profile,
-    interaction.user.displayAvatarURL({ size: 256 }),
-    true,
-    photos,
-    0
-  );
+  const cardData = await buildCardData(profile, {
+    avatarUrl: interaction.user.displayAvatarURL({ size: 256 }),
+    isOwnProfile: true,
+  });
+  const attachment = await renderProfileCard(cardData);
 
   const rows = buildProfileManageRows(profile, photos);
 
-  await interaction.reply({ embeds: [embed], components: rows, flags: 64 });
+  await interaction.editReply({ files: [attachment], components: rows });
 }
 
 // ─────────────────────────────────────────
@@ -730,8 +737,14 @@ async function showNextCandidate(
 
   const candidatePhotos = (candidate.photos as string[]) ?? [];
   const viewerInterests = (swiperProfile.interests as string[]) ?? [];
-  const embed = buildProfileEmbed(candidate, avatarUrl, false, candidatePhotos, 0, viewerInterests, swiperProfile.interestedIn ?? undefined);
-  embed.setFooter({ text: `${remaining} swipes left today | Ridgeline Connections 💘` });
+
+  const cardData = await buildCardData(candidate, {
+    avatarUrl,
+    viewerInterests,
+    viewerInterestedIn: swiperProfile.interestedIn ?? undefined,
+    swipesRemaining: remaining,
+  });
+  const attachment = await renderProfileCard(cardData);
 
   const buttons = buildSwipeButtons(candidate.discordUserId, superRemaining);
   const components: ActionRowBuilder<ButtonBuilder>[] = [buttons];
@@ -740,9 +753,9 @@ async function showNextCandidate(
   }
 
   try {
-    await interaction.update({ embeds: [embed], components });
+    await interaction.update({ files: [attachment], embeds: [], components });
   } catch {
-    await interaction.reply({ embeds: [embed], components, flags: 64 });
+    await interaction.reply({ files: [attachment], components, flags: 64 });
   }
 }
 
@@ -1053,6 +1066,7 @@ export async function handleThemeSelect(interaction: StringSelectMenuInteraction
     `UPDATE swipematch_profiles SET theme = $1, updated_at = NOW() WHERE discord_user_id = $2`,
     [themeKey, interaction.user.id]
   );
+  invalidateCardCache(interaction.user.id);
 
   const profile = await getSwipematchProfile(interaction.user.id);
   if (!profile) return;
@@ -1219,6 +1233,53 @@ export async function handlePhotoDeleteSelect(interaction: StringSelectMenuInter
 // ─────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────
+
+/** Build CardData from a profile + context for the canvas renderer */
+async function buildCardData(
+  profile: Awaited<ReturnType<typeof getSwipematchProfile>>,
+  opts: {
+    avatarUrl?: string;
+    viewerInterests?: string[];
+    viewerInterestedIn?: string;
+    swipesRemaining?: number;
+    isOwnProfile?: boolean;
+    photoIndex?: number;
+  } = {},
+): Promise<CardData> {
+  if (!profile) throw new Error('Profile is null');
+  const interests = (profile.interests as string[]) ?? [];
+  const photos = (profile.photos as string[]) ?? [];
+  const idx = opts.photoIndex ?? 0;
+  const themeKey = profile.theme ?? 'default';
+  const theme = SWIPEMATCH.profileThemes[themeKey] ?? SWIPEMATCH.profileThemes['default'];
+
+  let compatPercent: number | null = null;
+  let sharedInterests: string[] | undefined;
+  if (opts.viewerInterests && opts.viewerInterests.length > 0 && interests.length > 0 && !opts.isOwnProfile) {
+    compatPercent = calculateCompatibility(interests, opts.viewerInterests, profile.interestedIn, profile.gender, opts.viewerInterestedIn);
+    sharedInterests = interests.filter(i => opts.viewerInterests!.includes(i));
+  }
+
+  return {
+    characterName: profile.characterName,
+    age: profile.age,
+    gender: profile.gender,
+    interestedIn: profile.interestedIn,
+    bio: profile.bio,
+    interests,
+    slName: profile.slName,
+    theme: themeKey,
+    vibe: theme.vibe,
+    promptQuestion: profile.promptQuestion,
+    promptAnswer: profile.promptAnswer,
+    photoUrl: photos[idx] ?? null,
+    avatarUrl: opts.avatarUrl,
+    compatPercent,
+    sharedInterests,
+    swipesRemaining: opts.swipesRemaining,
+    isOwnProfile: opts.isOwnProfile,
+  };
+}
 
 function buildSwipeButtons(candidateId: string, superRemaining: number): ActionRowBuilder<ButtonBuilder> {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
