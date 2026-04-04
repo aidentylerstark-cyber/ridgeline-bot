@@ -13,6 +13,7 @@ import {
 import { pool } from '../db/index.js';
 import { CHANNELS } from '../config.js';
 import { getContentByKey, setContentByKey } from '../storage.js';
+import { isStaff } from '../utilities/permissions.js';
 
 // ─────────────────────────────────────────
 // Types
@@ -25,8 +26,14 @@ export type AuditAction =
   | 'ticket_close'
   | 'ticket_add_user'
   | 'ticket_deny_close'
+  | 'ticket_priority'
+  | 'ticket_status'
+  | 'ticket_note'
+  | 'ticket_reassign'
+  | 'ticket_reopen'
   | 'warn_issue'
   | 'warn_clear'
+  | 'warning_clear_all'
   | 'suggestion_approve'
   | 'suggestion_deny'
   | 'suggestion_review'
@@ -35,7 +42,13 @@ export type AuditAction =
   | 'role_remove'
   | 'announce_post'
   | 'member_join'
-  | 'member_leave';
+  | 'member_leave'
+  | 'member_onboard_complete'
+  | 'swipematch_match'
+  | 'swipematch_delete'
+  | 'swipematch_enable'
+  | 'swipematch_disable'
+  | 'swipematch_admin_delete';
 
 export type AuditSeverity = 'info' | 'warning' | 'critical';
 
@@ -60,8 +73,14 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   ticket_close:       'Ticket Closed',
   ticket_add_user:    'User Added to Ticket',
   ticket_deny_close:  'Ticket Close Denied',
+  ticket_priority:    'Ticket Priority Changed',
+  ticket_status:      'Ticket Status Changed',
+  ticket_note:        'Ticket Note Added',
+  ticket_reassign:    'Ticket Reassigned',
+  ticket_reopen:      'Ticket Reopened',
   warn_issue:         'Warning Issued',
   warn_clear:         'Warning Cleared',
+  warning_clear_all:  'All Warnings Cleared',
   suggestion_approve: 'Suggestion Approved',
   suggestion_deny:    'Suggestion Denied',
   suggestion_review:  'Suggestion Under Review',
@@ -71,6 +90,12 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   announce_post:      'Announcement Posted',
   member_join:        'Member Joined',
   member_leave:       'Member Left',
+  member_onboard_complete: 'Onboarding Completed',
+  swipematch_match:        'SwipeMatch Match',
+  swipematch_delete:       'SwipeMatch Profile Deleted',
+  swipematch_enable:       'SwipeMatch Profile Enabled',
+  swipematch_disable:      'SwipeMatch Profile Disabled',
+  swipematch_admin_delete: 'SwipeMatch Admin Delete',
 };
 
 const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
@@ -80,8 +105,14 @@ const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
   ticket_close:       0xCC4444,
   ticket_add_user:    0x5865F2,
   ticket_deny_close:  0xFEE75C,
+  ticket_priority:    0xFFA500,
+  ticket_status:      0x5865F2,
+  ticket_note:        0x95A5A6,
+  ticket_reassign:    0xCC8844,
+  ticket_reopen:      0x57F287,
   warn_issue:         0xFEE75C,
   warn_clear:         0x57F287,
+  warning_clear_all:  0x57F287,
   suggestion_approve: 0x57F287,
   suggestion_deny:    0xED4245,
   suggestion_review:  0xFEE75C,
@@ -91,6 +122,12 @@ const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
   announce_post:      0xD4A574,
   member_join:        0x57F287,
   member_leave:       0xED4245,
+  member_onboard_complete: 0x4A7C59,
+  swipematch_match:        0xFF69B4,
+  swipematch_delete:       0x95A5A6,
+  swipematch_enable:       0x57F287,
+  swipematch_disable:      0xCC4444,
+  swipematch_admin_delete: 0xED4245,
 };
 
 const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
@@ -100,8 +137,14 @@ const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
   ticket_close:       '\uD83D\uDD12',
   ticket_add_user:    '\uD83D\uDC64',
   ticket_deny_close:  '\uD83D\uDEAB',
+  ticket_priority:    '\uD83D\uDEA8',
+  ticket_status:      '\uD83D\uDCCB',
+  ticket_note:        '\uD83D\uDCDD',
+  ticket_reassign:    '\uD83D\uDD00',
+  ticket_reopen:      '\uD83D\uDD13',
   warn_issue:         '\u26A0\uFE0F',
   warn_clear:         '\u2705',
+  warning_clear_all:  '\uD83E\uDDF9',
   suggestion_approve: '\u2705',
   suggestion_deny:    '\u274C',
   suggestion_review:  '\uD83D\uDD0D',
@@ -111,6 +154,12 @@ const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
   announce_post:      '\uD83D\uDCE2',
   member_join:        '\uD83D\uDCE5',
   member_leave:       '\uD83D\uDCE4',
+  member_onboard_complete: '\uD83C\uDFE1',
+  swipematch_match:        '\uD83D\uDC98',
+  swipematch_delete:       '\uD83D\uDDD1\uFE0F',
+  swipematch_enable:       '\u2705',
+  swipematch_disable:      '\uD83D\uDEAB',
+  swipematch_admin_delete: '\uD83D\uDDD1\uFE0F',
 };
 
 const SEVERITY_COLORS: Record<AuditSeverity, number> = {
@@ -266,12 +315,6 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
     }
   })();
 }
-
-// ─────────────────────────────────────────
-// Staff Check (imported from shared utility)
-// ─────────────────────────────────────────
-
-import { isStaff } from '../utilities/permissions.js';
 
 // ─────────────────────────────────────────
 // Date Preset Parser
@@ -513,11 +556,23 @@ async function handleAuditSearch(interaction: ChatInputCommandInteraction, clien
     if (i.customId === 'audit_prev') page = Math.max(0, page - 1);
     if (i.customId === 'audit_next') page = Math.min(pages.length - 1, page + 1);
     const safePage = Math.max(0, Math.min(page, pages.length - 1));
-    await i.update({ embeds: [pages[safePage]!], components: [buildRow()] });
+    try {
+      await i.update({ embeds: [pages[safePage]!], components: [buildRow()] });
+    } catch {
+      console.warn('[Peaches] Audit log pagination update failed (token may have expired)');
+    }
   });
 
   collector.on('end', async () => {
-    await reply.edit({ components: [] }).catch(() => {});
+    try {
+      const safePage = Math.max(0, Math.min(page, pages.length - 1));
+      const expiredEmbed = EmbedBuilder.from(pages[safePage]!).setFooter({
+        text: `Page ${safePage + 1} of ${pages.length} • ${rows.length} result(s) • Pagination expired`,
+      });
+      await reply.edit({ embeds: [expiredEmbed], components: [] });
+    } catch {
+      console.warn('[Peaches] Audit log pagination expired edit failed');
+    }
   });
 }
 

@@ -1,5 +1,6 @@
 import {
   MessageFlags,
+  SeparatorSpacingSize,
   type Client,
   type TextChannel,
 } from 'discord.js';
@@ -8,7 +9,6 @@ import {
   TextDisplayBuilder,
   SeparatorBuilder,
 } from '@discordjs/builders';
-import { SeparatorSpacingSize } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 
 export async function postTriggerReference(client: Client) {
@@ -152,7 +152,7 @@ export async function postTriggerReference(client: Client) {
     new TextDisplayBuilder().setContent(
       `### :gear: Automatic Features (No Trigger Needed)\n\n` +
       `**Welcome Messages** — New members get auto-role + welcome + DM\n` +
-      `**Birthday Announcements** — Daily at 8 AM EST in <#${CHANNELS.celebrationCorner}>\n` +
+      `**Birthday Announcements** — Daily at 8 AM EST in <#${CHANNELS.birthdays}>\n` +
       `**Milestone Celebrations** — Daily at 9 AM EST in <#${CHANNELS.celebrationCorner}>`
     )
   );

@@ -98,7 +98,7 @@ export function scheduleCleanup(client: Client): { stop: () => void; start: () =
 
       // Post purge notification to #mod-log if entries were purged
       const totalPurged = tickets + suggestions + birthdayPosts + milestonePosts + auditLogs + regionSnapshots;
-      if (totalPurged > 0) {
+      if (totalPurged > 0 && isBotActive()) {
         const guild = client.guilds.cache.get(GUILD_ID);
         const rawModLogChannel = guild?.channels.cache.get(CHANNELS.modLog);
         const modLogChannel = rawModLogChannel?.isTextBased() && !rawModLogChannel.isDMBased() ? rawModLogChannel as TextChannel : undefined;

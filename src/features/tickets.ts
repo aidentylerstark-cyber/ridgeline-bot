@@ -13,8 +13,10 @@ import {
 } from 'discord.js';
 import { createTranscript } from 'discord-html-transcripts';
 import * as storage from '../storage.js';
-import { TICKET_CATEGORIES, CHANNELS, TICKET_LIMIT_BYPASS_ROLES, GLOBAL_STAFF_ROLES, isValidDepartment, type TicketDepartment } from '../config.js';
+import { TICKET_CATEGORIES, CHANNELS, TICKET_LIMIT_BYPASS_ROLES, GLOBAL_STAFF_ROLES, TICKET_PRIORITY_COLORS, isValidDepartment, type TicketDepartment } from '../config.js';
+import type { DiscordTicket } from '../db/schema.js';
 import { logAuditEvent } from './audit-log.js';
+import { sendTicketSurveyDM } from '../handlers/ticket-feedback.js';
 
 // ─────────────────────────────────────────
 // Utility Checks
@@ -177,15 +179,18 @@ export async function sendTicketOpeningEmbed(
   subject: string,
   ticketNumber: number,
   slName?: string,
-  extraFields?: Array<{ name: string; value: string }>
+  extraFields?: Array<{ name: string; value: string }>,
+  priority: string = 'normal',
 ) {
   const config = TICKET_CATEGORIES[department];
   const extraLines = (extraFields ?? [])
     .map(f => `${f.name}: **${f.value}**`)
     .join('\n');
 
+  const embedColor = TICKET_PRIORITY_COLORS[priority] ?? 0xD4A574;
+
   const embed = new EmbedBuilder()
-    .setColor(0xD4A574)
+    .setColor(embedColor)
     .setAuthor({
       name: 'Peaches \uD83C\uDF51 \u2014 Ticket System',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
@@ -269,6 +274,33 @@ export async function closeTicket(
     if (logChannel) {
       const dept = isValidDepartment(ticket.department) ? ticket.department : 'general';
       const config = TICKET_CATEGORIES[dept];
+
+      // Fetch staff notes for the log embed
+      const notes = await storage.getTicketNotes(ticket.id);
+      const notesSummary = notes.length > 0
+        ? notes.map((n, i) => `${i + 1}. <@${n.staffDiscordId}>: ${n.content.slice(0, 100)}`).join('\n').slice(0, 1024)
+        : 'None';
+
+      // Compute first response time if available
+      let firstResponseField = 'N/A';
+      if (ticket.firstResponseAt) {
+        const responseMs = new Date(ticket.firstResponseAt).getTime() - new Date(ticket.createdAt).getTime();
+        const responseMinutes = Math.floor(responseMs / 60000);
+        if (responseMinutes < 60) {
+          firstResponseField = `${responseMinutes}m`;
+        } else {
+          const hours = Math.floor(responseMinutes / 60);
+          const mins = responseMinutes % 60;
+          firstResponseField = `${hours}h ${mins}m`;
+        }
+      }
+
+      // Resolution info
+      const resolutionField = ticket.resolution || 'Not specified';
+      const resolutionTypeField = ticket.resolutionType
+        ? ticket.resolutionType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        : 'Resolved';
+
       const logEmbed = new EmbedBuilder()
         .setColor(0x8B6F47)
         .setAuthor({
@@ -281,10 +313,18 @@ export async function closeTicket(
           { name: '\uD83C\uDF10 SL Name', value: ticket.slName ?? 'Not provided', inline: true },
           { name: '\uD83D\uDD12 Closed By', value: `${closedBy}`, inline: true },
           { name: '\uD83D\uDCC2 Department', value: config.label, inline: true },
+          { name: '\uD83D\uDEA8 Priority', value: ticket.priority.toUpperCase(), inline: true },
+          { name: '\uD83D\uDCCB Status', value: ticket.status.replace(/_/g, ' '), inline: true },
           { name: '\uD83D\uDCDD Subject', value: ticket.subject, inline: false },
           { name: '\uD83D\uDE4B Claimed By', value: ticket.claimedBy ? `<@${ticket.claimedBy}>` : 'Unclaimed', inline: true },
+          { name: '\u23F1\uFE0F First Response', value: firstResponseField, inline: true },
+          { name: '\u200b', value: '\u200b', inline: true },
           { name: '\uD83D\uDCC5 Opened', value: `<t:${Math.floor(new Date(ticket.createdAt).getTime() / 1000)}:F>`, inline: true },
           { name: '\uD83D\uDCC5 Closed', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
+          { name: '\u200b', value: '\u200b', inline: true },
+          { name: '\uD83D\uDCCB Resolution Type', value: resolutionTypeField, inline: true },
+          { name: '\uD83D\uDCDD Resolution', value: resolutionField.slice(0, 1024), inline: false },
+          { name: `\uD83D\uDCDD Staff Notes (${notes.length})`, value: notesSummary, inline: false },
         )
         .setFooter({ text: 'Ridgeline Ticket System \u2014 Powered by Peaches \uD83C\uDF51' })
         .setTimestamp();
@@ -297,12 +337,16 @@ export async function closeTicket(
     await channel.send('⚠️ Transcript generation failed — the ticket will still be closed but the transcript may be incomplete.').catch(() => {});
   }
 
-  // Mark as closed in database — if this fails, do NOT delete the channel (prevents phantom open tickets)
+  // Atomically mark as closed in database — if this returns false, another close won the race
   try {
-    await storage.closeDiscordTicket(channel.id, closedBy.id);
+    const wasClosed = await storage.closeDiscordTicket(channel.id, closedBy.id);
+    if (!wasClosed) {
+      console.log(`[Peaches] Ticket #${ticket.ticketNumber} close race detected — another close already succeeded`);
+      return; // Other close handler will delete the channel
+    }
   } catch (err) {
     console.error('[Peaches] Failed to mark ticket as closed in DB — channel will NOT be deleted:', err);
-    await channel.send('⚠️ There was a database error closing this ticket. Please try again or contact a developer.').catch(() => {});
+    await channel.send('\u26A0\uFE0F There was a database error closing this ticket. Please try again or contact a developer.').catch(() => {});
     return;
   }
 
@@ -315,11 +359,113 @@ export async function closeTicket(
     referenceId: `ticket-${String(ticket.ticketNumber).padStart(4, '0')}`,
   });
 
+  // Send satisfaction survey DM to ticket owner (fire-and-forget)
+  // Re-fetch ticket to get resolution fields that may have been set just before close
+  const updatedTicket = await storage.getTicketByChannelId(channel.id);
+  sendTicketSurveyDM(client, updatedTicket ?? ticket).catch(err =>
+    console.error('[Peaches] Failed to send survey DM:', err)
+  );
+
   // Delete channel immediately after transcript send resolves (no artificial delay)
   try {
     await channel.delete('Ticket closed');
     console.log(`[Peaches] Ticket #${ticket.ticketNumber} closed by ${closedBy.displayName}`);
   } catch (err) {
     console.error('[Peaches] Failed to delete ticket channel:', err);
+    // Alert staff about orphaned channel — ticket is closed in DB but channel remains
+    try {
+      const rawModLog = channel.guild.channels.cache.get(CHANNELS.modLog);
+      const modLogChannel = rawModLog?.isTextBased() && !rawModLog.isDMBased() ? rawModLog as TextChannel : undefined;
+      if (modLogChannel) {
+        await modLogChannel.send(
+          `\u26A0\uFE0F **Orphaned Ticket Channel** — Ticket #${String(ticket.ticketNumber).padStart(4, '0')} was closed in the database but the channel <#${channel.id}> (\`${channel.name}\`, ID: \`${channel.id}\`) could not be deleted. Please remove it manually. \uD83C\uDF51`
+        );
+      }
+    } catch (modLogErr) {
+      console.error('[Peaches] Failed to notify mod-log about orphaned channel:', modLogErr);
+    }
+  }
+}
+
+// ─────────────────────────────────────────
+// Recreate Ticket Channel (for reopen)
+// ─────────────────────────────────────────
+
+export async function recreateTicketChannel(
+  client: Client,
+  guild: Guild,
+  ticket: DiscordTicket,
+): Promise<{ channel: TextChannel } | null> {
+  if (!isValidDepartment(ticket.department)) return null;
+  const department = ticket.department as TicketDepartment;
+  const config = TICKET_CATEGORIES[department];
+
+  const sanitizedUsername = ticket.userName
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 30);
+  const channelName = `${department}-${sanitizedUsername || 'ticket'}-${String(ticket.ticketNumber).padStart(4, '0')}`.slice(0, 100);
+
+  const overwrites: OverwriteResolvable[] = [
+    { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+    {
+      id: ticket.discordUserId,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.AttachFiles,
+        PermissionFlagsBits.EmbedLinks,
+      ],
+    },
+  ];
+
+  const allStaffRoles = getMergedStaffRoles(department);
+  for (const roleName of allStaffRoles) {
+    const role = guild.roles.cache.find(r => r.name === roleName);
+    if (role) {
+      overwrites.push({
+        id: role.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.AttachFiles,
+          PermissionFlagsBits.EmbedLinks,
+          PermissionFlagsBits.ManageMessages,
+        ],
+      });
+    }
+  }
+
+  if (client.user) {
+    overwrites.push({
+      id: client.user.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.AttachFiles,
+        PermissionFlagsBits.EmbedLinks,
+      ],
+    });
+  }
+
+  try {
+    const channel = await guild.channels.create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      parent: config.categoryId,
+      permissionOverwrites: overwrites,
+      topic: `${config.emoji} ${config.label} | REOPENED | Opened by ${ticket.userName} | ${ticket.subject}`,
+    });
+
+    return { channel: channel as TextChannel };
+  } catch (err) {
+    console.error('[Peaches] Failed to recreate ticket channel:', err);
+    return null;
   }
 }

@@ -1,6 +1,8 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
+import crypto from 'node:crypto';
 import type { Client } from 'discord.js';
 import { processRegionUpdate } from '../features/region-monitoring.js';
+import { isBotActive } from '../utilities/instance-lock.js';
 
 const MAX_BODY_SIZE = 65_536; // 64 KB guard
 
@@ -55,6 +57,11 @@ export function startRegionWebhookServer(client: Client): Server {
   }
 
   const server = createServer(async (req, res) => {
+    // Skip processing if this bot instance has been superseded
+    if (!isBotActive()) {
+      return json(res, 503, { error: 'Bot instance not active' });
+    }
+
     // Rate limit check (use x-forwarded-for behind reverse proxies like Railway)
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp = (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.socket.remoteAddress) ?? 'unknown';
@@ -69,9 +76,14 @@ export function startRegionWebhookServer(client: Client): Server {
 
     // Region status endpoint
     if (req.method === 'POST' && req.url === '/api/region-status') {
-      // Auth check
+      // Auth check — timing-safe comparison to prevent timing attacks
       const authHeader = req.headers.authorization;
-      if (!secret || authHeader !== `Bearer ${secret}`) {
+      if (!secret || !authHeader) {
+        return json(res, 401, { error: 'Unauthorized' });
+      }
+      const expected = `Bearer ${secret}`;
+      if (authHeader.length !== expected.length ||
+          !crypto.timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))) {
         return json(res, 401, { error: 'Unauthorized' });
       }
 

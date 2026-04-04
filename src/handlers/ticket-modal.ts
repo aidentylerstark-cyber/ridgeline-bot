@@ -255,9 +255,20 @@ export async function handleTicketModalSubmit(
   // Set cooldown now that the ticket has been successfully created
   ticketCooldowns.set(member.id);
 
+  // Priority auto-detection — check for urgent keywords
+  const urgentKeywords = ['emergency', 'urgent', 'asap', 'broken', "can't access", 'locked out', 'down', 'critical', 'immediately'];
+  const combinedText = `${subject} ${details}`.toLowerCase();
+  const isAutoUrgent = urgentKeywords.some(kw => combinedText.includes(kw));
+  let ticketPriority = 'normal';
+
+  if (isAutoUrgent) {
+    ticketPriority = 'urgent';
+    await (await import('../storage.js')).updateTicketPriority(channel.id, 'urgent');
+  }
+
   // Send opening embed with all info
   try {
-    await sendTicketOpeningEmbed(client, channel, member, department, subject, ticketNumber, slName, extraFields);
+    await sendTicketOpeningEmbed(client, channel, member, department, subject, ticketNumber, slName, extraFields, ticketPriority);
 
     // Send the full details as a follow-up
     const descEmbed = new EmbedBuilder()
@@ -267,6 +278,13 @@ export async function handleTicketModalSubmit(
       .setFooter({ text: `Submitted by ${member.displayName}` });
 
     await channel.send({ embeds: [descEmbed] });
+
+    // Post urgent notice if auto-detected
+    if (isAutoUrgent) {
+      await channel.send(
+        '\u26A0\uFE0F **Peaches flagged this as potentially urgent based on keywords.** Staff, please review the priority!'
+      ).catch(() => {});
+    }
   } catch (err) {
     console.error(`[Peaches] Failed to send opening embed for ticket #${ticketNumber}:`, err);
     // Still usable — post a minimal fallback so staff can see the ticket

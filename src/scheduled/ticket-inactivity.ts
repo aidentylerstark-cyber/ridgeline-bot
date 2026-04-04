@@ -1,79 +1,166 @@
 import cron from 'node-cron';
-import { EmbedBuilder, type Client, type TextChannel } from 'discord.js';
-import { GUILD_ID, CHANNELS } from '../config.js';
+import { EmbedBuilder, type Client, type TextChannel, type GuildMember } from 'discord.js';
+import {
+  GUILD_ID,
+  CHANNELS,
+  ESCALATION_THRESHOLDS_HOURS,
+  ESCALATION_URGENT_DIVISOR,
+  ESCALATION_MANAGEMENT_ROLES,
+  ESCALATION_DM_ROLES,
+} from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
-import { pool } from '../db/index.js';
+import * as storage from '../storage.js';
+import { closeTicket } from '../features/tickets.js';
 import { withRetry } from '../utilities/retry.js';
 
-// Track which tickets have already been alerted to prevent alert fatigue
-const alertedTickets = new Set<number>();
-
 export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTask {
-  // Every 6 hours — check for unclaimed tickets older than 24 hours
-  return cron.schedule('0 */6 * * *', async () => {
+  // Every 3 hours — check for tickets needing escalation
+  return cron.schedule('0 */3 * * *', async () => {
     if (!isBotActive()) return;
     try {
       await withRetry(async () => {
-      const guild = client.guilds.cache.get(GUILD_ID);
-      if (!guild) return;
+        const guild = client.guilds.cache.get(GUILD_ID);
+        if (!guild) return;
 
-      const modLogChannel = guild.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
-      if (!modLogChannel) return;
+        const modLogChannel = guild.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
+        if (!modLogChannel) return;
 
-      const { rows } = await pool.query<{
-        ticket_number: number;
-        department: string;
-        channel_id: string;
-        user_name: string;
-        created_at: Date;
-      }>(
-        `SELECT ticket_number, department, channel_id, user_name, created_at
-         FROM discord_tickets
-         WHERE is_closed = false AND claimed_by IS NULL AND created_at < NOW() - INTERVAL '24 hours'
-         ORDER BY created_at ASC`
-      );
+        const tickets = await storage.getTicketsForEscalation();
+        if (tickets.length === 0) return;
 
-      if (rows.length === 0) {
-        // Clear alert tracking when no unclaimed tickets remain
-        alertedTickets.clear();
-        return;
-      }
+        const now = Date.now();
 
-      // Only alert for tickets not previously alerted
-      const newRows = rows.filter(r => !alertedTickets.has(r.ticket_number));
+        for (const ticket of tickets) {
+          if (!isBotActive()) return; // Re-check after retry delay
+          const ageHours = (now - new Date(ticket.last_activity_at).getTime()) / 3_600_000;
+          const isUrgent = ticket.priority === 'urgent';
+          const divisor = isUrgent ? ESCALATION_URGENT_DIVISOR : 1;
 
-      // Clean up alerted set — remove tickets that are no longer in the unclaimed list
-      const currentTicketNums = new Set(rows.map(r => r.ticket_number));
-      for (const num of alertedTickets) {
-        if (!currentTicketNums.has(num)) alertedTickets.delete(num);
-      }
+          const t1 = ESCALATION_THRESHOLDS_HOURS.tier1 / divisor;
+          const t2 = ESCALATION_THRESHOLDS_HOURS.tier2 / divisor;
+          const t3 = ESCALATION_THRESHOLDS_HOURS.tier3 / divisor;
 
-      if (newRows.length === 0) return;
+          const ticketNum = String(ticket.ticket_number).padStart(4, '0');
+          const currentLevel = ticket.escalation_level;
 
-      // Mark these as alerted
-      for (const r of newRows) alertedTickets.add(r.ticket_number);
+          // Tier 3: DM owner/first lady
+          if (ageHours >= t3 && currentLevel < 3) {
+            await storage.updateTicketEscalationLevel(ticket.id, 3);
 
-      const lines = newRows.map(row => {
-        const ticketNum = String(row.ticket_number).padStart(4, '0');
-        const ts = Math.floor(new Date(row.created_at).getTime() / 1000);
-        return `\uD83C\uDFAB **#${ticketNum}** — ${row.department} — ${row.user_name} — <#${row.channel_id}> (opened <t:${ts}:R>)`;
-      });
+            // Post to mod-log
+            const embed = new EmbedBuilder()
+              .setColor(0xFF0000)
+              .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Escalation', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+              .setTitle(`\uD83D\uDED1 TIER 3 \u2014 Ticket #${ticketNum}`)
+              .setDescription(
+                `Ticket has been inactive for **${Math.floor(ageHours)}h**${isUrgent ? ' (URGENT)' : ''}.\n` +
+                `Department: ${ticket.department} \u2014 User: ${ticket.user_name}\n` +
+                `<#${ticket.channel_id}>\n\n` +
+                `DMs sent to leadership.`
+              )
+              .setTimestamp();
+            await modLogChannel.send({ embeds: [embed] }).catch(() => {});
 
-      let description = `The following **${newRows.length}** ticket(s) have been unclaimed for over 24 hours:\n\n` + lines.join('\n');
-      if (description.length > 4000) {
-        description = description.slice(0, 3990) + '\n\u2026 *(truncated)*';
-      }
+            // DM leadership roles
+            for (const roleName of ESCALATION_DM_ROLES) {
+              const role = guild.roles.cache.find(r => r.name === roleName);
+              if (!role) continue;
+              for (const [, member] of role.members) {
+                try {
+                  await member.send(
+                    `\uD83D\uDED1 **Tier 3 Escalation** \u2014 Ticket #${ticketNum} (${ticket.department}) has been inactive for **${Math.floor(ageHours)}h**.\n` +
+                    `User: ${ticket.user_name} \u2014 ${ticket.claimed_by ? `Claimed by <@${ticket.claimed_by}>` : 'Unclaimed'}\n` +
+                    `Please review immediately.`
+                  ).catch(() => {});
+                } catch { /* graceful */ }
+              }
+            }
+            continue;
+          }
 
-      const embed = new EmbedBuilder()
-        .setColor(0xFFA500)
-        .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Alert', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
-        .setTitle('\u26A0\uFE0F Unclaimed Tickets')
-        .setDescription(description)
-        .setFooter({ text: 'Please claim and respond to these tickets' })
-        .setTimestamp();
+          // Tier 2: Ping management in ticket channel
+          if (ageHours >= t2 && currentLevel < 2) {
+            await storage.updateTicketEscalationLevel(ticket.id, 2);
 
-      await modLogChannel.send({ embeds: [embed] }).catch(() => {});
-      console.log(`[Peaches] Ticket inactivity alert: ${rows.length} unclaimed ticket(s)`);
+            const embed = new EmbedBuilder()
+              .setColor(0xFFA500)
+              .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Escalation', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+              .setTitle(`\u26A0\uFE0F TIER 2 \u2014 Ticket #${ticketNum}`)
+              .setDescription(
+                `Ticket has been inactive for **${Math.floor(ageHours)}h**${isUrgent ? ' (URGENT)' : ''}.\n` +
+                `Department: ${ticket.department} \u2014 User: ${ticket.user_name}\n` +
+                `<#${ticket.channel_id}>`
+              )
+              .setTimestamp();
+            await modLogChannel.send({ embeds: [embed] }).catch(() => {});
+
+            // Ping management roles in the ticket channel
+            try {
+              const ticketChannel = guild.channels.cache.get(ticket.channel_id) as TextChannel | undefined;
+              if (ticketChannel) {
+                const mentions = ESCALATION_MANAGEMENT_ROLES
+                  .map(roleName => guild.roles.cache.find(r => r.name === roleName))
+                  .filter(Boolean)
+                  .map(r => `<@&${r!.id}>`)
+                  .join(' ');
+                if (mentions) {
+                  await ticketChannel.send(
+                    `\u26A0\uFE0F **Escalation** \u2014 This ticket has been inactive for **${Math.floor(ageHours)}h**. ${mentions} \u2014 please review. \uD83C\uDF51`
+                  ).catch(() => {});
+                }
+              }
+            } catch { /* graceful */ }
+            continue;
+          }
+
+          // Tier 1: Post to mod-log (only unclaimed tickets)
+          if (ageHours >= t1 && currentLevel < 1 && !ticket.claimed_by) {
+            await storage.updateTicketEscalationLevel(ticket.id, 1);
+
+            const embed = new EmbedBuilder()
+              .setColor(0xFEE75C)
+              .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Alert', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+              .setTitle(`\u26A0\uFE0F Unclaimed Ticket \u2014 #${ticketNum}`)
+              .setDescription(
+                `Ticket has been unclaimed for **${Math.floor(ageHours)}h**${isUrgent ? ' (URGENT)' : ''}.\n` +
+                `Department: ${ticket.department} \u2014 User: ${ticket.user_name}\n` +
+                `<#${ticket.channel_id}>\n\n` +
+                `Please claim and respond to this ticket.`
+              )
+              .setTimestamp();
+            await modLogChannel.send({ embeds: [embed] }).catch(() => {});
+          }
+        }
+
+        console.log(`[Peaches] Ticket escalation check complete: ${tickets.length} ticket(s) reviewed`);
+
+        // ── Auto-close stale "waiting_on_user" tickets (7 days / 168 hours) ──
+        const staleTickets = await storage.getStaleWaitingOnUserTickets(168);
+        for (const staleTicket of staleTickets) {
+          if (!isBotActive()) return;
+          try {
+            const ticketChannel = guild.channels.cache.get(staleTicket.channel_id) as TextChannel | undefined;
+            if (!ticketChannel) {
+              // Channel gone — just close in DB
+              await storage.closeDiscordTicket(staleTicket.channel_id, client.user?.id ?? 'system');
+              continue;
+            }
+
+            await ticketChannel.send(
+              "This ticket has been automatically closed after 7 days of waiting for a response. If you still need help, please open a new ticket! \uD83C\uDF51"
+            ).catch(() => {});
+
+            const botMember = guild.members.cache.get(client.user?.id ?? '');
+            if (botMember) {
+              await closeTicket(client, ticketChannel, botMember);
+            }
+          } catch (err) {
+            console.error(`[Peaches] Failed to auto-close stale ticket #${staleTicket.ticket_number}:`, err);
+          }
+        }
+        if (staleTickets.length > 0) {
+          console.log(`[Peaches] Auto-closed ${staleTickets.length} stale waiting_on_user ticket(s)`);
+        }
       }, { label: 'Ticket inactivity check' });
     } catch (err) {
       console.error('[Peaches] Ticket inactivity check failed after retries:', err);

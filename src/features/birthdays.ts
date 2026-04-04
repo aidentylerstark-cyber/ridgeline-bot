@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction } from 'discord.js';
+import { EmbedBuilder, type ChatInputCommandInteraction, type Client } from 'discord.js';
 import * as storage from '../storage.js';
 
 // ─────────────────────────────────────────
@@ -68,7 +68,7 @@ export async function lookupBirthday(discordUserId: string) {
 // Slash Command Handler
 // ─────────────────────────────────────────
 
-export async function handleBirthdayCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+export async function handleBirthdayCommand(interaction: ChatInputCommandInteraction, client?: Client): Promise<void> {
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'set') {
@@ -118,6 +118,59 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
         flags: 64,
       });
     }
+    return;
+  }
+
+  if (sub === 'upcoming') {
+    await interaction.deferReply({ flags: 64 });
+
+    // Build list of next 7 days (month/day pairs) in ET
+    const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const dates: Array<{ month: number; day: number }> = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(etNow);
+      d.setDate(d.getDate() + i);
+      dates.push({ month: d.getMonth() + 1, day: d.getDate() });
+    }
+
+    const birthdays = await storage.getUpcomingBirthdays(dates);
+
+    if (birthdays.length === 0) {
+      await interaction.editReply({ content: "No birthdays coming up in the next 7 days, sugar! 🍑" });
+      return;
+    }
+
+    // Group by month/day
+    const grouped = new Map<string, typeof birthdays>();
+    for (const b of birthdays) {
+      const key = `${b.month}-${b.day}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(b);
+    }
+
+    const lines: string[] = [];
+    for (const dateEntry of dates) {
+      const key = `${dateEntry.month}-${dateEntry.day}`;
+      const group = grouped.get(key);
+      if (!group || group.length === 0) continue;
+      const dateLabel = formatBirthdayDate(dateEntry.month, dateEntry.day);
+      const isToday = dateEntry.month === dates[0].month && dateEntry.day === dates[0].day;
+      const people = group.map(b => `<@${b.discordUserId}>`).join(', ');
+      lines.push(`${isToday ? '🎂' : '🗓️'} **${dateLabel}**${isToday ? ' *(today!)*' : ''}\n\u2003${people}`);
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0xD4A574)
+      .setAuthor({
+        name: 'Peaches 🍑 — Upcoming Birthdays',
+        iconURL: client?.user?.displayAvatarURL({ size: 128 }),
+      })
+      .setTitle('🎂 Birthdays — Next 7 Days')
+      .setDescription(lines.join('\n\n'))
+      .setFooter({ text: `${birthdays.length} birthday(s) coming up! 🍑` })
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
     return;
   }
 }

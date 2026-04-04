@@ -131,6 +131,11 @@ export async function runMigrations(): Promise<void> {
     `);
 
     await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_tickets_number
+        ON discord_tickets (ticket_number)
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS discord_birthdays (
         id SERIAL PRIMARY KEY,
         discord_user_id VARCHAR(30) NOT NULL UNIQUE,
@@ -286,10 +291,109 @@ export async function runMigrations(): Promise<void> {
         ON region_snapshots (created_at DESC)
     `);
 
+    // ── Ticket enhancements: priority, status, escalation, reopen, notes ──
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS priority VARCHAR(10) NOT NULL DEFAULT 'normal'`);
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'open'`);
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS escalation_level INTEGER NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS reopened_by VARCHAR(30)`);
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMP`);
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP NOT NULL DEFAULT NOW()`);
+    // One-time backfill: set last_activity_at to created_at for rows that still have the DEFAULT NOW() value
+    // Only runs if there are rows where last_activity_at matches the default (i.e., never updated)
+    await client.query(`
+      UPDATE discord_tickets SET last_activity_at = created_at
+      WHERE last_activity_at = created_at
+      AND NOT EXISTS (
+        SELECT 1 FROM site_content
+        WHERE key = 'migration_last_activity_backfill_done'
+      )
+    `);
+    await client.query(`
+      INSERT INTO site_content (key, value) VALUES ('migration_last_activity_backfill_done', '"true"')
+      ON CONFLICT (key) DO NOTHING
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_ticket_notes (
+        id SERIAL PRIMARY KEY,
+        ticket_id INTEGER NOT NULL,
+        staff_discord_id VARCHAR(30) NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_ticket_notes_ticket
+        ON discord_ticket_notes (ticket_id)
+    `);
+
+    // Add FK constraint with CASCADE so notes are auto-deleted when tickets are purged
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'fk_ticket_notes_ticket_id'
+        ) THEN
+          ALTER TABLE discord_ticket_notes
+            ADD CONSTRAINT fk_ticket_notes_ticket_id
+            FOREIGN KEY (ticket_id) REFERENCES discord_tickets(id) ON DELETE CASCADE;
+        END IF;
+      END $$
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_tickets_status
+        ON discord_tickets (status) WHERE NOT is_closed
+    `);
+
     // Seed ticket counter in site_content if not present
     await client.query(`
       INSERT INTO site_content (key, value) VALUES ('discord_bot_state', '{"nextTicketNumber": 1}')
       ON CONFLICT (key) DO NOTHING
+    `);
+
+    // Additional performance indexes
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_audit_log_created_at
+        ON discord_audit_log (created_at DESC)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_tickets_open_status
+        ON discord_tickets (is_closed) WHERE is_closed = false
+    `);
+
+    // ── Ticket enhancements: resolution, first response time, feedback ──
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS resolution TEXT`);
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS resolution_type VARCHAR(20)`);
+    await client.query(`ALTER TABLE discord_tickets ADD COLUMN IF NOT EXISTS first_response_at TIMESTAMP`);
+
+    // Ticket feedback (satisfaction survey) table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_ticket_feedback (
+        id SERIAL PRIMARY KEY,
+        ticket_id INTEGER NOT NULL REFERENCES discord_tickets(id) ON DELETE CASCADE,
+        rating INTEGER NOT NULL,
+        comment TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_discord_ticket_feedback_ticket
+        ON discord_ticket_feedback (ticket_id)
+    `);
+
+    // Onboarding table — interactive DM journey state
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_onboarding (
+        user_id VARCHAR(30) PRIMARY KEY,
+        character_name VARCHAR(200),
+        interests VARCHAR(200),
+        step INTEGER NOT NULL DEFAULT 1,
+        started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        completed_at TIMESTAMP
+      )
     `);
 
     // One-time migration: seed from JSON files if tables are empty

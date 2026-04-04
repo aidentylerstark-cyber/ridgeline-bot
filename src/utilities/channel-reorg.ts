@@ -1,4 +1,4 @@
-import { type Client, type Guild } from 'discord.js';
+import { PermissionFlagsBits, type Client, type Guild, type TextChannel, type OverwriteResolvable } from 'discord.js';
 import { GUILD_ID } from '../config.js';
 
 async function reorganizeCategory(
@@ -8,14 +8,24 @@ async function reorganizeCategory(
   categoryName: string | null,
   renames: Array<{ id: string; name: string }>
 ) {
-  if (categoryId && categoryName) {
-    const category = guild.channels.cache.get(categoryId);
+  // Resolve 'auto' categoryId from the first channel's parent
+  let resolvedCategoryId = categoryId;
+  if (categoryId === 'auto' && renames.length > 0) {
+    const firstChannel = guild.channels.cache.get(renames[0].id);
+    resolvedCategoryId = firstChannel?.parentId ?? null;
+    if (resolvedCategoryId) {
+      console.log(`[Discord Bot] Auto-resolved category ID: ${resolvedCategoryId}`);
+    }
+  }
+
+  if (resolvedCategoryId && categoryName) {
+    const category = guild.channels.cache.get(resolvedCategoryId);
     if (category) {
       try {
         await category.setName(categoryName);
-        console.log(`[Bot] Category renamed \u2192 ${categoryName}`);
+        console.log(`[Discord Bot] Category renamed \u2192 ${categoryName}`);
       } catch (err) {
-        console.error(`[Bot] Failed to rename category:`, err);
+        console.error(`[Discord Bot] Failed to rename category:`, err);
       }
       await new Promise(r => setTimeout(r, 2000));
     }
@@ -25,21 +35,21 @@ async function reorganizeCategory(
     const { id, name } = renames[i];
     const channel = guild.channels.cache.get(id);
     if (!channel) {
-      console.log(`[Bot] Channel ${id} not found, skipping`);
+      console.log(`[Discord Bot] Channel ${id} not found, skipping`);
       continue;
     }
     try {
       const oldName = channel.name;
       await channel.setName(name);
-      console.log(`[Bot] Renamed: #${oldName} \u2192 #${name}`);
+      console.log(`[Discord Bot] Renamed: #${oldName} \u2192 #${name}`);
     } catch (err) {
-      console.error(`[Bot] Failed to rename ${id}:`, err);
+      console.error(`[Discord Bot] Failed to rename ${id}:`, err);
     }
     if (i < renames.length - 1) {
       await new Promise(r => setTimeout(r, 2000));
     }
   }
-  console.log(`[Bot] ${label} reorganization complete \u2705`);
+  console.log(`[Discord Bot] ${label} reorganization complete \u2705`);
 }
 
 const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName: string | null; renames: Array<{ id: string; name: string }> }> = {
@@ -61,17 +71,17 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
       { id: '1400691265431015546', name: '\uD83D\uDCDA\u250Abook-club' },
     ],
   },
-  'welcome-center': {
-    categoryId: null,
-    categoryName: null,
+  'town-hall': {
+    categoryId: 'auto',  // Resolved from the first channel's parent category
+    categoryName: '\uD83C\uDFDB\uFE0F TOWN HALL',
     renames: [
       { id: '1096864061200793662', name: '\uD83D\uDC4B\u250Awelcome' },
-      { id: '1097039896209784863', name: '\uD83D\uDCDC\u250Arules' },
-      { id: '1097041761999786015', name: '\uD83C\uDFAD\u250Aget-roles' },
-      { id: '1388647632792064030', name: '\uD83D\uDCE3\u250Acommunity-announcements' },
-      { id: '1383987811698348063', name: '\uD83C\uDFE2\u250Adepartment-announcements' },
-      { id: '1097074925455560765', name: '\uD83D\uDCC5\u250Aupcoming-events' },
-      { id: '1378183356885504000', name: '\uD83D\uDCA1\u250Asuggestions' },
+      { id: '1097039896209784863', name: '\uD83D\uDCDC\u250Atown-rules' },
+      { id: '1097041761999786015', name: '\uD83C\uDFAD\u250Aget-your-roles' },
+      { id: '1388647632792064030', name: '\uD83D\uDCE3\u250Aannouncements' },
+      { id: '1383987811698348063', name: '\uD83C\uDFE2\u250Adepartment-news' },
+      { id: '1097074925455560765', name: '\uD83D\uDCC5\u250Aevent-board' },
+      { id: '1378183356885504000', name: '\uD83D\uDCA1\u250Asuggestion-box' },
       { id: '1466235361658404981', name: '\uD83D\uDCCA\u250Acommunity-polls' },
     ],
   },
@@ -372,6 +382,48 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
       { id: '1436162790636388515', name: '\uD83D\uDCC7\u250Astaff-roster' },
     ],
   },
+  'animal-services': {
+    categoryId: '1485397337902678257',
+    categoryName: '\uD83D\uDC3E CLOVERDALE ANIMAL SERVICES',
+    renames: [
+      // Shared
+      { id: '1485396504033231032', name: '\uD83D\uDCE2\u250Aannouncements' },
+      { id: '1485396567853764668', name: '\uD83D\uDD0A\u250Ateam-meeting' },
+      { id: '1382372809296187442', name: '\uD83D\uDCDA\u250Aresources' },
+      { id: '1486982701578977280', name: '\uD83D\uDEA8\u250Aemergency-dispatch' },
+      // Vet Clinic
+      { id: '1485396496282157128', name: '\uD83D\uDCAC\u250Avet-staff-chat' },
+      { id: '1485396512283427007', name: '\uD83D\uDCC7\u250Avet-staff-roster' },
+      { id: '1485396520042758255', name: '\uD83D\uDCD6\u250Avet-handbook' },
+      { id: '1485397848928550912', name: '\u23F0\u250Avet-time-clock' },
+      { id: '1485396534773284954', name: '\uD83D\uDCCB\u250Aappointments' },
+      { id: '1485396542088155136', name: '\uD83E\uDE7A\u250Apatient-records' },
+      { id: '1485396549864395013', name: '\uD83D\uDEA8\u250Aemergency-cases' },
+      // Wildlife Reserve
+      { id: '1486982709174865941', name: '\uD83D\uDCC7\u250Areserve-staff-roster' },
+      { id: '1486982716871282729', name: '\uD83D\uDCD6\u250Areserve-handbook' },
+      { id: '1486982724458774571', name: '\u23F0\u250Areserve-time-clock' },
+      { id: '1486982732553781289', name: '\uD83E\uDD8C\u250Aanimal-tracking' },
+      { id: '1486982740745130004', name: '\uD83C\uDF3F\u250Ahabitat-reports' },
+      { id: '1486982760752087152', name: '\uD83D\uDC3E\u250Arescue-operations' },
+    ],
+  },
+  'post-office': {
+    categoryId: '1485397422791463072',
+    categoryName: '\uD83D\uDCEE RIDGELINE POST OFFICE',
+    renames: [
+      { id: '1485396595196563526', name: '\uD83D\uDCAC\u250Apostal-staff-chat' },
+      { id: '1485396602645381200', name: '\uD83D\uDCE2\u250Aannouncements' },
+      { id: '1485396609947930796', name: '\uD83D\uDCC7\u250Astaff-roster' },
+      { id: '1485396617405272135', name: '\uD83D\uDCD6\u250Ahand-book' },
+      { id: '1485396527491973321', name: '\u23F0\u250Atime-clock' },
+      { id: '1485396632643047474', name: '\uD83D\uDCE6\u250Apackage-tracking' },
+      { id: '1485396640264356020', name: '\uD83D\uDCEC\u250Amailroom' },
+      { id: '1485396647465848975', name: '\uD83D\uDCCB\u250Adelivery-routes' },
+      { id: '1485396557963595816', name: '\uD83D\uDCDA\u250Aresources' },
+      { id: '1485396662229663827', name: '\uD83D\uDD0A\u250Apostal-meeting' },
+    ],
+  },
   'staff': {
     categoryId: '1097020460098666516',
     categoryName: '\uD83D\uDEE1\uFE0F STAFF',
@@ -425,13 +477,132 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
 
 export async function reorganizeCategoryByKey(client: Client, categoryKey: string) {
   const guild = client.guilds.cache.get(GUILD_ID);
-  if (!guild) { console.log('[Bot] Guild not found'); return; }
+  if (!guild) { console.log('[Discord Bot] Guild not found'); return; }
 
   const config = CATEGORY_CONFIGS[categoryKey];
   if (!config) {
-    console.log(`[Bot] Unknown category key: ${categoryKey}`);
+    console.log(`[Discord Bot] Unknown category key: ${categoryKey}`);
     return;
   }
 
   await reorganizeCategory(guild, categoryKey, config.categoryId, config.categoryName, config.renames);
+}
+
+// ─────────────────────────────────────────
+// Channel Permission Templates
+// ─────────────────────────────────────────
+
+type PermissionPreset = 'read-only' | 'members-can-send' | 'bot-panel' | 'staff-post';
+
+const CHANNEL_PERMISSIONS: Record<string, Array<{ id: string; preset: PermissionPreset }>> = {
+  'town-hall': [
+    { id: '1096864061200793662', preset: 'read-only' },          // welcome — bot posts, members read
+    { id: '1097039896209784863', preset: 'read-only' },          // town-rules — read only
+    { id: '1097041761999786015', preset: 'bot-panel' },          // get-your-roles — bot panel with buttons
+    { id: '1388647632792064030', preset: 'staff-post' },         // announcements — staff only
+    { id: '1383987811698348063', preset: 'staff-post' },         // department-news — staff only
+    { id: '1097074925455560765', preset: 'staff-post' },         // event-board — staff only
+    { id: '1378183356885504000', preset: 'read-only' },          // suggestion-box — /suggest command, members can't type
+    { id: '1466235361658404981', preset: 'read-only' },          // community-polls — staff posts polls, members vote via native polls
+  ],
+};
+
+export async function setChannelPermissions(client: Client, categoryKey: string) {
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (!guild) { console.log('[Discord Bot] Guild not found'); return; }
+
+  const permConfig = CHANNEL_PERMISSIONS[categoryKey];
+  if (!permConfig) {
+    console.log(`[Discord Bot] No permission config for category: ${categoryKey}`);
+    return;
+  }
+
+  // Find staff roles for staff-post channels
+  const staffRoleNames = ['Community Manager', 'Community Moderator', 'Ridgeline Owner', 'First Lady', 'Ridgeline Management', 'Ridgeline Manager'];
+  const staffRoles = staffRoleNames
+    .map(name => guild.roles.cache.find(r => r.name === name))
+    .filter(Boolean);
+
+  for (const { id, preset } of permConfig) {
+    const channel = guild.channels.cache.get(id) as TextChannel | undefined;
+    if (!channel) {
+      console.log(`[Discord Bot] Channel ${id} not found, skipping permissions`);
+      continue;
+    }
+
+    try {
+      const overwrites: OverwriteResolvable[] = [];
+
+      switch (preset) {
+        case 'read-only':
+          // Everyone can see but not send
+          overwrites.push({
+            id: guild.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+            deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads],
+          });
+          // Bot can send
+          if (client.user) {
+            overwrites.push({
+              id: client.user.id,
+              allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
+            });
+          }
+          break;
+
+        case 'bot-panel':
+          // Everyone can see + use buttons, but not type
+          overwrites.push({
+            id: guild.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+            deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.CreatePublicThreads],
+          });
+          // Bot can send + manage
+          if (client.user) {
+            overwrites.push({
+              id: client.user.id,
+              allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.EmbedLinks],
+            });
+          }
+          break;
+
+        case 'staff-post':
+          // Everyone can see but not send
+          overwrites.push({
+            id: guild.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+            deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.CreatePublicThreads],
+          });
+          // Staff can send
+          for (const role of staffRoles) {
+            overwrites.push({
+              id: role!.id,
+              allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ManageMessages],
+            });
+          }
+          // Bot can send
+          if (client.user) {
+            overwrites.push({
+              id: client.user.id,
+              allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
+            });
+          }
+          break;
+
+        case 'members-can-send':
+          overwrites.push({
+            id: guild.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
+          });
+          break;
+      }
+
+      await channel.permissionOverwrites.set(overwrites);
+      console.log(`[Discord Bot] Permissions set: #${channel.name} \u2192 ${preset}`);
+      await new Promise(r => setTimeout(r, 1000)); // Rate limit buffer
+    } catch (err) {
+      console.error(`[Discord Bot] Failed to set permissions on #${channel.name}:`, err);
+    }
+  }
+  console.log(`[Discord Bot] ${categoryKey} permissions complete \u2705`);
 }

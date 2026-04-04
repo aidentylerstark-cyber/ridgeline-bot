@@ -137,6 +137,12 @@ export async function processRegionUpdate(client: Client, payload: Record<string
   const region = String(payload.region ?? '').trim();
   if (!region) return;
 
+  // Validate region name against known regions
+  if (!REGION_NAMES.includes(region as typeof REGION_NAMES[number])) {
+    console.warn(`[Discord Bot] Region webhook received unknown region name: "${region}" — ignoring`);
+    return;
+  }
+
   const rawAgents: RegionAgent[] = Array.isArray(payload.agents)
     ? payload.agents.map((a: unknown) => {
         if (typeof a === 'object' && a !== null && 'key' in a && 'name' in a) {
@@ -192,11 +198,19 @@ export async function processRegionUpdate(client: Client, payload: Record<string
       const arrivals = currNormalized.filter(a => !prevKeys.has(a.key));
       const departures = prevNormalized.filter(a => !currKeys.has(a.key));
 
+      const movementLines: string[] = [];
       for (const agent of arrivals) {
-        await channel.send(formatAgentLine(region, agent)).catch(() => {});
+        movementLines.push(formatAgentLine(region, agent));
       }
       for (const agent of departures) {
-        await channel.send(`${region} | ${agent.name} left`).catch(() => {});
+        movementLines.push(`${region} | ${agent.name} left`);
+      }
+
+      // Send batched arrival/departure messages (max ~10 per message to stay under 2000 chars)
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < movementLines.length; i += BATCH_SIZE) {
+        const batch = movementLines.slice(i, i + BATCH_SIZE);
+        await channel.send(batch.join('\n')).catch(() => {});
       }
     }
   }
@@ -211,7 +225,7 @@ export async function processRegionUpdate(client: Client, payload: Record<string
 
   // ── FPS / Dilation alerts ──
   const dilation = rawDilation ? parseFloat(rawDilation) : null;
-  const displayFps = rawFps ?? (typeof payload.fps === 'number' ? Math.round(payload.fps * 10) / 10 : null);
+  const displayFps = rawFps;
 
   if (displayFps !== null && displayFps < REGION_ALERT_THRESHOLDS.fpsCritical) {
     const cooldownKey = `${region}:fps_critical`;
@@ -348,7 +362,30 @@ export async function handleRegionCommand(interaction: ChatInputCommandInteracti
     lines.push('');
   }
 
-  await interaction.editReply({ content: lines.join('\n') });
+  const output = lines.join('\n');
+
+  // Guard against exceeding Discord's 2000-char message limit
+  if (output.length <= 1900) {
+    await interaction.editReply({ content: output });
+  } else {
+    // Split into multiple messages — send first as editReply, rest as followUp
+    const chunks: string[] = [];
+    let current = '';
+    for (const line of lines) {
+      if (current.length + line.length + 1 > 1900) {
+        chunks.push(current);
+        current = line;
+      } else {
+        current += (current ? '\n' : '') + line;
+      }
+    }
+    if (current) chunks.push(current);
+
+    await interaction.editReply({ content: chunks[0] ?? 'No region data available.' });
+    for (let i = 1; i < chunks.length; i++) {
+      await interaction.followUp({ content: chunks[i], flags: 64 });
+    }
+  }
 }
 
 // ── Daily summary ──
@@ -430,5 +467,26 @@ export async function postDailySummary(client: Client): Promise<void> {
     lines.push('');
   }
 
-  await channel.send(lines.join('\n')).catch(() => {});
+  const output = lines.join('\n');
+
+  // Guard against exceeding Discord's 2000-char message limit
+  if (output.length <= 1900) {
+    await channel.send(output).catch(() => {});
+  } else {
+    const chunks: string[] = [];
+    let current = '';
+    for (const line of lines) {
+      if (current.length + line.length + 1 > 1900) {
+        chunks.push(current);
+        current = line;
+      } else {
+        current += (current ? '\n' : '') + line;
+      }
+    }
+    if (current) chunks.push(current);
+
+    for (const chunk of chunks) {
+      await channel.send(chunk).catch(() => {});
+    }
+  }
 }

@@ -10,6 +10,7 @@ export function scheduleRegionDailySummary(client: Client): cron.ScheduledTask {
     if (!isBotActive()) return;
     try {
       await withRetry(async () => {
+        if (!isBotActive()) return; // Re-check after retry delay
         await postDailySummary(client);
         console.log('[Peaches] Posted daily region summary');
       }, { label: 'Region daily summary' });

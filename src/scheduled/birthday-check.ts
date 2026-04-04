@@ -15,7 +15,7 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
       const guild = client.guilds.cache.get(GUILD_ID);
       if (!guild) return;
 
-      const birthdayChannel = guild.channels.cache.get(CHANNELS.birthdays ?? CHANNELS.celebrationCorner) as TextChannel | undefined;
+      const birthdayChannel = guild.channels.cache.get(CHANNELS.birthdays) as TextChannel | undefined;
       if (!birthdayChannel) return;
 
       // Use Eastern time to match the cron schedule timezone
@@ -30,6 +30,7 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
         const alreadyPostedSet = await getPostedBirthdaysForYear(currentYear);
 
         for (const bp of birthdayPeople) {
+          if (!isBotActive()) return; // Re-check after retry delay
           if (alreadyPostedSet.has(bp.discordUserId)) continue;
 
           // Check member exists BEFORE recording the post (so left members can retry next year)

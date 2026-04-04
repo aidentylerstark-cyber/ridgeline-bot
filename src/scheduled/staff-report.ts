@@ -4,6 +4,7 @@ import { GUILD_ID, CHANNELS } from '../config.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { pool } from '../db/index.js';
 import { withRetry } from '../utilities/retry.js';
+import { getAverageRatingSince, getAverageFirstResponseTime, getStaffSatisfactionSince } from '../storage.js';
 
 export function scheduleStaffReport(client: Client): cron.ScheduledTask {
   // Monday 9 AM ET — weekly staff activity report
@@ -16,6 +17,8 @@ export function scheduleStaffReport(client: Client): cron.ScheduledTask {
 
       const modLogChannel = guild.channels.cache.get(CHANNELS.modLog) as TextChannel | undefined;
       if (!modLogChannel) return;
+
+      if (!isBotActive()) return; // Re-check after retry delay
 
       const { rows } = await pool.query<{
         actor_discord_id: string;
@@ -87,8 +90,43 @@ export function scheduleStaffReport(client: Client): cron.ScheduledTask {
       }
 
       let description = lines.join('\n');
-      if (description.length > 4000) {
-        description = description.slice(0, 3990) + '\n\u2026 *(truncated)*';
+      if (description.length > 3500) {
+        description = description.slice(0, 3490) + '\n\u2026 *(truncated)*';
+      }
+
+      // Fetch satisfaction and FRT data for the week
+      const weekAgo = new Date(Date.now() - 7 * 86_400_000);
+      const [weekRating, weekFrt, staffSatisfaction] = await Promise.all([
+        getAverageRatingSince(weekAgo),
+        getAverageFirstResponseTime(weekAgo),
+        getStaffSatisfactionSince(weekAgo),
+      ]);
+
+      // Format satisfaction line
+      let satisfactionLine = 'No ratings this week';
+      if (weekRating.total_responses > 0) {
+        const stars = '\u2B50'.repeat(Math.round(weekRating.avg_rating));
+        satisfactionLine = `${stars} **${weekRating.avg_rating.toFixed(1)}/5** (${weekRating.total_responses} responses)`;
+      }
+
+      // Format FRT line
+      let frtLine = 'No data';
+      if (weekFrt !== null) {
+        if (weekFrt < 60) {
+          frtLine = `**${Math.round(weekFrt)}m**`;
+        } else {
+          const hours = Math.floor(weekFrt / 60);
+          const mins = Math.round(weekFrt % 60);
+          frtLine = `**${hours}h ${mins}m**`;
+        }
+      }
+
+      // Per-staff satisfaction
+      const staffSatLines: string[] = [];
+      for (const s of staffSatisfaction.slice(0, 10)) {
+        const starCount = Math.round(s.avg_rating);
+        const stars = '\u2B50'.repeat(starCount);
+        staffSatLines.push(`<@${s.staff_id}>: ${stars} **${s.avg_rating.toFixed(1)}/5** (${s.total_responses})`);
       }
 
       const embed = new EmbedBuilder()
@@ -96,6 +134,15 @@ export function scheduleStaffReport(client: Client): cron.ScheduledTask {
         .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Weekly Staff Report', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
         .setTitle('\uD83D\uDCCA Weekly Staff Activity Report')
         .setDescription(description)
+        .addFields(
+          { name: '\u2B50 Avg Satisfaction', value: satisfactionLine, inline: true },
+          { name: '\u23F1\uFE0F Avg First Response', value: frtLine, inline: true },
+          ...(staffSatLines.length > 0 ? [{
+            name: '\uD83D\uDC64 Per-Staff Satisfaction',
+            value: staffSatLines.join('\n'),
+            inline: false,
+          }] : []),
+        )
         .setFooter({ text: 'Last 7 days of activity' })
         .setTimestamp();
 

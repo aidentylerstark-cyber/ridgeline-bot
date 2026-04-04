@@ -31,7 +31,27 @@ export const CHANNELS = {
   statsMembersVC: '1475717469791457352',   // Voice channel showing member count (e.g. "Members: 247")
   statsOnlineVC: '1475717470936498176',    // Voice channel showing online count (e.g. "Online: 43")
   regionMonitoring: '1420963602457825330', // SL region monitoring alerts & logs
+  swipematch: '1489884763874529390',  // Ridgeline Connections panel channel
 };
+
+// ─────────────────────────────────────────
+// Chatbot Channel Denylist
+// ─────────────────────────────────────────
+
+/** Channels where Peaches should NOT respond to chatbot triggers */
+export const CHATBOT_DENIED_CHANNELS = new Set([
+  CHANNELS.rules,
+  CHANNELS.communityAnnouncements,
+  CHANNELS.deptAnnouncements,
+  CHANNELS.ticketLogs,
+  CHANNELS.modLog,
+  CHANNELS.ticketPanel,
+  CHANNELS.welcome,
+  CHANNELS.regionMonitoring,
+  CHANNELS.statsMembersVC,
+  CHANNELS.statsOnlineVC,
+  CHANNELS.swipematch,
+]);
 
 // ─────────────────────────────────────────
 // Roles
@@ -135,9 +155,83 @@ export const MAX_TICKETS_PER_DEPARTMENT = 1;
 export const TICKET_LIMIT_BYPASS_ROLES = ['First Lady', 'Ridgeline Owner'];
 export const GLOBAL_STAFF_ROLES = ['Ridgeline Owner', 'First Lady', 'Ridgeline Management', 'Ridgeline Manager'];
 
+// ── Ticket Escalation ──
+
+/** Hours of inactivity before each escalation tier fires (for normal priority) */
+export const ESCALATION_THRESHOLDS_HOURS = {
+  tier1: 24,   // Post to mod-log
+  tier2: 48,   // Ping management in ticket channel
+  tier3: 72,   // DM owner/first lady
+} as const;
+
+/** Urgent tickets use half the normal thresholds */
+export const ESCALATION_URGENT_DIVISOR = 2;
+
+/** Roles to ping at tier 2 escalation */
+export const ESCALATION_MANAGEMENT_ROLES = ['Ridgeline Management', 'Ridgeline Manager'];
+
+/** Roles to DM at tier 3 escalation */
+export const ESCALATION_DM_ROLES = ['Ridgeline Owner', 'First Lady'];
+
+// ── Ticket priority colors ──
+
+export const TICKET_PRIORITY_COLORS: Record<string, number> = {
+  low: 0x95A5A6,
+  normal: 0xD4A574,
+  urgent: 0xED4245,
+};
+
 // ─────────────────────────────────────────
-// Milestones
+// Business Locations
 // ─────────────────────────────────────────
+
+export const BUSINESS_CATEGORIES = {
+  animalServices: {
+    label: 'Cloverdale Animal Services',
+    categoryId: '1485397337902678257',
+    staffRoles: ['Vet Clinic Director', 'Vet Clinic Staff', 'Wildlife Reserve Director', 'Wildlife Reserve Staff'],
+    shared: {
+      announcements: '1485396504033231032',
+      teamMeetingVC: '1485396567853764668',
+      resources: '1382372809296187442',
+      emergencyDispatch: '1486982701578977280',
+    },
+    vetClinic: {
+      staffChat: '1485396496282157128',
+      staffRoster: '1485396512283427007',
+      handBook: '1485396520042758255',
+      timeClock: '1485397848928550912',
+      appointments: '1485396534773284954',
+      patientRecords: '1485396542088155136',
+      emergencyCases: '1485396549864395013',
+    },
+    wildlifeReserve: {
+      staffRoster: '1486982709174865941',
+      handBook: '1486982716871282729',
+      timeClock: '1486982724458774571',
+      animalTracking: '1486982732553781289',
+      habitatReports: '1486982740745130004',
+      rescueOperations: '1486982760752087152',
+    },
+  },
+  postOffice: {
+    label: 'Ridgeline Post Office',
+    categoryId: '1485397422791463072',
+    staffRoles: ['Postmaster', 'Post Office Staff'],
+    channels: {
+      staffChat: '1485396595196563526',
+      announcements: '1485396602645381200',
+      staffRoster: '1485396609947930796',
+      handBook: '1485396617405272135',
+      timeClock: '1485396527491973321',
+      packageTracking: '1485396632643047474',
+      mailroom: '1485396640264356020',
+      deliveryRoutes: '1485396647465848975',
+      resources: '1485396557963595816',
+      postalMeetingVC: '1485396662229663827',
+    },
+  },
+};
 
 // ─────────────────────────────────────────
 // Region Monitoring (Second Life)
@@ -161,6 +255,37 @@ export const REGION_SNAPSHOT_RETENTION_DAYS = 7;
 // ─────────────────────────────────────────
 // Milestones
 // ─────────────────────────────────────────
+
+// ─────────────────────────────────────────
+// SwipeMatch — Ridgeline Connections
+// ─────────────────────────────────────────
+
+export const SWIPEMATCH = {
+  /** Max swipes per day per user */
+  dailySwipeLimit: 15,
+  /** Max super likes per day per user */
+  dailySuperLikeLimit: 2,
+  /** Minimum age to display on profiles */
+  minAge: '18',
+  /** Interest options for profile creation */
+  interestOptions: [
+    '🎮 Gaming', '🌲 Outdoors', '🎵 Music', '🐴 Horses',
+    '📸 Photography', '🎭 Theater', '☕ Coffee Dates', '🎣 Fishing',
+    '🏕 Camping', '🍳 Cooking', '📚 Reading', '💃 Dancing',
+    '🏋️ Fitness', '🎨 Art', '🐾 Animals', '🌄 Sunsets',
+  ],
+  /** Gender options */
+  genderOptions: ['Male', 'Female', 'Non-Binary', 'Other'],
+  /** Interested-in options */
+  interestedInOptions: ['Men', 'Women', 'Everyone', 'Just Here for RP'],
+  /** Score weights for smart matching */
+  scoreWeights: {
+    sharedInterest: 3,
+    sharedRole: 2,
+    preferenceMatch: 5,
+    superLikeBonus: 10,
+  },
+} as const;
 
 export const FOUNDING_DATE = new Date('2025-06-25');
 
