@@ -285,6 +285,21 @@ export const SWIPEMATCH = {
     preferenceMatch: 5,
     superLikeBonus: 10,
   },
+  /** Rotating profile prompts — changes weekly */
+  profilePrompts: [
+    "What's your character's biggest secret?",
+    "Describe your perfect Saturday in Ridgeline.",
+    "What's the one thing that makes your character smile?",
+    "Where in Ridgeline would you take someone on a first date?",
+    "What song plays when your character walks into a room?",
+    "If your character could change one thing about their past, what would it be?",
+    "What does your character's ideal lazy Sunday look like?",
+    "What's the most trouble your character has ever gotten into?",
+    "Coffee or sweet tea — and how does your character take it?",
+    "What's the view from your character's favorite spot in town?",
+    "If your character wrote a personal ad, what would it say?",
+    "What does your character do when nobody's watching?",
+  ],
 } as const;
 
 export const FOUNDING_DATE = new Date('2025-06-25');

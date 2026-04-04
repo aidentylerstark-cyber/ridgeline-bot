@@ -49,6 +49,8 @@ import {
   handleMyMatchesButton,
   handleDeleteProfileButton,
   handleUploadPhotosButton,
+  handleAnswerPromptButton,
+  handlePromptModalSubmit,
   handlePhotoNav,
   handlePhotoDelete,
   handleSwipematchLike,
@@ -211,6 +213,7 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     { match: 'sm_pause_profile', exact: true, handler: handlePauseProfile },
     { match: 'sm_unpause_profile', exact: true, handler: handleUnpauseProfile },
     { match: 'sm_upload_photos', exact: true, handler: handleUploadPhotosButton },
+    { match: 'sm_answer_prompt', exact: true, handler: handleAnswerPromptButton },
     { match: 'sm_photo_count_', handler: async (i) => { await i.deferUpdate(); } }, // disabled counter button
     { match: 'sm_photodel_', handler: handlePhotoDelete },
     { match: 'sm_photo_', handler: handlePhotoNav },
@@ -294,6 +297,10 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
         }
         if (interaction.customId === 'swipematch_profile_modal') {
           await handleProfileModalSubmit(interaction, client);
+          return;
+        }
+        if (interaction.customId === 'swipematch_prompt_modal') {
+          await handlePromptModalSubmit(interaction, client);
           return;
         }
         return;

@@ -37,6 +37,7 @@ import {
   removeSwipematchPhoto,
   getSwipematchPhotos,
 } from '../storage.js';
+import { pool } from '../db/index.js';
 import { logAuditEvent } from './audit-log.js';
 import { isStaff } from '../utilities/permissions.js';
 
@@ -435,7 +436,8 @@ export async function handleStartSwipingButton(interaction: ButtonInteraction, c
   const superRemaining = SWIPEMATCH.dailySuperLikeLimit - limits.superLikeCount;
 
   const candidatePhotos = (candidate.photos as string[]) ?? [];
-  const embed = buildProfileEmbed(candidate, avatarUrl, false, candidatePhotos, 0);
+  const viewerInterests = (profile.interests as string[]) ?? [];
+  const embed = buildProfileEmbed(candidate, avatarUrl, false, candidatePhotos, 0, viewerInterests, profile.interestedIn ?? undefined);
   embed.setFooter({ text: `${remaining} swipes left today | Ridgeline Connections 💘` });
 
   const buttons = buildSwipeButtons(candidate.discordUserId, superRemaining);
@@ -643,10 +645,10 @@ async function processSwipe(
       return;
     }
 
-    // Super like DM notification
-    if (action === 'superlike') {
-      try {
-        const targetUser = await client.users.fetch(targetId);
+    // "Someone liked you" DM hints
+    try {
+      const targetUser = await client.users.fetch(targetId);
+      if (action === 'superlike') {
         await targetUser.send({
           embeds: [new EmbedBuilder()
             .setColor(0xFFD700)
@@ -657,8 +659,21 @@ async function processSwipe(
             )
           ],
         });
-      } catch { /* DMs disabled */ }
-    }
+      } else {
+        // Regular like — subtle hint
+        await targetUser.send({
+          embeds: [new EmbedBuilder()
+            .setColor(ACCENT_COLOR)
+            .setTitle('💘 Someone took a shot at you!')
+            .setDescription(
+              `Somebody in Ridgeline just liked your profile...\n\n` +
+              `Who could it be? Hit **Start Swiping** to find out — if you like 'em back, it's a match! 👀`
+            )
+            .setFooter({ text: 'Ridgeline Connections 💘' })
+          ],
+        });
+      }
+    } catch { /* DMs disabled */ }
   }
 
   // Auto-show next card
@@ -714,7 +729,8 @@ async function showNextCandidate(
   } catch { /* member may have left */ }
 
   const candidatePhotos = (candidate.photos as string[]) ?? [];
-  const embed = buildProfileEmbed(candidate, avatarUrl, false, candidatePhotos, 0);
+  const viewerInterests = (swiperProfile.interests as string[]) ?? [];
+  const embed = buildProfileEmbed(candidate, avatarUrl, false, candidatePhotos, 0, viewerInterests, swiperProfile.interestedIn ?? undefined);
   embed.setFooter({ text: `${remaining} swipes left today | Ridgeline Connections 💘` });
 
   const buttons = buildSwipeButtons(candidate.discordUserId, superRemaining);
@@ -1012,7 +1028,57 @@ export async function handleUploadPhotosButton(interaction: ButtonInteraction, _
   });
 }
 
-// Photo URL modal removed — users upload directly via attachments
+// ─────────────────────────────────────────
+// Prompt Answer — rotating weekly question
+// ─────────────────────────────────────────
+
+/** Get the current weekly prompt based on week number */
+function getCurrentPrompt(): string {
+  const weekNumber = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+  const prompts = SWIPEMATCH.profilePrompts;
+  return prompts[weekNumber % prompts.length];
+}
+
+export async function handleAnswerPromptButton(interaction: ButtonInteraction, _client: Client): Promise<void> {
+  const currentPrompt = getCurrentPrompt();
+
+  const modal = new ModalBuilder()
+    .setCustomId('swipematch_prompt_modal')
+    .setTitle('💬 Weekly Prompt');
+
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('sm_prompt_answer')
+        .setLabel(currentPrompt.length > 45 ? currentPrompt.slice(0, 42) + '...' : currentPrompt)
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Your answer shows on your profile card!')
+        .setMaxLength(200)
+        .setRequired(true)
+    ),
+  );
+
+  await interaction.showModal(modal);
+}
+
+export async function handlePromptModalSubmit(interaction: ModalSubmitInteraction, _client: Client): Promise<void> {
+  const answer = interaction.fields.getTextInputValue('sm_prompt_answer').trim();
+  if (!answer) {
+    await interaction.reply({ content: "Give me an answer, sugar! 🍑", flags: 64 });
+    return;
+  }
+
+  const currentPrompt = getCurrentPrompt();
+  await pool.query(
+    `UPDATE swipematch_profiles SET prompt_question = $1, prompt_answer = $2, updated_at = NOW() WHERE discord_user_id = $3`,
+    [currentPrompt, answer, interaction.user.id]
+  );
+
+  await interaction.reply({
+    content: `💬 **Prompt answered!** Your response will show on your profile card:\n\n**${currentPrompt}**\n> ${answer}`,
+    flags: 64,
+  });
+}
 
 // ─────────────────────────────────────────
 // Photo carousel — prev/next on swipe cards
@@ -1127,7 +1193,7 @@ function buildSwipeButtons(candidateId: string, superRemaining: number): ActionR
   );
 }
 
-function buildProfileEmbed(
+interface ProfileEmbedOptions {
   profile: {
     characterName: string;
     age?: string | null;
@@ -1137,24 +1203,54 @@ function buildProfileEmbed(
     interests: unknown;
     slName?: string | null;
     photos?: unknown;
-  },
+    promptQuestion?: string | null;
+    promptAnswer?: string | null;
+  };
+  avatarUrl?: string;
+  isOwnProfile?: boolean;
+  photos?: string[];
+  photoIndex?: number;
+  /** Viewer's interests for compatibility calculation */
+  viewerInterests?: string[];
+  /** Viewer's interestedIn preference */
+  viewerInterestedIn?: string;
+}
+
+function buildProfileEmbed(
+  profile: ProfileEmbedOptions['profile'],
   avatarUrl?: string,
   isOwnProfile?: boolean,
   photos?: string[],
   photoIndex?: number,
+  viewerInterests?: string[],
+  viewerInterestedIn?: string,
 ): EmbedBuilder {
   const interests = (profile.interests as string[]) ?? [];
   const interestStr = interests.length > 0 ? interests.join(' | ') : 'None set';
   const photoList = photos ?? (profile.photos as string[]) ?? [];
   const idx = photoIndex ?? 0;
 
+  // Calculate compatibility %
+  let compatStr = '';
+  if (viewerInterests && viewerInterests.length > 0 && interests.length > 0 && !isOwnProfile) {
+    const compat = calculateCompatibility(interests, viewerInterests, profile.interestedIn, profile.gender, viewerInterestedIn);
+    const emoji = compat >= 75 ? '🔥' : compat >= 50 ? '✨' : compat >= 25 ? '👀' : '🤷';
+    compatStr = `\n${emoji} **${compat}% Compatible**`;
+  }
+
+  // Build bio section with prompt if available
+  let bioSection = `*"${profile.bio ?? 'No bio yet — still mysterious!'}"*`;
+  if (profile.promptQuestion && profile.promptAnswer) {
+    bioSection += `\n\n💬 **${profile.promptQuestion}**\n> ${profile.promptAnswer}`;
+  }
+
   const embed = new EmbedBuilder()
     .setColor(ACCENT_COLOR)
     .setTitle(`${profile.characterName}${profile.age ? `, ${profile.age}` : ''}`)
     .setDescription(
-      `${profile.gender ?? ''}${profile.interestedIn ? ` — Looking for: **${profile.interestedIn}**` : ''}\n\n` +
+      `${profile.gender ?? ''}${profile.interestedIn ? ` — Looking for: **${profile.interestedIn}**` : ''}${compatStr}\n\n` +
       `${interestStr}\n\n` +
-      `*"${profile.bio ?? 'No bio yet — still mysterious!'}"*`
+      bioSection
     );
 
   // Show photo as main image if available, otherwise Discord avatar as thumbnail
@@ -1172,6 +1268,54 @@ function buildProfileEmbed(
   if (isOwnProfile) embed.setFooter({ text: 'This is your profile | Hit Edit Profile to change it' });
 
   return embed;
+}
+
+/** Calculate compatibility percentage between two profiles */
+function calculateCompatibility(
+  profileInterests: string[],
+  viewerInterests: string[],
+  profileInterestedIn?: string | null,
+  profileGender?: string | null,
+  viewerInterestedIn?: string,
+): number {
+  let score = 0;
+  let maxScore = 0;
+
+  // Shared interests (up to 50 points)
+  const maxInterests = Math.max(profileInterests.length, viewerInterests.length);
+  if (maxInterests > 0) {
+    const shared = profileInterests.filter(i => viewerInterests.includes(i)).length;
+    score += (shared / maxInterests) * 50;
+  }
+  maxScore += 50;
+
+  // Preference alignment (up to 30 points)
+  if (viewerInterestedIn && profileGender) {
+    const genderMap: Record<string, string> = { 'Men': 'Male', 'Women': 'Female' };
+    if (viewerInterestedIn === 'Everyone' || viewerInterestedIn === 'Just Here for RP') {
+      score += 30;
+    } else if (genderMap[viewerInterestedIn] === profileGender) {
+      score += 30;
+    }
+  } else {
+    score += 15; // Unknown = neutral
+  }
+  maxScore += 30;
+
+  // Mutual RP interest bonus (up to 20 points)
+  if (profileInterestedIn === 'Just Here for RP' || viewerInterestedIn === 'Just Here for RP') {
+    score += 20; // RP-focused people match with everyone
+  } else if (profileInterestedIn === 'Everyone' || viewerInterestedIn === 'Everyone') {
+    score += 15;
+  } else if (profileInterestedIn && viewerInterestedIn) {
+    // Both have specific preferences — check mutual compatibility
+    const viewerGenderMap: Record<string, string> = { 'Men': 'Male', 'Women': 'Female' };
+    // This is a simplification — real Tinder has more complex matching
+    score += 10;
+  }
+  maxScore += 20;
+
+  return Math.round((score / maxScore) * 100);
 }
 
 function buildPhotoNavRow(targetId: string, totalPhotos: number, currentIndex: number): ActionRowBuilder<ButtonBuilder> {
@@ -1200,7 +1344,7 @@ function buildProfileManageRows(
 ): Array<ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>> {
   const rows: Array<ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>> = [];
 
-  // Row 1: Edit / Pause / Upload Photos
+  // Row 1: Edit / Pause / Upload Photos / Answer Prompt
   rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('sm_create_profile')
@@ -1209,15 +1353,20 @@ function buildProfileManageRows(
       .setEmoji('✏️'),
     new ButtonBuilder()
       .setCustomId(profile.isActive ? 'sm_pause_profile' : 'sm_unpause_profile')
-      .setLabel(profile.isActive ? 'Pause Profile' : 'Unpause Profile')
+      .setLabel(profile.isActive ? 'Pause' : 'Unpause')
       .setStyle(profile.isActive ? ButtonStyle.Secondary : ButtonStyle.Success)
       .setEmoji(profile.isActive ? '⏸️' : '▶️'),
     new ButtonBuilder()
       .setCustomId('sm_upload_photos')
-      .setLabel(`Add Photos (${photos.length}/5)`)
+      .setLabel(`Photos (${photos.length}/5)`)
       .setStyle(ButtonStyle.Secondary)
       .setEmoji('📸')
       .setDisabled(photos.length >= 5),
+    new ButtonBuilder()
+      .setCustomId('sm_answer_prompt')
+      .setLabel('Answer Prompt')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('💬'),
   ));
 
   // Row 2: Edit Interests select menu

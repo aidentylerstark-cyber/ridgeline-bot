@@ -196,6 +196,8 @@ export const swipematchProfiles = pgTable("swipematch_profiles", {
   slName: varchar("sl_name", { length: 100 }),
   photoUrl: varchar("photo_url", { length: 500 }),    // legacy — kept for migration compat
   photos: jsonb("photos").notNull().default([]),       // string[] of CDN URLs, max 5
+  promptQuestion: varchar("prompt_question", { length: 200 }),  // current weekly prompt
+  promptAnswer: text("prompt_answer"),                          // user's answer to the prompt
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
