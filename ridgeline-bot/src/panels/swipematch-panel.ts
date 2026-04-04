@@ -1,17 +1,11 @@
 import {
+  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  MessageFlags,
-  SeparatorSpacingSize,
   type Client,
   type TextChannel,
 } from 'discord.js';
-import {
-  ContainerBuilder,
-  TextDisplayBuilder,
-  SeparatorBuilder,
-} from '@discordjs/builders';
 import { GUILD_ID, CHANNELS } from '../config.js';
 
 export async function postSwipematchPanel(client: Client) {
@@ -44,87 +38,80 @@ export async function postSwipematchPanel(client: Client) {
     }
   }
 
-  // ── Panel Container ──
-  const panel = new ContainerBuilder()
-    .setAccentColor(0xE8788A);
-
-  panel.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `# 💘  Ridgeline Connections\n` +
+  // ── Embed ──
+  const embed = new EmbedBuilder()
+    .setColor(0xE8788A)
+    .setTitle('💘  Ridgeline Connections')
+    .setDescription(
       `> *Peaches slides a lemonade across the counter and winks*\n\n` +
       `Well hey there, sugar! Welcome to **Ridgeline Connections** — the best way to find your next RP partner, ` +
       `romance, rivalry, or just someone to share a sunset with on the back porch. 🌅\n\n` +
       `This ain't some big-city dating app — it's **small-town matchmaking**, Ridgeline style.`
     )
+    .addFields(
+      {
+        name: '📋 How It Works',
+        value:
+          `**1.** Hit **Create Profile** and tell us about your character\n` +
+          `**2.** Hit **Start Swiping** to browse profiles\n` +
+          `**3.** Tap ❤️ **Take a Shot** or ❌ **Keep Driving**\n` +
+          `**4.** If you both like each other — **IT'S A MATCH!** 💘\n` +
+          `**5.** Peaches creates a private thread so y'all can chat`,
+      },
+      {
+        name: '⭐ Front Porch Pick',
+        value: `Send a special anonymous notification to someone — limited to **2 per day**!`,
+        inline: true,
+      },
+      {
+        name: '📸 Photos',
+        value: `Upload up to **5 character photos** to your profile!`,
+        inline: true,
+      },
+    )
+    .setFooter({ text: 'This is for characters, not players. Keep it fun, keep it respectful — Peaches is always watchin\'. 👀🍑' });
+
+  // ── Buttons Row 1 ──
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId('sm_create_profile')
+      .setLabel('Create Profile')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('✨'),
+    new ButtonBuilder()
+      .setCustomId('sm_start_swiping')
+      .setLabel('Start Swiping')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('💘'),
   );
 
-  panel.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
-
-  panel.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `### How It Works\n` +
-      `**1.** Hit **Create Profile** and tell us about your character\n` +
-      `**2.** Hit **Start Swiping** to browse profiles\n` +
-      `**3.** Tap ❤️ **Take a Shot** or ❌ **Keep Driving**\n` +
-      `**4.** If you both like each other — **IT'S A MATCH!** 💘\n` +
-      `**5.** Peaches creates a private thread so y'all can chat\n\n` +
-      `-# ⭐ Use your **Front Porch Pick** to send a special anonymous notification — limited to 2/day!\n` +
-      `-# You get **15 swipes per day**. Make 'em count, darlin'!`
-    )
-  );
-
-  panel.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
-
-  // Main action buttons
-  panel.addActionRowComponents(
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId('sm_create_profile')
-        .setLabel('Create Profile')
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('✨'),
-      new ButtonBuilder()
-        .setCustomId('sm_start_swiping')
-        .setLabel('Start Swiping')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('💘'),
-    )
-  );
-
-  panel.addActionRowComponents(
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId('sm_my_matches')
-        .setLabel('My Matches')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('💌'),
-      new ButtonBuilder()
-        .setCustomId('sm_my_profile')
-        .setLabel('View My Profile')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('👤'),
-      new ButtonBuilder()
-        .setCustomId('sm_upload_photos')
-        .setLabel('Upload Photos')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('📸'),
-      new ButtonBuilder()
-        .setCustomId('sm_delete_profile')
-        .setLabel('Delete Profile')
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('🗑️'),
-    )
-  );
-
-  panel.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `-# This is for **characters**, not players. Keep it fun, keep it respectful, and remember — Peaches is always watchin'. 👀🍑`
-    )
+  // ── Buttons Row 2 ──
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId('sm_my_matches')
+      .setLabel('My Matches')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('💌'),
+    new ButtonBuilder()
+      .setCustomId('sm_my_profile')
+      .setLabel('View My Profile')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('👤'),
+    new ButtonBuilder()
+      .setCustomId('sm_upload_photos')
+      .setLabel('Upload Photos')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('📸'),
+    new ButtonBuilder()
+      .setCustomId('sm_delete_profile')
+      .setLabel('Delete Profile')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('🗑️'),
   );
 
   await panelChannel.send({
-    components: [panel],
-    flags: MessageFlags.IsComponentsV2,
+    embeds: [embed],
+    components: [row1, row2],
   });
   console.log('[Peaches] SwipeMatch panel posted');
 }

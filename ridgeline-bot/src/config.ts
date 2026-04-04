@@ -31,7 +31,7 @@ export const CHANNELS = {
   statsMembersVC: '1475717469791457352',   // Voice channel showing member count (e.g. "Members: 247")
   statsOnlineVC: '1475717470936498176',    // Voice channel showing online count (e.g. "Online: 43")
   regionMonitoring: '1420963602457825330', // SL region monitoring alerts & logs
-  swipematch: '',  // Ridgeline Connections panel channel — fill in after creating channel
+  swipematch: '1489884763874529390',  // Ridgeline Connections panel channel
 };
 
 // ─────────────────────────────────────────
