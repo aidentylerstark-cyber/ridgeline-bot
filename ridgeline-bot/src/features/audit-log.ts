@@ -43,12 +43,7 @@ export type AuditAction =
   | 'announce_post'
   | 'member_join'
   | 'member_leave'
-  | 'member_onboard_complete'
-  | 'swipematch_match'
-  | 'swipematch_delete'
-  | 'swipematch_enable'
-  | 'swipematch_disable'
-  | 'swipematch_admin_delete';
+  | 'member_onboard_complete';
 
 export type AuditSeverity = 'info' | 'warning' | 'critical';
 
@@ -91,11 +86,6 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   member_join:        'Member Joined',
   member_leave:       'Member Left',
   member_onboard_complete: 'Onboarding Completed',
-  swipematch_match:        'SwipeMatch Match',
-  swipematch_delete:       'SwipeMatch Profile Deleted',
-  swipematch_enable:       'SwipeMatch Profile Enabled',
-  swipematch_disable:      'SwipeMatch Profile Disabled',
-  swipematch_admin_delete: 'SwipeMatch Admin Delete',
 };
 
 const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
@@ -123,11 +113,6 @@ const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
   member_join:        0x57F287,
   member_leave:       0xED4245,
   member_onboard_complete: 0x4A7C59,
-  swipematch_match:        0xFF69B4,
-  swipematch_delete:       0x95A5A6,
-  swipematch_enable:       0x57F287,
-  swipematch_disable:      0xCC4444,
-  swipematch_admin_delete: 0xED4245,
 };
 
 const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
@@ -155,11 +140,6 @@ const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
   member_join:        '\uD83D\uDCE5',
   member_leave:       '\uD83D\uDCE4',
   member_onboard_complete: '\uD83C\uDFE1',
-  swipematch_match:        '\uD83D\uDC98',
-  swipematch_delete:       '\uD83D\uDDD1\uFE0F',
-  swipematch_enable:       '\u2705',
-  swipematch_disable:      '\uD83D\uDEAB',
-  swipematch_admin_delete: '\uD83D\uDDD1\uFE0F',
 };
 
 const SEVERITY_COLORS: Record<AuditSeverity, number> = {

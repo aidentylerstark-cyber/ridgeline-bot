@@ -8,9 +8,7 @@ import { postRoleButtons } from '../panels/role-panel.js';
 import { postTicketPanel } from '../panels/ticket-panel.js';
 import { postSuggestionPanel } from '../panels/suggestion-panel.js';
 import { postTriggerReference } from '../panels/trigger-reference.js';
-import { postSwipematchPanel } from '../panels/swipematch-panel.js';
 import { handleSetupBusinesses } from './setup-business.js';
-import { handleSetupConnections } from './setup-connections.js';
 import { GLOBAL_STAFF_ROLES } from '../config.js';
 
 /** Only Ridgeline Owner / First Lady can use /admin */
@@ -67,18 +65,6 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
       return;
     }
 
-    case 'setup-connections': {
-      await interaction.deferReply({ flags: 64 });
-      try {
-        const result = await handleSetupConnections(client);
-        await interaction.editReply({ content: `\u2705 **Ridgeline Connections setup complete!**\n${result}` });
-      } catch (err) {
-        console.error('[Peaches] Admin setup-connections failed:', err);
-        await interaction.editReply({ content: `Well shoot, sugar \u2014 that setup didn't go as planned. Check the logs! \uD83C\uDF51` });
-      }
-      return;
-    }
-
     case 'panel': {
       const panelType = interaction.options.getString('type', true);
       await interaction.deferReply({ flags: 64 });
@@ -99,10 +85,6 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
           case 'triggers':
             await postTriggerReference(client);
             await interaction.editReply({ content: `\u2705 Trigger reference posted! \uD83C\uDF51` });
-            break;
-          case 'swipematch':
-            await postSwipematchPanel(client);
-            await interaction.editReply({ content: `\u2705 Ridgeline Connections panel posted! \uD83D\uDC98` });
             break;
           default:
             await interaction.editReply({ content: `Unknown panel type, sugar.` });

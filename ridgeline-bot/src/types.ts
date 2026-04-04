@@ -10,6 +10,5 @@ declare module 'discord.js' {
     postSuggestionPanel?: () => Promise<void>;
     postCommunityPoll?: (question: string, options: string[], durationHours?: number) => Promise<void>;
     postTriggerReference?: () => Promise<void>;
-    postSwipematchPanel?: () => Promise<void>;
   }
 }

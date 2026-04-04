@@ -20,7 +20,6 @@ import { postTriggerReference } from './panels/trigger-reference.js';
 import { destroyMemory } from './chatbot/memory.js';
 import { reorganizeCategoryByKey, setChannelPermissions } from './utilities/channel-reorg.js';
 import { postSuggestionPanel } from './panels/suggestion-panel.js';
-import { postSwipematchPanel } from './panels/swipematch-panel.js';
 import { setupModLog, clearRaidModeTimer } from './features/modlog.js';
 import { destroyAuditLogInterval } from './features/audit-log.js';
 import { startRegionWebhookServer } from './api/region-webhook.js';
@@ -102,7 +101,6 @@ async function main() {
   client.postSuggestionPanel = () => postSuggestionPanel(client);
   client.postCommunityPoll = (q: string, opts: string[], dur?: number) => postCommunityPoll(client, q, opts, dur);
   client.postTriggerReference = () => postTriggerReference(client);
-  client.postSwipematchPanel = () => postSwipematchPanel(client);
   // Login
   await client.login(token);
 

@@ -35,33 +35,6 @@ import {
   handleOnboardSkipDetails,
   handleOnboardModalSubmit,
 } from '../handlers/onboarding-buttons.js';
-import {
-  handleSwipematchCommand,
-  handleCreateProfileButton,
-  handleProfileModalSubmit,
-  handleGenderSelect,
-  handleInterestedSelect,
-  handleInterestsSelect,
-  handleStartSwipingButton,
-  handleViewProfileButton,
-  handlePauseProfile,
-  handleUnpauseProfile,
-  handleMyMatchesButton,
-  handleDeleteProfileButton,
-  handleUploadPhotosButton,
-  handleAnswerPromptButton,
-  handlePromptModalSubmit,
-  handleThemeSelect,
-  handlePhotoNav,
-  handlePhotoDeleteSelect,
-  handleSwipematchLike,
-  handleSwipematchPass,
-  handleSwipematchSuperlike,
-  handleDeleteConfirm,
-  handleDeleteCancel,
-  handleAdminToggle,
-  handleAdminDelete,
-} from '../features/swipematch.js';
 import { CHANNELS } from '../config.js';
 import { isStaff } from '../utilities/permissions.js';
 
@@ -93,14 +66,6 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
           '`/birthday upcoming` — See birthdays in the next 7 days',
       },
       { name: '💡 Suggestions', value: '`/suggest <idea>` — Submit a suggestion for Ridgeline' },
-      {
-        name: '💘 Ridgeline Connections',
-        value:
-          `Head to the Ridgeline Connections channel and use the buttons!\n` +
-          `**Create Profile** — Set up your character\n` +
-          `**Start Swiping** — Browse & swipe on profiles\n` +
-          `**My Matches** — See your connections`,
-      },
       {
         name: '\uD83C\uDFAB Tickets',
         value:
@@ -179,7 +144,6 @@ const SLASH_COMMANDS: Record<string, SlashHandler> = {
   userinfo:    handleUserInfoCommand,
   welcome:     handleWelcomeCommand,
   serverstats: handleServerStatsCommand,
-  swipematch:  handleSwipematchCommand,
 };
 
 export function setupInteractionHandler(client: Client, ticketCooldowns: CooldownManager) {
@@ -205,26 +169,6 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     // Ticket feedback buttons
     { match: 'ticket_rate_', handler: handleTicketRate },
     { match: 'ticket_comment_', handler: handleTicketCommentButton },
-    // SwipeMatch panel buttons
-    { match: 'sm_create_profile', exact: true, handler: handleCreateProfileButton },
-    { match: 'sm_start_swiping', exact: true, handler: handleStartSwipingButton },
-    { match: 'sm_my_matches', exact: true, handler: handleMyMatchesButton },
-    { match: 'sm_my_profile', exact: true, handler: handleViewProfileButton },
-    { match: 'sm_delete_profile', exact: true, handler: handleDeleteProfileButton },
-    { match: 'sm_pause_profile', exact: true, handler: handlePauseProfile },
-    { match: 'sm_unpause_profile', exact: true, handler: handleUnpauseProfile },
-    { match: 'sm_upload_photos', exact: true, handler: handleUploadPhotosButton },
-    { match: 'sm_answer_prompt', exact: true, handler: handleAnswerPromptButton },
-    { match: 'sm_photo_count_', handler: async (i) => { await i.deferUpdate(); } }, // disabled counter button
-    { match: 'sm_photo_', handler: handlePhotoNav },
-    // SwipeMatch swipe buttons
-    { match: 'swipematch_like_', handler: handleSwipematchLike },
-    { match: 'swipematch_pass_', handler: handleSwipematchPass },
-    { match: 'swipematch_superlike_', handler: handleSwipematchSuperlike },
-    { match: 'swipematch_delete_confirm', exact: true, handler: handleDeleteConfirm },
-    { match: 'swipematch_delete_cancel', exact: true, handler: handleDeleteCancel },
-    { match: 'swipematch_admin_toggle_', handler: handleAdminToggle },
-    { match: 'swipematch_admin_delete_', handler: handleAdminDelete },
     // Onboarding flow buttons
     { match: 'onboard_start', exact: true, handler: handleOnboardStart },
     { match: 'onboard_rules_ack', exact: true, handler: handleOnboardRulesAck },
@@ -258,26 +202,6 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
           await handleTicketDepartmentSelect(interaction, client);
           return;
         }
-        if (interaction.customId === 'swipematch_gender_select') {
-          await handleGenderSelect(interaction, client);
-          return;
-        }
-        if (interaction.customId === 'swipematch_interested_select') {
-          await handleInterestedSelect(interaction, client);
-          return;
-        }
-        if (interaction.customId === 'swipematch_interests_select') {
-          await handleInterestsSelect(interaction, client);
-          return;
-        }
-        if (interaction.customId === 'swipematch_theme_select') {
-          await handleThemeSelect(interaction, client);
-          return;
-        }
-        if (interaction.customId === 'swipematch_photodel_select') {
-          await handlePhotoDeleteSelect(interaction, client);
-          return;
-        }
         return;
       }
 
@@ -301,14 +225,6 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
         }
         if (interaction.customId === 'onboard_details_modal') {
           await handleOnboardModalSubmit(interaction, client);
-          return;
-        }
-        if (interaction.customId === 'swipematch_profile_modal') {
-          await handleProfileModalSubmit(interaction, client);
-          return;
-        }
-        if (interaction.customId === 'swipematch_prompt_modal') {
-          await handlePromptModalSubmit(interaction, client);
           return;
         }
         return;

@@ -31,7 +31,6 @@ export const CHANNELS = {
   statsMembersVC: '1475717469791457352',   // Voice channel showing member count (e.g. "Members: 247")
   statsOnlineVC: '1475717470936498176',    // Voice channel showing online count (e.g. "Online: 43")
   regionMonitoring: '1420963602457825330', // SL region monitoring alerts & logs
-  swipematch: '1489884763874529390',  // Ridgeline Connections panel channel
 };
 
 // ─────────────────────────────────────────
@@ -50,7 +49,6 @@ export const CHATBOT_DENIED_CHANNELS = new Set([
   CHANNELS.regionMonitoring,
   CHANNELS.statsMembersVC,
   CHANNELS.statsOnlineVC,
-  CHANNELS.swipematch,
 ]);
 
 // ─────────────────────────────────────────
@@ -255,67 +253,6 @@ export const REGION_SNAPSHOT_RETENTION_DAYS = 7;
 // ─────────────────────────────────────────
 // Milestones
 // ─────────────────────────────────────────
-
-// ─────────────────────────────────────────
-// SwipeMatch — Ridgeline Connections
-// ─────────────────────────────────────────
-
-export const SWIPEMATCH = {
-  /** Max swipes per day per user */
-  dailySwipeLimit: 15,
-  /** Max super likes per day per user */
-  dailySuperLikeLimit: 2,
-  /** Minimum age to display on profiles */
-  minAge: '18',
-  /** Interest options for profile creation */
-  interestOptions: [
-    '🎮 Gaming', '🌲 Outdoors', '🎵 Music', '🐴 Horses',
-    '📸 Photography', '🎭 Theater', '☕ Coffee Dates', '🎣 Fishing',
-    '🏕 Camping', '🍳 Cooking', '📚 Reading', '💃 Dancing',
-    '🏋️ Fitness', '🎨 Art', '🐾 Animals', '🌄 Sunsets',
-  ],
-  /** Gender options */
-  genderOptions: ['Male', 'Female', 'Non-Binary', 'Other'],
-  /** Interested-in options */
-  interestedInOptions: ['Men', 'Women', 'Everyone', 'Just Here for RP'],
-  /** Score weights for smart matching */
-  scoreWeights: {
-    sharedInterest: 3,
-    sharedRole: 2,
-    preferenceMatch: 5,
-    superLikeBonus: 10,
-  },
-  /** Profile themes — visual styles for cards */
-  profileThemes: {
-    'default':      { label: 'Default',          emoji: '🍑', color: 0xE8788A, border: '',                              vibe: '' },
-    'country':      { label: 'Country Roads',    emoji: '🤠', color: 0xC8A96E, border: '🌾',                            vibe: '🤠 Country Soul' },
-    'midnight':     { label: 'Midnight',         emoji: '🌙', color: 0x2C2F33, border: '✦',                             vibe: '🌙 Night Owl' },
-    'sunset':       { label: 'Golden Hour',      emoji: '🌅', color: 0xFF8C42, border: '☀️',                             vibe: '🌅 Sunset Chaser' },
-    'wildflower':   { label: 'Wildflower',       emoji: '🌸', color: 0xE0A0C0, border: '✿',                             vibe: '🌸 Free Spirit' },
-    'thunder':      { label: 'Thunder',          emoji: '⚡', color: 0x5865F2, border: '⚡',                             vibe: '⚡ Electric' },
-    'campfire':     { label: 'Campfire',         emoji: '🔥', color: 0xE25822, border: '🔥',                             vibe: '🔥 Warm & Wild' },
-    'moonshine':    { label: 'Moonshine',        emoji: '🥃', color: 0xDAA520, border: '★',                             vibe: '🥃 Smooth Talker' },
-    'lavender':     { label: 'Lavender Fields',  emoji: '💜', color: 0x9B72CF, border: '❋',                             vibe: '💜 Dreamer' },
-    'riverbank':    { label: 'Riverbank',        emoji: '🎣', color: 0x5B8C6E, border: '〰️',                            vibe: '🎣 Easy Goin\'' },
-    'neon':         { label: 'Neon Nights',      emoji: '💖', color: 0xFF1493, border: '◆',                             vibe: '💖 Bold & Bright' },
-    'vintage':      { label: 'Vintage',          emoji: '📷', color: 0x8B7355, border: '❧',                             vibe: '📷 Old Soul' },
-  } as Record<string, { label: string; emoji: string; color: number; border: string; vibe: string }>,
-  /** Rotating profile prompts — changes weekly */
-  profilePrompts: [
-    "What's your character's biggest secret?",
-    "Describe your perfect Saturday in Ridgeline.",
-    "What's the one thing that makes your character smile?",
-    "Where in Ridgeline would you take someone on a first date?",
-    "What song plays when your character walks into a room?",
-    "If your character could change one thing about their past, what would it be?",
-    "What does your character's ideal lazy Sunday look like?",
-    "What's the most trouble your character has ever gotten into?",
-    "Coffee or sweet tea — and how does your character take it?",
-    "What's the view from your character's favorite spot in town?",
-    "If your character wrote a personal ad, what would it say?",
-    "What does your character do when nobody's watching?",
-  ],
-} as const;
 
 export const FOUNDING_DATE = new Date('2025-06-25');
 
