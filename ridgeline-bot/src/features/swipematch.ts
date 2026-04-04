@@ -330,6 +330,9 @@ export async function handleInterestsSelect(interaction: StringSelectMenuInterac
     return;
   }
 
+  // Check if this is initial setup (no gender/interestedIn yet) or an edit
+  const isInitialSetup = !profile.gender || !profile.interestedIn;
+
   await upsertSwipematchProfile({
     discordUserId: interaction.user.id,
     characterName: profile.characterName,
@@ -341,29 +344,45 @@ export async function handleInterestsSelect(interaction: StringSelectMenuInterac
     slName: profile.slName ?? undefined,
   });
 
+  const photos = (profile.photos as string[]) ?? [];
   const profileEmbed = buildProfileEmbed(
     { ...profile, interests, interestedIn: profile.interestedIn },
     interaction.user.displayAvatarURL({ size: 256 }),
-    true
+    true,
+    photos,
+    0
   );
 
-  // Show profile + "Start Swiping" button so they can jump right in
-  const startRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId('sm_start_swiping')
-      .setLabel('Start Swiping!')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('💘'),
-  );
+  if (isInitialSetup) {
+    // First time — show "Start Swiping" button
+    const startRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId('sm_start_swiping')
+        .setLabel('Start Swiping!')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('💘'),
+    );
 
-  try {
-    await interaction.update({
-      content: `You're all set, sugar! Here's your profile: 💘`,
-      embeds: [profileEmbed],
-      components: [startRow],
-    });
-  } catch {
-    await interaction.reply({ content: `Profile ready!`, embeds: [profileEmbed], components: [startRow], flags: 64 });
+    try {
+      await interaction.update({
+        content: `You're all set, sugar! Here's your profile: 💘`,
+        embeds: [profileEmbed],
+        components: [startRow],
+      });
+    } catch {
+      await interaction.reply({ content: `Profile ready!`, embeds: [profileEmbed], components: [startRow], flags: 64 });
+    }
+  } else {
+    // Editing — show updated profile with manage buttons
+    try {
+      await interaction.update({
+        content: `Interests updated, darlin'! 💘`,
+        embeds: [profileEmbed],
+        components: [],
+      });
+    } catch {
+      await interaction.reply({ content: `Interests updated!`, embeds: [profileEmbed], flags: 64 });
+    }
   }
 }
 
@@ -949,65 +968,51 @@ export async function handleUploadPhotosButton(interaction: ButtonInteraction, _
   }
 
   await interaction.reply({
-    content: `📸 **Upload a photo of your character!**\n\n` +
-      `Post an image in your next message right here in this channel, and I'll grab it.\n` +
-      `You can upload **${remaining} more photo${remaining !== 1 ? 's' : ''}** (max 5 total).\n\n` +
-      `-# Tip: Send a message with an image attachment. Links to external images work too!`,
-    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId('sm_photo_url_modal')
-        .setLabel('Enter Image URL Instead')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('🔗'),
-    )],
+    content: `📸 **Upload a photo of your character!**\n\nSend a message with an **image attached** in this channel within the next 60 seconds and I'll add it to your profile.\n\nYou can upload **${remaining} more photo${remaining !== 1 ? 's' : ''}** (max 5 total).`,
     flags: 64,
+  });
+
+  // Collect the user's next message with an image attachment
+  const channel = interaction.channel;
+  if (!channel || !('createMessageCollector' in channel)) return;
+
+  const collector = channel.createMessageCollector({
+    filter: (msg) => msg.author.id === interaction.user.id && msg.attachments.size > 0,
+    time: 60_000,
+    max: 1,
+  });
+
+  collector.on('collect', async (msg) => {
+    const attachment = msg.attachments.first();
+    if (!attachment) return;
+
+    // Validate it's an image
+    const contentType = attachment.contentType ?? '';
+    if (!contentType.startsWith('image/')) {
+      await msg.reply({ content: "That doesn't look like an image, sugar. Try uploading a .jpg, .png, or .gif! 🍑" });
+      return;
+    }
+
+    const added = await addSwipematchPhoto(interaction.user.id, attachment.url);
+    if (!added) {
+      await msg.reply({ content: "You're at the 5-photo limit! Delete one first from **View My Profile**. 📸" });
+      return;
+    }
+
+    await msg.reply({ content: `📸 Photo added to your profile! Use **View My Profile** to see all your photos.` });
+
+    // Try to delete the user's image message to keep the channel clean
+    try { await msg.delete(); } catch { /* no perms to delete */ }
+  });
+
+  collector.on('end', (collected) => {
+    if (collected.size === 0) {
+      interaction.followUp({ content: "Photo upload timed out — no image received. Try again! 🍑", flags: 64 }).catch(() => {});
+    }
   });
 }
 
-// ─────────────────────────────────────────
-// Photo URL modal (for entering a URL manually)
-// ─────────────────────────────────────────
-
-export async function handlePhotoUrlModalButton(interaction: ButtonInteraction, _client: Client): Promise<void> {
-  const modal = new ModalBuilder()
-    .setCustomId('swipematch_photo_url_modal')
-    .setTitle('📸 Add Photo by URL');
-
-  modal.addComponents(
-    new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder()
-        .setCustomId('sm_photo_url')
-        .setLabel('Image URL')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('https://i.imgur.com/example.jpg')
-        .setMaxLength(500)
-        .setRequired(true)
-    ),
-  );
-
-  await interaction.showModal(modal);
-}
-
-export async function handlePhotoUrlModalSubmit(interaction: ModalSubmitInteraction, _client: Client): Promise<void> {
-  const url = interaction.fields.getTextInputValue('sm_photo_url').trim();
-
-  // Basic URL validation
-  if (!url.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i) && !url.match(/^https?:\/\/(i\.imgur\.com|cdn\.discordapp\.com|media\.discordapp\.net)\//i)) {
-    await interaction.reply({
-      content: "That doesn't look like an image URL, sugar. Try a direct link ending in .jpg, .png, .gif, or .webp — or an imgur/Discord CDN link. 🍑",
-      flags: 64,
-    });
-    return;
-  }
-
-  const added = await addSwipematchPhoto(interaction.user.id, url);
-  if (!added) {
-    await interaction.reply({ content: "You're at the 5-photo limit! Delete one first. 📸", flags: 64 });
-    return;
-  }
-
-  await interaction.reply({ content: `Photo added! 📸 Use **View My Profile** to see all your photos.`, flags: 64 });
-}
+// Photo URL modal removed — users upload directly via attachments
 
 // ─────────────────────────────────────────
 // Photo carousel — prev/next on swipe cards
@@ -1192,8 +1197,8 @@ function buildPhotoNavRow(targetId: string, totalPhotos: number, currentIndex: n
 function buildProfileManageRows(
   profile: { isActive: boolean },
   photos: string[],
-): ActionRowBuilder<ButtonBuilder>[] {
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+): Array<ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>> {
+  const rows: Array<ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>> = [];
 
   // Row 1: Edit / Pause / Upload Photos
   rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -1215,7 +1220,17 @@ function buildProfileManageRows(
       .setDisabled(photos.length >= 5),
   ));
 
-  // Row 2: Delete individual photos (if any exist)
+  // Row 2: Edit Interests select menu
+  rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('swipematch_interests_select')
+      .setPlaceholder('Change your interests (pick up to 5)')
+      .setMinValues(1)
+      .setMaxValues(5)
+      .addOptions(SWIPEMATCH.interestOptions.map(i => ({ label: i, value: i })))
+  ));
+
+  // Row 3: Delete individual photos (if any exist)
   if (photos.length > 0) {
     const deleteButtons = photos.slice(0, 5).map((_, i) =>
       new ButtonBuilder()
