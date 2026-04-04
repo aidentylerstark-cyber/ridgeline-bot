@@ -285,6 +285,21 @@ export const SWIPEMATCH = {
     preferenceMatch: 5,
     superLikeBonus: 10,
   },
+  /** Profile themes — visual styles for cards */
+  profileThemes: {
+    'default':      { label: 'Default',          emoji: '🍑', color: 0xE8788A, border: '',                              vibe: '' },
+    'country':      { label: 'Country Roads',    emoji: '🤠', color: 0xC8A96E, border: '🌾',                            vibe: '🤠 Country Soul' },
+    'midnight':     { label: 'Midnight',         emoji: '🌙', color: 0x2C2F33, border: '✦',                             vibe: '🌙 Night Owl' },
+    'sunset':       { label: 'Golden Hour',      emoji: '🌅', color: 0xFF8C42, border: '☀️',                             vibe: '🌅 Sunset Chaser' },
+    'wildflower':   { label: 'Wildflower',       emoji: '🌸', color: 0xE0A0C0, border: '✿',                             vibe: '🌸 Free Spirit' },
+    'thunder':      { label: 'Thunder',          emoji: '⚡', color: 0x5865F2, border: '⚡',                             vibe: '⚡ Electric' },
+    'campfire':     { label: 'Campfire',         emoji: '🔥', color: 0xE25822, border: '🔥',                             vibe: '🔥 Warm & Wild' },
+    'moonshine':    { label: 'Moonshine',        emoji: '🥃', color: 0xDAA520, border: '★',                             vibe: '🥃 Smooth Talker' },
+    'lavender':     { label: 'Lavender Fields',  emoji: '💜', color: 0x9B72CF, border: '❋',                             vibe: '💜 Dreamer' },
+    'riverbank':    { label: 'Riverbank',        emoji: '🎣', color: 0x5B8C6E, border: '〰️',                            vibe: '🎣 Easy Goin\'' },
+    'neon':         { label: 'Neon Nights',      emoji: '💖', color: 0xFF1493, border: '◆',                             vibe: '💖 Bold & Bright' },
+    'vintage':      { label: 'Vintage',          emoji: '📷', color: 0x8B7355, border: '❧',                             vibe: '📷 Old Soul' },
+  } as Record<string, { label: string; emoji: string; color: number; border: string; vibe: string }>,
   /** Rotating profile prompts — changes weekly */
   profilePrompts: [
     "What's your character's biggest secret?",

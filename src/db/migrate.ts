@@ -454,9 +454,10 @@ export async function runMigrations(): Promise<void> {
       )
     `);
 
-    // SwipeMatch profile enhancements: rotating prompts
+    // SwipeMatch profile enhancements: rotating prompts + themes
     await client.query(`ALTER TABLE swipematch_profiles ADD COLUMN IF NOT EXISTS prompt_question VARCHAR(200)`);
     await client.query(`ALTER TABLE swipematch_profiles ADD COLUMN IF NOT EXISTS prompt_answer TEXT`);
+    await client.query(`ALTER TABLE swipematch_profiles ADD COLUMN IF NOT EXISTS theme VARCHAR(30) NOT NULL DEFAULT 'default'`);
 
     // One-time migration: seed from JSON files if tables are empty
     await migrateJsonData(client);

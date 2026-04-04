@@ -1220,7 +1220,8 @@ export async function getNextSwipeCandidate(
     id: number; discord_user_id: string; character_name: string; age: string | null;
     gender: string | null; interested_in: string | null; bio: string | null;
     interests: string[]; sl_name: string | null; photo_url: string | null;
-    photos: string[]; is_active: boolean; created_at: Date; updated_at: Date; score: number;
+    photos: string[]; prompt_question: string | null; prompt_answer: string | null;
+    theme: string; is_active: boolean; created_at: Date; updated_at: Date; score: number;
   }>(`
     SELECT p.*,
       (SELECT COUNT(*) FROM jsonb_array_elements_text(p.interests) AS pi
@@ -1252,6 +1253,9 @@ export async function getNextSwipeCandidate(
     slName: r.sl_name,
     photoUrl: r.photo_url,
     photos: r.photos ?? [],
+    promptQuestion: r.prompt_question,
+    promptAnswer: r.prompt_answer,
+    theme: r.theme ?? 'default',
     isActive: r.is_active,
     createdAt: r.created_at,
     updatedAt: r.updated_at,

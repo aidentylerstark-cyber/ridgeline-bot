@@ -51,6 +51,7 @@ import {
   handleUploadPhotosButton,
   handleAnswerPromptButton,
   handlePromptModalSubmit,
+  handleThemeSelect,
   handlePhotoNav,
   handlePhotoDelete,
   handleSwipematchLike,
@@ -268,6 +269,10 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
         }
         if (interaction.customId === 'swipematch_interests_select') {
           await handleInterestsSelect(interaction, client);
+          return;
+        }
+        if (interaction.customId === 'swipematch_theme_select') {
+          await handleThemeSelect(interaction, client);
           return;
         }
         return;

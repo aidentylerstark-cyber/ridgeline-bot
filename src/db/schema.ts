@@ -198,6 +198,7 @@ export const swipematchProfiles = pgTable("swipematch_profiles", {
   photos: jsonb("photos").notNull().default([]),       // string[] of CDN URLs, max 5
   promptQuestion: varchar("prompt_question", { length: 200 }),  // current weekly prompt
   promptAnswer: text("prompt_answer"),                          // user's answer to the prompt
+  theme: varchar("theme", { length: 30 }).notNull().default('default'),  // visual card theme
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

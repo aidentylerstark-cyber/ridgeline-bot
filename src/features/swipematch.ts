@@ -1038,6 +1038,46 @@ export async function handleUploadPhotosButton(interaction: ButtonInteraction, _
 }
 
 // ─────────────────────────────────────────
+// Theme selector
+// ─────────────────────────────────────────
+
+export async function handleThemeSelect(interaction: StringSelectMenuInteraction, _client: Client): Promise<void> {
+  const themeKey = interaction.values[0];
+  const theme = SWIPEMATCH.profileThemes[themeKey];
+  if (!theme) {
+    await interaction.reply({ content: "Unknown theme, sugar! 🍑", flags: 64 });
+    return;
+  }
+
+  await pool.query(
+    `UPDATE swipematch_profiles SET theme = $1, updated_at = NOW() WHERE discord_user_id = $2`,
+    [themeKey, interaction.user.id]
+  );
+
+  const profile = await getSwipematchProfile(interaction.user.id);
+  if (!profile) return;
+
+  const photos = (profile.photos as string[]) ?? [];
+  const embed = buildProfileEmbed(
+    { ...profile, theme: themeKey },
+    interaction.user.displayAvatarURL({ size: 256 }),
+    true,
+    photos,
+    0
+  );
+
+  try {
+    await interaction.update({
+      content: `🎨 Theme set to **${theme.emoji} ${theme.label}**!`,
+      embeds: [embed],
+      components: [],
+    });
+  } catch {
+    await interaction.reply({ content: `Theme set to ${theme.emoji} ${theme.label}! 🎨`, flags: 64 });
+  }
+}
+
+// ─────────────────────────────────────────
 // Prompt Answer — rotating weekly question
 // ─────────────────────────────────────────
 
@@ -1214,6 +1254,7 @@ interface ProfileEmbedOptions {
     photos?: unknown;
     promptQuestion?: string | null;
     promptAnswer?: string | null;
+    theme?: string | null;
   };
   avatarUrl?: string;
   isOwnProfile?: boolean;
@@ -1235,9 +1276,14 @@ function buildProfileEmbed(
   viewerInterestedIn?: string,
 ): EmbedBuilder {
   const interests = (profile.interests as string[]) ?? [];
-  const interestStr = interests.length > 0 ? interests.join(' | ') : 'None set';
   const photoList = photos ?? (profile.photos as string[]) ?? [];
   const idx = photoIndex ?? 0;
+
+  // Resolve theme
+  const themeKey = profile.theme ?? 'default';
+  const theme = SWIPEMATCH.profileThemes[themeKey] ?? SWIPEMATCH.profileThemes['default'];
+  const border = theme.border;
+  const themeColor = isOwnProfile ? 0xD4A574 : theme.color;
 
   // Calculate compatibility %
   let compatLine = '';
@@ -1247,21 +1293,28 @@ function buildProfileEmbed(
     compatLine = `\n${bar}`;
   }
 
-  // Header line — name, age, gender
+  // Header line — gender, looking for, vibe tag
   const headerParts: string[] = [];
   if (profile.gender) headerParts.push(profile.gender);
   if (profile.interestedIn) headerParts.push(`Looking for **${profile.interestedIn}**`);
   const headerLine = headerParts.length > 0 ? headerParts.join(' · ') : '';
 
-  // Bio section
+  // Bio
   const bioText = profile.bio ?? 'No bio yet — still mysterious!';
 
-  // Build the card description
+  // Build card description with theme decorations
   let description = '';
+
+  // Theme border top
+  if (border) description += `${border.repeat(15)}\n`;
+
+  // Vibe tag
+  if (theme.vibe) description += `${theme.vibe}\n\n`;
+
   if (headerLine) description += `${headerLine}${compatLine}\n\n`;
   else if (compatLine) description += `${compatLine}\n\n`;
 
-  // Interest tags — styled as inline badges
+  // Interest tags
   if (interests.length > 0) {
     description += interests.join('  ') + '\n\n';
   }
@@ -1274,10 +1327,13 @@ function buildProfileEmbed(
     description += `\n💬 **${profile.promptQuestion}**\n> ${profile.promptAnswer}\n`;
   }
 
+  // Theme border bottom
+  if (border) description += `\n${border.repeat(15)}`;
+
   const embed = new EmbedBuilder()
-    .setColor(isOwnProfile ? 0xD4A574 : ACCENT_COLOR)
+    .setColor(themeColor)
     .setAuthor({
-      name: `${profile.characterName}${profile.age ? `, ${profile.age}` : ''}`,
+      name: `${theme.emoji !== '🍑' ? theme.emoji + ' ' : ''}${profile.characterName}${profile.age ? `, ${profile.age}` : ''}`,
       iconURL: avatarUrl,
     });
 
@@ -1288,18 +1344,19 @@ function buildProfileEmbed(
       description += `\n📸 Photo ${idx + 1} of ${photoList.length}`;
     }
   } else if (avatarUrl) {
-    // No photos — show avatar as large image instead of tiny thumbnail
     embed.setImage(avatarUrl);
   }
 
   embed.setDescription(description);
 
-  // Fields row for metadata
+  // Fields row
   if (profile.slName) {
     embed.addFields({ name: '🌐 SL Name', value: profile.slName, inline: true });
   }
+  if (themeKey !== 'default') {
+    embed.addFields({ name: '🎨 Theme', value: theme.label, inline: true });
+  }
   if (interests.length > 0 && !isOwnProfile) {
-    // Show shared interests count for swipe cards
     if (viewerInterests && viewerInterests.length > 0) {
       const shared = interests.filter(i => viewerInterests.includes(i));
       if (shared.length > 0) {
@@ -1309,7 +1366,7 @@ function buildProfileEmbed(
   }
 
   if (isOwnProfile) {
-    embed.setFooter({ text: '✏️ Edit Profile · 📸 Upload Photos · 💬 Answer Prompt' });
+    embed.setFooter({ text: `🎨 ${theme.label} Theme · ✏️ Edit · 📸 Photos · 💬 Prompt` });
   }
 
   return embed;
@@ -1423,7 +1480,20 @@ function buildProfileManageRows(
       .setEmoji('💬'),
   ));
 
-  // Row 2: Edit Interests select menu
+  // Row 2: Theme selector
+  rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('swipematch_theme_select')
+      .setPlaceholder('🎨 Change your card theme')
+      .addOptions(Object.entries(SWIPEMATCH.profileThemes).map(([key, t]) => ({
+        label: t.label,
+        value: key,
+        emoji: t.emoji,
+        description: t.vibe || 'Classic look',
+      })))
+  ));
+
+  // Row 3: Edit Interests select menu
   rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('swipematch_interests_select')
