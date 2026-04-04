@@ -144,22 +144,7 @@ export async function handleSetupConnections(client: Client): Promise<string> {
         ],
       });
     }
-    // Allow staff to view match threads for moderation
-    for (const roleName of GLOBAL_STAFF_ROLES) {
-      const role = guild.roles.cache.find(r => r.name === roleName);
-      if (role) {
-        threadOverwrites.push({
-          id: role.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory,
-            PermissionFlagsBits.ManageMessages,
-          ],
-        });
-      }
-    }
-
+    // No staff access — match threads are fully private between matched users
     await guild.channels.create({
       name: '💌︊match-threads',
       type: ChannelType.GuildText,
