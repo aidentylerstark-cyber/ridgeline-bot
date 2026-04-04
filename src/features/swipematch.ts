@@ -1231,43 +1231,88 @@ function buildProfileEmbed(
   const idx = photoIndex ?? 0;
 
   // Calculate compatibility %
-  let compatStr = '';
+  let compatLine = '';
   if (viewerInterests && viewerInterests.length > 0 && interests.length > 0 && !isOwnProfile) {
     const compat = calculateCompatibility(interests, viewerInterests, profile.interestedIn, profile.gender, viewerInterestedIn);
-    const emoji = compat >= 75 ? '🔥' : compat >= 50 ? '✨' : compat >= 25 ? '👀' : '🤷';
-    compatStr = `\n${emoji} **${compat}% Compatible**`;
+    const bar = buildCompatBar(compat);
+    compatLine = `\n${bar}`;
   }
 
-  // Build bio section with prompt if available
-  let bioSection = `*"${profile.bio ?? 'No bio yet — still mysterious!'}"*`;
+  // Header line — name, age, gender
+  const headerParts: string[] = [];
+  if (profile.gender) headerParts.push(profile.gender);
+  if (profile.interestedIn) headerParts.push(`Looking for **${profile.interestedIn}**`);
+  const headerLine = headerParts.length > 0 ? headerParts.join(' · ') : '';
+
+  // Bio section
+  const bioText = profile.bio ?? 'No bio yet — still mysterious!';
+
+  // Build the card description
+  let description = '';
+  if (headerLine) description += `${headerLine}${compatLine}\n\n`;
+  else if (compatLine) description += `${compatLine}\n\n`;
+
+  // Interest tags — styled as inline badges
+  if (interests.length > 0) {
+    description += interests.join('  ') + '\n\n';
+  }
+
+  // Bio with quote styling
+  description += `> *${bioText}*\n`;
+
+  // Weekly prompt answer
   if (profile.promptQuestion && profile.promptAnswer) {
-    bioSection += `\n\n💬 **${profile.promptQuestion}**\n> ${profile.promptAnswer}`;
+    description += `\n💬 **${profile.promptQuestion}**\n> ${profile.promptAnswer}\n`;
   }
 
   const embed = new EmbedBuilder()
-    .setColor(ACCENT_COLOR)
-    .setTitle(`${profile.characterName}${profile.age ? `, ${profile.age}` : ''}`)
-    .setDescription(
-      `${profile.gender ?? ''}${profile.interestedIn ? ` — Looking for: **${profile.interestedIn}**` : ''}${compatStr}\n\n` +
-      `${interestStr}\n\n` +
-      bioSection
-    );
+    .setColor(isOwnProfile ? 0xD4A574 : ACCENT_COLOR)
+    .setAuthor({
+      name: `${profile.characterName}${profile.age ? `, ${profile.age}` : ''}`,
+      iconURL: avatarUrl,
+    });
 
-  // Show photo as main image if available, otherwise Discord avatar as thumbnail
+  // Show photo as main large image
   if (photoList.length > 0 && photoList[idx]) {
     embed.setImage(photoList[idx]);
-    if (avatarUrl) embed.setThumbnail(avatarUrl);
     if (photoList.length > 1) {
-      embed.addFields({ name: '📸 Photos', value: `${idx + 1} of ${photoList.length}`, inline: true });
+      description += `\n📸 Photo ${idx + 1} of ${photoList.length}`;
     }
   } else if (avatarUrl) {
-    embed.setThumbnail(avatarUrl);
+    // No photos — show avatar as large image instead of tiny thumbnail
+    embed.setImage(avatarUrl);
   }
 
-  if (profile.slName) embed.addFields({ name: '🌐 Second Life', value: profile.slName, inline: true });
-  if (isOwnProfile) embed.setFooter({ text: 'This is your profile | Hit Edit Profile to change it' });
+  embed.setDescription(description);
+
+  // Fields row for metadata
+  if (profile.slName) {
+    embed.addFields({ name: '🌐 SL Name', value: profile.slName, inline: true });
+  }
+  if (interests.length > 0 && !isOwnProfile) {
+    // Show shared interests count for swipe cards
+    if (viewerInterests && viewerInterests.length > 0) {
+      const shared = interests.filter(i => viewerInterests.includes(i));
+      if (shared.length > 0) {
+        embed.addFields({ name: '🤝 In Common', value: shared.join(', '), inline: true });
+      }
+    }
+  }
+
+  if (isOwnProfile) {
+    embed.setFooter({ text: '✏️ Edit Profile · 📸 Upload Photos · 💬 Answer Prompt' });
+  }
 
   return embed;
+}
+
+/** Build a visual compatibility bar */
+function buildCompatBar(percent: number): string {
+  const emoji = percent >= 80 ? '🔥' : percent >= 60 ? '✨' : percent >= 40 ? '💫' : '👀';
+  const filled = Math.round(percent / 10);
+  const empty = 10 - filled;
+  const bar = '█'.repeat(filled) + '░'.repeat(empty);
+  return `${emoji} **${percent}%** \`${bar}\``;
 }
 
 /** Calculate compatibility percentage between two profiles */
