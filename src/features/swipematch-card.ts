@@ -10,8 +10,8 @@ const CARD_W = 680;
 const CARD_H = 920;
 const PADDING = 32;
 const AVATAR_SIZE = 160;
-const PILL_H = 30;
-const PILL_RADIUS = 15;
+const PILL_H = 34;
+const PILL_RADIUS = 17;
 const PANEL_RADIUS = 16;
 
 // ─────────────────────────────────────────
@@ -23,19 +23,20 @@ interface ThemeGradient {
   overlayOpacity: number;
 }
 
+// Dark-base gradients — theme color as accent, dark enough for white text
 const THEME_GRADIENTS: Record<string, ThemeGradient> = {
-  default:    { stops: [[0, '#E8788A'], [0.5, '#D4A574'], [1, '#E8788A']], overlayOpacity: 0.85 },
-  country:    { stops: [[0, '#8B6914'], [0.5, '#C8A96E'], [1, '#6B4E0A']], overlayOpacity: 0.82 },
-  midnight:   { stops: [[0, '#0D1117'], [0.5, '#1A1D23'], [1, '#2C2F33']], overlayOpacity: 0.9 },
-  sunset:     { stops: [[0, '#FF6B35'], [0.5, '#FF8C42'], [1, '#FFA62B']], overlayOpacity: 0.8 },
-  wildflower: { stops: [[0, '#C77DA8'], [0.5, '#E0A0C0'], [1, '#F0C0D8']], overlayOpacity: 0.82 },
-  thunder:    { stops: [[0, '#23272A'], [0.5, '#5865F2'], [1, '#23272A']], overlayOpacity: 0.85 },
-  campfire:   { stops: [[0, '#8B1A00'], [0.5, '#E25822'], [1, '#FF8C00']], overlayOpacity: 0.82 },
-  moonshine:  { stops: [[0, '#8B6914'], [0.5, '#DAA520'], [1, '#FFD700']], overlayOpacity: 0.82 },
-  lavender:   { stops: [[0, '#5B3A8C'], [0.5, '#9B72CF'], [1, '#C4A8E0']], overlayOpacity: 0.82 },
-  riverbank:  { stops: [[0, '#2D5A3C'], [0.5, '#5B8C6E'], [1, '#8CB89C']], overlayOpacity: 0.82 },
-  neon:       { stops: [[0, '#1A0020'], [0.5, '#FF1493'], [1, '#1A0020']], overlayOpacity: 0.85 },
-  vintage:    { stops: [[0, '#5C4033'], [0.5, '#8B7355'], [1, '#A89070']], overlayOpacity: 0.82 },
+  default:    { stops: [[0, '#2A1520'], [0.4, '#3D1F2A'], [1, '#1A0E14']], overlayOpacity: 0 },
+  country:    { stops: [[0, '#1A1408'], [0.4, '#2D2210'], [1, '#1A1408']], overlayOpacity: 0 },
+  midnight:   { stops: [[0, '#08090C'], [0.4, '#0D1117'], [1, '#08090C']], overlayOpacity: 0 },
+  sunset:     { stops: [[0, '#1A0E05'], [0.4, '#2D1A0A'], [1, '#1A0E05']], overlayOpacity: 0 },
+  wildflower: { stops: [[0, '#1A0E16'], [0.4, '#2D1A28'], [1, '#1A0E16']], overlayOpacity: 0 },
+  thunder:    { stops: [[0, '#0A0B10'], [0.4, '#141628'], [1, '#0A0B10']], overlayOpacity: 0 },
+  campfire:   { stops: [[0, '#1A0800'], [0.4, '#2D1205'], [1, '#1A0800']], overlayOpacity: 0 },
+  moonshine:  { stops: [[0, '#1A1408'], [0.4, '#2D2210'], [1, '#1A1408']], overlayOpacity: 0 },
+  lavender:   { stops: [[0, '#120E1A'], [0.4, '#1E182D'], [1, '#120E1A']], overlayOpacity: 0 },
+  riverbank:  { stops: [[0, '#0A1A10'], [0.4, '#142D1E'], [1, '#0A1A10']], overlayOpacity: 0 },
+  neon:       { stops: [[0, '#0D0010'], [0.4, '#1A0020'], [1, '#0D0010']], overlayOpacity: 0 },
+  vintage:    { stops: [[0, '#140E0A'], [0.4, '#241C14'], [1, '#140E0A']], overlayOpacity: 0 },
 };
 
 // ─────────────────────────────────────────
@@ -75,7 +76,7 @@ export async function renderProfileCard(data: CardData): Promise<AttachmentBuild
   const gradient = THEME_GRADIENTS[themeKey] ?? THEME_GRADIENTS['default'];
 
   // ── 1. Background gradient ──
-  drawBackground(ctx, gradient);
+  drawBackground(ctx, gradient, theme.color);
 
   // ── 2. Photo or avatar as hero (top portion) ──
   let heroImage: Awaited<ReturnType<typeof loadImage>> | null = null;
@@ -162,23 +163,27 @@ export async function renderProfileCard(data: CardData): Promise<AttachmentBuild
     y += 28;
   }
 
-  // Name + Age
-  ctx.font = 'bold 36px sans-serif';
-  ctx.fillStyle = '#ffffff';
+  // Name + Age (with text shadow for readability)
+  ctx.font = 'bold 40px sans-serif';
   ctx.textAlign = 'center';
   const nameText = `${data.characterName}${data.age ? `, ${data.age}` : ''}`;
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillText(nameText, CARD_W / 2 + 2, y + 2);
+  // Main text
+  ctx.fillStyle = '#ffffff';
   ctx.fillText(nameText, CARD_W / 2, y);
-  y += 28;
+  y += 32;
 
   // Gender + Looking for
   if (data.gender || data.interestedIn) {
-    ctx.font = '16px sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '18px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
     const subParts: string[] = [];
     if (data.gender) subParts.push(data.gender);
     if (data.interestedIn) subParts.push(`Looking for ${data.interestedIn}`);
-    ctx.fillText(subParts.join(' · '), CARD_W / 2, y);
-    y += 24;
+    ctx.fillText(subParts.join('  ·  '), CARD_W / 2, y);
+    y += 28;
   }
 
   // Compatibility bar
@@ -190,19 +195,21 @@ export async function renderProfileCard(data: CardData): Promise<AttachmentBuild
 
   // ── 5. Bio panel (frosted glass) ──
   if (data.bio) {
-    y += 10;
-    const bioLines = wrapText(ctx, data.bio, CARD_W - PADDING * 4, '16px sans-serif');
-    const panelH = bioLines.length * 22 + 24;
+    y += 12;
+    const bioLines = wrapText(ctx, data.bio, CARD_W - PADDING * 4, '18px sans-serif');
+    const panelH = bioLines.length * 26 + 28;
 
     drawFrostedPanel(ctx, PADDING, y, CARD_W - PADDING * 2, panelH);
 
-    ctx.font = 'italic 16px sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = 'italic 18px sans-serif';
+    ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'left';
     for (let i = 0; i < bioLines.length; i++) {
-      ctx.fillText(`"${i === 0 ? '' : ''}${bioLines[i]}${i === bioLines.length - 1 ? '"' : ''}`, PADDING + 16, y + 22 + i * 22);
+      const prefix = i === 0 ? '"' : '';
+      const suffix = i === bioLines.length - 1 ? '"' : '';
+      ctx.fillText(`${prefix}${bioLines[i]}${suffix}`, PADDING + 18, y + 26 + i * 26);
     }
-    y += panelH + 10;
+    y += panelH + 12;
   }
 
   // ── 6. Interest pills ──
@@ -242,24 +249,24 @@ export async function renderProfileCard(data: CardData): Promise<AttachmentBuild
     }
 
     if (bottomItems.length > 0) {
-      ctx.font = '14px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '15px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
       ctx.textAlign = 'center';
-      ctx.fillText(bottomItems.join('  ·  '), CARD_W / 2, CARD_H - 40);
+      ctx.fillText(bottomItems.join('  ·  '), CARD_W / 2, CARD_H - 44);
     }
   }
 
   // ── 9. Footer ──
   if (data.swipesRemaining != null) {
-    ctx.font = '13px sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.textAlign = 'center';
-    ctx.fillText(`${data.swipesRemaining} swipes left today · Ridgeline Connections 💘`, CARD_W / 2, CARD_H - 16);
+    ctx.fillText(`${data.swipesRemaining} swipes left today · Ridgeline Connections`, CARD_W / 2, CARD_H - 18);
   } else if (data.isOwnProfile) {
-    ctx.font = '13px sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.textAlign = 'center';
-    ctx.fillText('✏️ Edit · 📸 Photos · 🎨 Theme · 💬 Prompt', CARD_W / 2, CARD_H - 16);
+    ctx.fillText('Edit · Photos · Theme · Prompt', CARD_W / 2, CARD_H - 18);
   }
 
   // ── Encode and return ──
@@ -271,7 +278,8 @@ export async function renderProfileCard(data: CardData): Promise<AttachmentBuild
 // Drawing Helpers
 // ─────────────────────────────────────────
 
-function drawBackground(ctx: SKRSContext2D, gradient: ThemeGradient): void {
+function drawBackground(ctx: SKRSContext2D, gradient: ThemeGradient, themeColor: number): void {
+  // Dark base gradient
   const grad = ctx.createLinearGradient(0, 0, 0, CARD_H);
   for (const [stop, color] of gradient.stops) {
     grad.addColorStop(stop, color);
@@ -279,9 +287,19 @@ function drawBackground(ctx: SKRSContext2D, gradient: ThemeGradient): void {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
 
-  // Subtle dark overlay for text readability
-  ctx.fillStyle = `rgba(0,0,0,${gradient.overlayOpacity * 0.3})`;
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  // Subtle theme-colored accent glow at top
+  const r = (themeColor >> 16) & 0xff;
+  const g = (themeColor >> 8) & 0xff;
+  const b = themeColor & 0xff;
+  const accentGrad = ctx.createLinearGradient(0, 0, 0, 300);
+  accentGrad.addColorStop(0, `rgba(${r},${g},${b},0.15)`);
+  accentGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = accentGrad;
+  ctx.fillRect(0, 0, CARD_W, 300);
+
+  // Thin accent line at very top
+  ctx.fillStyle = hexFromInt(themeColor);
+  ctx.fillRect(0, 0, CARD_W, 3);
 }
 
 function drawImageCover(ctx: SKRSContext2D, img: unknown, x: number, y: number, w: number, h: number): void {
@@ -301,13 +319,13 @@ function drawImageCover(ctx: SKRSContext2D, img: unknown, x: number, y: number, 
 
 function drawFrostedPanel(ctx: SKRSContext2D, x: number, y: number, w: number, h: number): void {
   ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
   ctx.beginPath();
   roundRect(ctx, x, y, w, h, PANEL_RADIUS);
   ctx.fill();
 
-  // Subtle border
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  // Visible border
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
   ctx.lineWidth = 1;
   ctx.stroke();
   ctx.restore();
@@ -351,7 +369,7 @@ function drawInterestPills(
   themeColor: number,
   shared?: string[],
 ): number {
-  ctx.font = '14px sans-serif';
+  ctx.font = '16px sans-serif';
   const sharedSet = new Set(shared ?? []);
   let x = PADDING;
   let y = startY;
@@ -384,9 +402,9 @@ function drawInterestPills(
     }
 
     // Pill text
-    ctx.fillStyle = isShared ? '#ffffff' : 'rgba(255,255,255,0.8)';
+    ctx.fillStyle = isShared ? '#ffffff' : 'rgba(255,255,255,0.85)';
     ctx.textAlign = 'left';
-    ctx.fillText(interest, x + 10, y + 20);
+    ctx.fillText(interest, x + 12, y + 23);
 
     x += pillW + 8;
   }
