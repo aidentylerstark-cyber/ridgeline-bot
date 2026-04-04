@@ -410,6 +410,9 @@ export async function runMigrations(): Promise<void> {
         sl_name VARCHAR(100),
         photo_url VARCHAR(500),
         photos JSONB NOT NULL DEFAULT '[]',
+        prompt_question VARCHAR(200),
+        prompt_answer TEXT,
+        theme VARCHAR(30) NOT NULL DEFAULT 'default',
         is_active BOOLEAN NOT NULL DEFAULT true,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()

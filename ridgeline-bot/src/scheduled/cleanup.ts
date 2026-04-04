@@ -10,6 +10,7 @@ import {
   purgeOldAuditLogs,
   purgeAuditLogsByAction,
   purgeOldRegionSnapshots,
+  purgeOldSwipematchLimits,
   getDueRoleRemovals,
   getContentByKey,
 } from '../storage.js';
@@ -90,10 +91,12 @@ export function scheduleCleanup(client: Client): { stop: () => void; start: () =
       }
 
       const regionSnapshots = await purgeOldRegionSnapshots(REGION_SNAPSHOT_RETENTION_DAYS);
+      const swipematchLimits = await purgeOldSwipematchLimits();
 
       console.log(
         `[Peaches] Weekly cleanup complete — tickets: ${tickets}, suggestions: ${suggestions}, ` +
-        `birthday posts: ${birthdayPosts}, milestone posts: ${milestonePosts}, audit logs: ${auditLogs}, region snapshots: ${regionSnapshots}`
+        `birthday posts: ${birthdayPosts}, milestone posts: ${milestonePosts}, audit logs: ${auditLogs}, ` +
+        `region snapshots: ${regionSnapshots}, swipematch limits: ${swipematchLimits}`
       );
 
       // Post purge notification to #mod-log if entries were purged

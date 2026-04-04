@@ -53,7 +53,7 @@ import {
   handlePromptModalSubmit,
   handleThemeSelect,
   handlePhotoNav,
-  handlePhotoDelete,
+  handlePhotoDeleteSelect,
   handleSwipematchLike,
   handleSwipematchPass,
   handleSwipematchSuperlike,
@@ -216,7 +216,6 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     { match: 'sm_upload_photos', exact: true, handler: handleUploadPhotosButton },
     { match: 'sm_answer_prompt', exact: true, handler: handleAnswerPromptButton },
     { match: 'sm_photo_count_', handler: async (i) => { await i.deferUpdate(); } }, // disabled counter button
-    { match: 'sm_photodel_', handler: handlePhotoDelete },
     { match: 'sm_photo_', handler: handlePhotoNav },
     // SwipeMatch swipe buttons
     { match: 'swipematch_like_', handler: handleSwipematchLike },
@@ -273,6 +272,10 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
         }
         if (interaction.customId === 'swipematch_theme_select') {
           await handleThemeSelect(interaction, client);
+          return;
+        }
+        if (interaction.customId === 'swipematch_photodel_select') {
+          await handlePhotoDeleteSelect(interaction, client);
           return;
         }
         return;

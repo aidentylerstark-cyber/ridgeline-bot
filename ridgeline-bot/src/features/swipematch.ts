@@ -1185,9 +1185,8 @@ export async function handlePhotoNav(interaction: ButtonInteraction, _client: Cl
 // Photo management — delete from own profile
 // ─────────────────────────────────────────
 
-export async function handlePhotoDelete(interaction: ButtonInteraction, _client: Client): Promise<void> {
-  // customId format: sm_photodel_{index}
-  const index = parseInt(interaction.customId.replace('sm_photodel_', ''), 10);
+export async function handlePhotoDeleteSelect(interaction: StringSelectMenuInteraction, _client: Client): Promise<void> {
+  const index = parseInt(interaction.values[0], 10);
 
   const removed = await removeSwipematchPhoto(interaction.user.id, index);
   if (!removed) {
@@ -1392,13 +1391,13 @@ function calculateCompatibility(
   let score = 0;
   let maxScore = 0;
 
-  // Shared interests (up to 50 points)
+  // Shared interests (up to 50 points) — only counts if both have interests
   const maxInterests = Math.max(profileInterests.length, viewerInterests.length);
   if (maxInterests > 0) {
     const shared = profileInterests.filter(i => viewerInterests.includes(i)).length;
     score += (shared / maxInterests) * 50;
+    maxScore += 50;
   }
-  maxScore += 50;
 
   // Preference alignment (up to 30 points)
   if (viewerInterestedIn && profileGender) {
@@ -1503,15 +1502,18 @@ function buildProfileManageRows(
       .addOptions(SWIPEMATCH.interestOptions.map(i => ({ label: i, value: i })))
   ));
 
-  // Row 3: Delete individual photos (if any exist)
+  // Row 4: Delete photo select (if photos exist) — uses select instead of buttons to save row space
   if (photos.length > 0) {
-    const deleteButtons = photos.slice(0, 5).map((_, i) =>
-      new ButtonBuilder()
-        .setCustomId(`sm_photodel_${i}`)
-        .setLabel(`Delete Photo ${i + 1}`)
-        .setStyle(ButtonStyle.Danger)
-    );
-    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...deleteButtons));
+    rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('swipematch_photodel_select')
+        .setPlaceholder('🗑️ Delete a photo...')
+        .addOptions(photos.map((_, i) => ({
+          label: `Delete Photo ${i + 1}`,
+          value: String(i),
+          emoji: '🗑️',
+        })))
+    ));
   }
 
   return rows;
