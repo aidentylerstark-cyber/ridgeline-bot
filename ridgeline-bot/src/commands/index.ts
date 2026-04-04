@@ -439,7 +439,7 @@ export async function registerSlashCommands(client: Client): Promise<void> {
               { name: 'Staff', value: 'staff' },
               { name: 'Community Management', value: 'community-management' },
               { name: 'Admin Garbage', value: 'admin-garbage' },
-              { name: 'Vet Clinic', value: 'vet-clinic' },
+              { name: 'Animal Services', value: 'animal-services' },
               { name: 'Post Office', value: 'post-office' },
             )
         )
@@ -461,6 +461,10 @@ export async function registerSlashCommands(client: Client): Promise<void> {
         .setDescription('One-time setup: create Vet Clinic & Post Office categories, channels, roles')
       )
       .addSubcommand(sub => sub
+        .setName('setup-connections')
+        .setDescription('One-time setup: create Ridgeline Connections category, channel, and panel')
+      )
+      .addSubcommand(sub => sub
         .setName('panel')
         .setDescription('Post or refresh a bot panel')
         .addStringOption(opt =>
@@ -472,10 +476,22 @@ export async function registerSlashCommands(client: Client): Promise<void> {
               { name: 'Ticket Panel', value: 'tickets' },
               { name: 'Suggestion Box', value: 'suggestions' },
               { name: 'Trigger Reference', value: 'triggers' },
+              { name: 'Ridgeline Connections', value: 'swipematch' },
             )
         )
       )
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+    // /swipematch (staff only — users interact via panel buttons)
+    new SlashCommandBuilder()
+      .setName('swipematch')
+      .setDescription('[Staff] Manage Ridgeline Connections')
+      .addUserOption(opt =>
+        opt.setName('user')
+          .setDescription('User to manage')
+          .setRequired(false)
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   ];
 

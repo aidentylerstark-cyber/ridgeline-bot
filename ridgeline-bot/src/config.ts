@@ -31,6 +31,7 @@ export const CHANNELS = {
   statsMembersVC: '1475717469791457352',   // Voice channel showing member count (e.g. "Members: 247")
   statsOnlineVC: '1475717470936498176',    // Voice channel showing online count (e.g. "Online: 43")
   regionMonitoring: '1420963602457825330', // SL region monitoring alerts & logs
+  swipematch: '',  // Ridgeline Connections panel channel — fill in after creating channel
 };
 
 // ─────────────────────────────────────────
@@ -49,6 +50,7 @@ export const CHATBOT_DENIED_CHANNELS = new Set([
   CHANNELS.regionMonitoring,
   CHANNELS.statsMembersVC,
   CHANNELS.statsOnlineVC,
+  CHANNELS.swipematch,
 ]);
 
 // ─────────────────────────────────────────
@@ -184,21 +186,32 @@ export const TICKET_PRIORITY_COLORS: Record<string, number> = {
 // ─────────────────────────────────────────
 
 export const BUSINESS_CATEGORIES = {
-  vetClinic: {
-    label: 'Pawsome Vet Clinic',
+  animalServices: {
+    label: 'Cloverdale Animal Services',
     categoryId: '1485397337902678257',
-    staffRoles: ['Vet Clinic Director', 'Vet Clinic Staff'],
-    channels: {
-      staffChat: '1485396496282157128',
+    staffRoles: ['Vet Clinic Director', 'Vet Clinic Staff', 'Wildlife Reserve Director', 'Wildlife Reserve Staff'],
+    shared: {
       announcements: '1485396504033231032',
+      teamMeetingVC: '1485396567853764668',
+      resources: '1382372809296187442',
+      emergencyDispatch: '1486982701578977280',
+    },
+    vetClinic: {
+      staffChat: '1485396496282157128',
       staffRoster: '1485396512283427007',
       handBook: '1485396520042758255',
       timeClock: '1485397848928550912',
       appointments: '1485396534773284954',
       patientRecords: '1485396542088155136',
       emergencyCases: '1485396549864395013',
-      resources: '1382372809296187442',
-      vetMeetingVC: '1485396567853764668',
+    },
+    wildlifeReserve: {
+      staffRoster: '1486982709174865941',
+      handBook: '1486982716871282729',
+      timeClock: '1486982724458774571',
+      animalTracking: '1486982732553781289',
+      habitatReports: '1486982740745130004',
+      rescueOperations: '1486982760752087152',
     },
   },
   postOffice: {
@@ -242,6 +255,37 @@ export const REGION_SNAPSHOT_RETENTION_DAYS = 7;
 // ─────────────────────────────────────────
 // Milestones
 // ─────────────────────────────────────────
+
+// ─────────────────────────────────────────
+// SwipeMatch — Ridgeline Connections
+// ─────────────────────────────────────────
+
+export const SWIPEMATCH = {
+  /** Max swipes per day per user */
+  dailySwipeLimit: 15,
+  /** Max super likes per day per user */
+  dailySuperLikeLimit: 2,
+  /** Minimum age to display on profiles */
+  minAge: '18',
+  /** Interest options for profile creation */
+  interestOptions: [
+    '🎮 Gaming', '🌲 Outdoors', '🎵 Music', '🐴 Horses',
+    '📸 Photography', '🎭 Theater', '☕ Coffee Dates', '🎣 Fishing',
+    '🏕 Camping', '🍳 Cooking', '📚 Reading', '💃 Dancing',
+    '🏋️ Fitness', '🎨 Art', '🐾 Animals', '🌄 Sunsets',
+  ],
+  /** Gender options */
+  genderOptions: ['Male', 'Female', 'Non-Binary', 'Other'],
+  /** Interested-in options */
+  interestedInOptions: ['Men', 'Women', 'Everyone', 'Just Here for RP'],
+  /** Score weights for smart matching */
+  scoreWeights: {
+    sharedInterest: 3,
+    sharedRole: 2,
+    preferenceMatch: 5,
+    superLikeBonus: 10,
+  },
+} as const;
 
 export const FOUNDING_DATE = new Date('2025-06-25');
 

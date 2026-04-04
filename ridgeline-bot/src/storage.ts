@@ -1035,3 +1035,333 @@ export async function getBirthdaysByMonth(month: number): Promise<DiscordBirthda
   return db.select().from(discordBirthdays)
     .where(eq(discordBirthdays.month, month));
 }
+
+// ============================================
+// SwipeMatch — Ridgeline Connections
+// ============================================
+
+import {
+  swipematchProfiles, swipematchSwipes, swipematchMatches, swipematchDailyLimits,
+  type SwipematchProfile, type SwipematchMatch,
+} from './db/schema.js';
+
+// ── Profiles ──
+
+export async function getSwipematchProfile(discordUserId: string): Promise<SwipematchProfile | undefined> {
+  const [row] = await db.select().from(swipematchProfiles)
+    .where(eq(swipematchProfiles.discordUserId, discordUserId));
+  return row;
+}
+
+export async function upsertSwipematchProfile(data: {
+  discordUserId: string;
+  characterName: string;
+  age?: string;
+  gender?: string;
+  interestedIn?: string;
+  bio?: string;
+  interests: string[];
+  slName?: string;
+  photoUrl?: string;
+}): Promise<SwipematchProfile> {
+  const [row] = await db.insert(swipematchProfiles)
+    .values({
+      discordUserId: data.discordUserId,
+      characterName: data.characterName,
+      age: data.age ?? null,
+      gender: data.gender ?? null,
+      interestedIn: data.interestedIn ?? null,
+      bio: data.bio ?? null,
+      interests: data.interests,
+      slName: data.slName ?? null,
+      photoUrl: data.photoUrl ?? null,
+    })
+    .onConflictDoUpdate({
+      target: swipematchProfiles.discordUserId,
+      set: {
+        characterName: data.characterName,
+        age: data.age ?? null,
+        gender: data.gender ?? null,
+        interestedIn: data.interestedIn ?? null,
+        bio: data.bio ?? null,
+        interests: data.interests,
+        slName: data.slName ?? null,
+        photoUrl: data.photoUrl ?? null,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
+}
+
+export async function deleteSwipematchProfile(discordUserId: string): Promise<boolean> {
+  // Delete all related data first, then the profile
+  await pool.query(`DELETE FROM swipematch_swipes WHERE swiper_id = $1 OR target_id = $1`, [discordUserId]);
+  await pool.query(
+    `DELETE FROM swipematch_matches WHERE user_a = $1 OR user_b = $1`,
+    [discordUserId]
+  );
+  await pool.query(`DELETE FROM swipematch_daily_limits WHERE discord_user_id = $1`, [discordUserId]);
+  const { rowCount } = await pool.query(
+    `DELETE FROM swipematch_profiles WHERE discord_user_id = $1`,
+    [discordUserId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function setSwipematchProfileActive(discordUserId: string, isActive: boolean): Promise<void> {
+  await pool.query(
+    `UPDATE swipematch_profiles SET is_active = $1, updated_at = NOW() WHERE discord_user_id = $2`,
+    [isActive, discordUserId]
+  );
+}
+
+export async function getActiveSwipematchProfileCount(): Promise<number> {
+  const { rows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) FROM swipematch_profiles WHERE is_active = true`
+  );
+  return parseInt(rows[0]?.count ?? '0', 10);
+}
+
+// ── Photos ──
+
+const MAX_PHOTOS = 5;
+
+/** Add a photo URL to a profile. Returns false if at max capacity. */
+export async function addSwipematchPhoto(discordUserId: string, url: string): Promise<boolean> {
+  const { rows } = await pool.query<{ photo_count: number }>(
+    `SELECT jsonb_array_length(COALESCE(photos, '[]'::jsonb)) AS photo_count
+     FROM swipematch_profiles WHERE discord_user_id = $1`,
+    [discordUserId]
+  );
+  if (!rows[0] || rows[0].photo_count >= MAX_PHOTOS) return false;
+
+  await pool.query(
+    `UPDATE swipematch_profiles
+     SET photos = COALESCE(photos, '[]'::jsonb) || to_jsonb($1::text),
+         updated_at = NOW()
+     WHERE discord_user_id = $2`,
+    [url, discordUserId]
+  );
+  return true;
+}
+
+/** Remove a photo by index (0-based). Returns false if index out of range. */
+export async function removeSwipematchPhoto(discordUserId: string, index: number): Promise<boolean> {
+  const { rows } = await pool.query<{ photos: string[] }>(
+    `SELECT photos FROM swipematch_profiles WHERE discord_user_id = $1`,
+    [discordUserId]
+  );
+  const photos = (rows[0]?.photos ?? []) as string[];
+  if (index < 0 || index >= photos.length) return false;
+
+  photos.splice(index, 1);
+  await pool.query(
+    `UPDATE swipematch_profiles SET photos = $1::jsonb, updated_at = NOW() WHERE discord_user_id = $2`,
+    [JSON.stringify(photos), discordUserId]
+  );
+  return true;
+}
+
+/** Get all photos for a profile. */
+export async function getSwipematchPhotos(discordUserId: string): Promise<string[]> {
+  const { rows } = await pool.query<{ photos: string[] }>(
+    `SELECT photos FROM swipematch_profiles WHERE discord_user_id = $1`,
+    [discordUserId]
+  );
+  return (rows[0]?.photos ?? []) as string[];
+}
+
+// ── Swiping ──
+
+/** Record a swipe. Returns true if inserted, false if already swiped (dedup). */
+export async function recordSwipe(swiperId: string, targetId: string, action: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `INSERT INTO swipematch_swipes (swiper_id, target_id, action)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (swiper_id, target_id) DO NOTHING`,
+    [swiperId, targetId, action]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+/** Check if target has already liked/superliked the swiper (mutual match check). */
+export async function hasTargetLikedSwiper(swiperId: string, targetId: string): Promise<boolean> {
+  const { rows } = await pool.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+      SELECT 1 FROM swipematch_swipes
+      WHERE swiper_id = $1 AND target_id = $2 AND action IN ('like', 'superlike')
+    ) AS exists`,
+    [targetId, swiperId]
+  );
+  return rows[0]?.exists ?? false;
+}
+
+/** Get a random unseen active profile for a user, weighted by compatibility score. */
+export async function getNextSwipeCandidate(
+  discordUserId: string,
+  userInterests: string[],
+  interestedIn?: string,
+  userGender?: string,
+): Promise<SwipematchProfile | null> {
+  // Build preference filter
+  let genderFilter = '';
+  const params: unknown[] = [discordUserId];
+
+  if (interestedIn && interestedIn !== 'Everyone' && interestedIn !== 'Just Here for RP') {
+    // Map preference to gender: "Men" -> "Male", "Women" -> "Female"
+    const targetGender = interestedIn === 'Men' ? 'Male' : interestedIn === 'Women' ? 'Female' : null;
+    if (targetGender) {
+      params.push(targetGender);
+      genderFilter = `AND p.gender = $${params.length}`;
+    }
+  }
+
+  // Score profiles by shared interests using SQL array overlap
+  const interestsJson = JSON.stringify(userInterests);
+  params.push(interestsJson);
+  const interestsParam = `$${params.length}`;
+
+  const { rows } = await pool.query<{
+    id: number; discord_user_id: string; character_name: string; age: string | null;
+    gender: string | null; interested_in: string | null; bio: string | null;
+    interests: string[]; sl_name: string | null; photo_url: string | null;
+    photos: string[]; is_active: boolean; created_at: Date; updated_at: Date; score: number;
+  }>(`
+    SELECT p.*,
+      (SELECT COUNT(*) FROM jsonb_array_elements_text(p.interests) AS pi
+       WHERE pi IN (SELECT jsonb_array_elements_text(${interestsParam}::jsonb))) * 3
+      + CASE WHEN p.interested_in = 'Just Here for RP' THEN 2 ELSE 0 END
+      AS score
+    FROM swipematch_profiles p
+    WHERE p.discord_user_id != $1
+      AND p.is_active = true
+      AND p.discord_user_id NOT IN (
+        SELECT target_id FROM swipematch_swipes WHERE swiper_id = $1
+      )
+      ${genderFilter}
+    ORDER BY score DESC, RANDOM()
+    LIMIT 1
+  `, params);
+
+  if (!rows[0]) return null;
+  const r = rows[0];
+  return {
+    id: r.id,
+    discordUserId: r.discord_user_id,
+    characterName: r.character_name,
+    age: r.age,
+    gender: r.gender,
+    interestedIn: r.interested_in,
+    bio: r.bio,
+    interests: r.interests,
+    slName: r.sl_name,
+    photoUrl: r.photo_url,
+    photos: r.photos ?? [],
+    isActive: r.is_active,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+// ── Matches ──
+
+/** Create a match record. Normalizes user order (lower ID = userA). Returns the match. */
+export async function createSwipematchMatch(userA: string, userB: string, threadId?: string): Promise<SwipematchMatch> {
+  const [a, b] = userA < userB ? [userA, userB] : [userB, userA];
+  const { rows } = await pool.query<{
+    id: number; user_a: string; user_b: string; thread_id: string | null; matched_at: Date;
+  }>(
+    `INSERT INTO swipematch_matches (user_a, user_b, thread_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_a, user_b) DO NOTHING
+     RETURNING *`,
+    [a, b, threadId ?? null]
+  );
+  if (!rows[0]) {
+    // Already matched — return existing
+    const { rows: existing } = await pool.query<{
+      id: number; user_a: string; user_b: string; thread_id: string | null; matched_at: Date;
+    }>(`SELECT * FROM swipematch_matches WHERE user_a = $1 AND user_b = $2`, [a, b]);
+    const e = existing[0]!;
+    return { id: e.id, userA: e.user_a, userB: e.user_b, threadId: e.thread_id, matchedAt: e.matched_at };
+  }
+  const r = rows[0];
+  return { id: r.id, userA: r.user_a, userB: r.user_b, threadId: r.thread_id, matchedAt: r.matched_at };
+}
+
+export async function updateMatchThread(matchId: number, threadId: string): Promise<void> {
+  await pool.query(`UPDATE swipematch_matches SET thread_id = $1 WHERE id = $2`, [threadId, matchId]);
+}
+
+export async function getSwipematchMatches(discordUserId: string): Promise<SwipematchMatch[]> {
+  const { rows } = await pool.query<{
+    id: number; user_a: string; user_b: string; thread_id: string | null; matched_at: Date;
+  }>(
+    `SELECT * FROM swipematch_matches
+     WHERE user_a = $1 OR user_b = $1
+     ORDER BY matched_at DESC`,
+    [discordUserId]
+  );
+  return rows.map(r => ({
+    id: r.id, userA: r.user_a, userB: r.user_b, threadId: r.thread_id, matchedAt: r.matched_at,
+  }));
+}
+
+export async function getTotalMatchCount(): Promise<number> {
+  const { rows } = await pool.query<{ count: string }>(`SELECT COUNT(*) FROM swipematch_matches`);
+  return parseInt(rows[0]?.count ?? '0', 10);
+}
+
+// ── Daily Limits ──
+
+/** Get today's swipe counts for a user. Creates the record if it doesn't exist. */
+export async function getSwipematchDailyLimits(discordUserId: string): Promise<{ swipeCount: number; superLikeCount: number }> {
+  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+  const { rows } = await pool.query<{ swipe_count: number; super_like_count: number }>(
+    `INSERT INTO swipematch_daily_limits (discord_user_id, date, swipe_count, super_like_count)
+     VALUES ($1, $2, 0, 0)
+     ON CONFLICT (discord_user_id, date) DO NOTHING
+     RETURNING swipe_count, super_like_count`,
+    [discordUserId, today]
+  );
+  // If ON CONFLICT hit, we need to SELECT
+  if (!rows[0]) {
+    const { rows: existing } = await pool.query<{ swipe_count: number; super_like_count: number }>(
+      `SELECT swipe_count, super_like_count FROM swipematch_daily_limits WHERE discord_user_id = $1 AND date = $2`,
+      [discordUserId, today]
+    );
+    return {
+      swipeCount: existing[0]?.swipe_count ?? 0,
+      superLikeCount: existing[0]?.super_like_count ?? 0,
+    };
+  }
+  return { swipeCount: rows[0].swipe_count, superLikeCount: rows[0].super_like_count };
+}
+
+/** Increment swipe count. Returns new count. */
+export async function incrementSwipeCount(discordUserId: string, isSuperLike: boolean): Promise<{ swipeCount: number; superLikeCount: number }> {
+  const today = new Date().toLocaleDateString('en-CA');
+  const col = isSuperLike ? 'super_like_count' : 'swipe_count';
+  const { rows } = await pool.query<{ swipe_count: number; super_like_count: number }>(
+    `UPDATE swipematch_daily_limits
+     SET ${col} = ${col} + 1
+     WHERE discord_user_id = $1 AND date = $2
+     RETURNING swipe_count, super_like_count`,
+    [discordUserId, today]
+  );
+  return {
+    swipeCount: rows[0]?.swipe_count ?? 0,
+    superLikeCount: rows[0]?.super_like_count ?? 0,
+  };
+}
+
+/** Purge old daily limit records (older than 7 days) */
+export async function purgeOldSwipematchLimits(): Promise<number> {
+  const cutoff = new Date(Date.now() - 7 * 86_400_000).toLocaleDateString('en-CA');
+  const { rowCount } = await pool.query(
+    `DELETE FROM swipematch_daily_limits WHERE date < $1`,
+    [cutoff]
+  );
+  return rowCount ?? 0;
+}

@@ -180,3 +180,53 @@ export type RegionSnapshot = typeof regionSnapshots.$inferSelect;
 export type DiscordTicketFeedback = typeof discordTicketFeedback.$inferSelect;
 export type DiscordOnboarding = typeof discordOnboarding.$inferSelect;
 
+// ============================================
+// SwipeMatch — Ridgeline Connections
+// ============================================
+
+export const swipematchProfiles = pgTable("swipematch_profiles", {
+  id: serial("id").primaryKey(),
+  discordUserId: varchar("discord_user_id", { length: 30 }).notNull().unique(),
+  characterName: varchar("character_name", { length: 100 }).notNull(),
+  age: varchar("age", { length: 10 }),
+  gender: varchar("gender", { length: 30 }),
+  interestedIn: varchar("interested_in", { length: 50 }),
+  bio: text("bio"),
+  interests: jsonb("interests").notNull().default([]),   // string[]
+  slName: varchar("sl_name", { length: 100 }),
+  photoUrl: varchar("photo_url", { length: 500 }),    // legacy — kept for migration compat
+  photos: jsonb("photos").notNull().default([]),       // string[] of CDN URLs, max 5
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const swipematchSwipes = pgTable("swipematch_swipes", {
+  id: serial("id").primaryKey(),
+  swiperId: varchar("swiper_id", { length: 30 }).notNull(),
+  targetId: varchar("target_id", { length: 30 }).notNull(),
+  action: varchar("action", { length: 15 }).notNull(), // like | pass | superlike
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [unique().on(table.swiperId, table.targetId)]);
+
+export const swipematchMatches = pgTable("swipematch_matches", {
+  id: serial("id").primaryKey(),
+  userA: varchar("user_a", { length: 30 }).notNull(),
+  userB: varchar("user_b", { length: 30 }).notNull(),
+  threadId: varchar("thread_id", { length: 30 }),
+  matchedAt: timestamp("matched_at").notNull().defaultNow(),
+}, (table) => [unique().on(table.userA, table.userB)]);
+
+export const swipematchDailyLimits = pgTable("swipematch_daily_limits", {
+  id: serial("id").primaryKey(),
+  discordUserId: varchar("discord_user_id", { length: 30 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  swipeCount: integer("swipe_count").notNull().default(0),
+  superLikeCount: integer("super_like_count").notNull().default(0),
+}, (table) => [unique().on(table.discordUserId, table.date)]);
+
+export type SwipematchProfile = typeof swipematchProfiles.$inferSelect;
+export type SwipematchSwipe = typeof swipematchSwipes.$inferSelect;
+export type SwipematchMatch = typeof swipematchMatches.$inferSelect;
+export type SwipematchDailyLimit = typeof swipematchDailyLimits.$inferSelect;
+
