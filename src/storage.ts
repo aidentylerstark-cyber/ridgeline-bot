@@ -1127,23 +1127,17 @@ export async function getActiveSwipematchProfileCount(): Promise<number> {
 
 const MAX_PHOTOS = 5;
 
-/** Add a photo URL to a profile. Returns false if at max capacity. */
+/** Add a photo URL to a profile. Atomic — returns false if at max capacity. */
 export async function addSwipematchPhoto(discordUserId: string, url: string): Promise<boolean> {
-  const { rows } = await pool.query<{ photo_count: number }>(
-    `SELECT jsonb_array_length(COALESCE(photos, '[]'::jsonb)) AS photo_count
-     FROM swipematch_profiles WHERE discord_user_id = $1`,
-    [discordUserId]
-  );
-  if (!rows[0] || rows[0].photo_count >= MAX_PHOTOS) return false;
-
-  await pool.query(
+  const { rowCount } = await pool.query(
     `UPDATE swipematch_profiles
      SET photos = COALESCE(photos, '[]'::jsonb) || to_jsonb($1::text),
          updated_at = NOW()
-     WHERE discord_user_id = $2`,
-    [url, discordUserId]
+     WHERE discord_user_id = $2
+       AND jsonb_array_length(COALESCE(photos, '[]'::jsonb)) < $3`,
+    [url, discordUserId, MAX_PHOTOS]
   );
-  return true;
+  return (rowCount ?? 0) > 0;
 }
 
 /** Remove a photo by index (0-based). Returns false if index out of range. */
@@ -1318,37 +1312,30 @@ export async function getTotalMatchCount(): Promise<number> {
 /** Get today's swipe counts for a user. Creates the record if it doesn't exist. */
 export async function getSwipematchDailyLimits(discordUserId: string): Promise<{ swipeCount: number; superLikeCount: number }> {
   const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+  // Atomic upsert — always returns the row
   const { rows } = await pool.query<{ swipe_count: number; super_like_count: number }>(
     `INSERT INTO swipematch_daily_limits (discord_user_id, date, swipe_count, super_like_count)
      VALUES ($1, $2, 0, 0)
-     ON CONFLICT (discord_user_id, date) DO NOTHING
+     ON CONFLICT (discord_user_id, date) DO UPDATE SET discord_user_id = EXCLUDED.discord_user_id
      RETURNING swipe_count, super_like_count`,
     [discordUserId, today]
   );
-  // If ON CONFLICT hit, we need to SELECT
-  if (!rows[0]) {
-    const { rows: existing } = await pool.query<{ swipe_count: number; super_like_count: number }>(
-      `SELECT swipe_count, super_like_count FROM swipematch_daily_limits WHERE discord_user_id = $1 AND date = $2`,
-      [discordUserId, today]
-    );
-    return {
-      swipeCount: existing[0]?.swipe_count ?? 0,
-      superLikeCount: existing[0]?.super_like_count ?? 0,
-    };
-  }
-  return { swipeCount: rows[0].swipe_count, superLikeCount: rows[0].super_like_count };
+  return {
+    swipeCount: rows[0]?.swipe_count ?? 0,
+    superLikeCount: rows[0]?.super_like_count ?? 0,
+  };
 }
 
 /** Increment swipe count. Returns new count. */
 export async function incrementSwipeCount(discordUserId: string, isSuperLike: boolean): Promise<{ swipeCount: number; superLikeCount: number }> {
   const today = new Date().toLocaleDateString('en-CA');
-  const col = isSuperLike ? 'super_like_count' : 'swipe_count';
   const { rows } = await pool.query<{ swipe_count: number; super_like_count: number }>(
     `UPDATE swipematch_daily_limits
-     SET ${col} = ${col} + 1
+     SET swipe_count = CASE WHEN $3::boolean THEN swipe_count ELSE swipe_count + 1 END,
+         super_like_count = CASE WHEN $3::boolean THEN super_like_count + 1 ELSE super_like_count END
      WHERE discord_user_id = $1 AND date = $2
      RETURNING swipe_count, super_like_count`,
-    [discordUserId, today]
+    [discordUserId, today, isSuperLike]
   );
   return {
     swipeCount: rows[0]?.swipe_count ?? 0,

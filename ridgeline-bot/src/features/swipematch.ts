@@ -760,6 +760,8 @@ async function handleNewMatch(
 
   const profileA = await getSwipematchProfile(userAId);
   const profileB = await getSwipematchProfile(userBId);
+  const nameA = profileA?.characterName ?? 'Someone';
+  const nameB = profileB?.characterName ?? 'Someone';
 
   const matchEmbed = new EmbedBuilder()
     .setColor(MATCH_COLOR)
@@ -822,15 +824,17 @@ async function handleNewMatch(
     } catch { /* DMs disabled */ }
   }
 
-  // Audit log
-  if (interaction.guild) {
-    logAuditEvent(client, interaction.guild, {
-      action: 'swipematch_match',
-      actorId: userAId,
-      targetId: userBId,
-      details: `SwipeMatch: ${profileA?.characterName} matched with ${profileB?.characterName}`,
-    });
-  }
+  // Audit log (fire-and-forget, never crash the handler)
+  try {
+    if (interaction.guild) {
+      logAuditEvent(client, interaction.guild, {
+        action: 'swipematch_match',
+        actorId: userAId,
+        targetId: userBId,
+        details: `SwipeMatch: ${nameA} matched with ${nameB}`,
+      });
+    }
+  } catch { /* audit log failure is non-fatal */ }
 
   // Show match card + "Keep Swiping" button
   const keepGoing = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -999,26 +1003,31 @@ export async function handleUploadPhotosButton(interaction: ButtonInteraction, _
   });
 
   collector.on('collect', async (msg) => {
-    const attachment = msg.attachments.first();
-    if (!attachment) return;
+    try {
+      const attachment = msg.attachments.first();
+      if (!attachment) return;
 
-    // Validate it's an image
-    const contentType = attachment.contentType ?? '';
-    if (!contentType.startsWith('image/')) {
-      await msg.reply({ content: "That doesn't look like an image, sugar. Try uploading a .jpg, .png, or .gif! 🍑" });
-      return;
+      // Validate it's an image
+      const contentType = attachment.contentType ?? '';
+      if (!contentType.startsWith('image/')) {
+        await msg.reply({ content: "That doesn't look like an image, sugar. Try uploading a .jpg, .png, or .gif! 🍑" });
+        return;
+      }
+
+      const added = await addSwipematchPhoto(interaction.user.id, attachment.url);
+      if (!added) {
+        await msg.reply({ content: "You're at the 5-photo limit! Delete one first from **View My Profile**. 📸" });
+        return;
+      }
+
+      await msg.reply({ content: `📸 Photo added to your profile! Use **View My Profile** to see all your photos.` });
+
+      // Try to delete the user's image message to keep the channel clean
+      try { await msg.delete(); } catch { /* no perms to delete */ }
+    } catch (err) {
+      console.error('[Peaches] Photo upload collect error:', err);
+      collector.stop();
     }
-
-    const added = await addSwipematchPhoto(interaction.user.id, attachment.url);
-    if (!added) {
-      await msg.reply({ content: "You're at the 5-photo limit! Delete one first from **View My Profile**. 📸" });
-      return;
-    }
-
-    await msg.reply({ content: `📸 Photo added to your profile! Use **View My Profile** to see all your photos.` });
-
-    // Try to delete the user's image message to keep the channel clean
-    try { await msg.delete(); } catch { /* no perms to delete */ }
   });
 
   collector.on('end', (collected) => {
