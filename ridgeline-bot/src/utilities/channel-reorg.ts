@@ -382,20 +382,30 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
       { id: '1436162790636388515', name: '\uD83D\uDCC7\u250Astaff-roster' },
     ],
   },
-  'vet-clinic': {
+  'animal-services': {
     categoryId: '1485397337902678257',
-    categoryName: '\uD83D\uDC3E PAWSOME VET CLINIC',
+    categoryName: '\uD83D\uDC3E CLOVERDALE ANIMAL SERVICES',
     renames: [
-      { id: '1485396496282157128', name: '\uD83D\uDCAC\u250Avet-staff-chat' },
+      // Shared
       { id: '1485396504033231032', name: '\uD83D\uDCE2\u250Aannouncements' },
-      { id: '1485396512283427007', name: '\uD83D\uDCC7\u250Astaff-roster' },
-      { id: '1485396520042758255', name: '\uD83D\uDCD6\u250Ahand-book' },
-      { id: '1485397848928550912', name: '\u23F0\u250Atime-clock' },
+      { id: '1485396567853764668', name: '\uD83D\uDD0A\u250Ateam-meeting' },
+      { id: '1382372809296187442', name: '\uD83D\uDCDA\u250Aresources' },
+      { id: '1486982701578977280', name: '\uD83D\uDEA8\u250Aemergency-dispatch' },
+      // Vet Clinic
+      { id: '1485396496282157128', name: '\uD83D\uDCAC\u250Avet-staff-chat' },
+      { id: '1485396512283427007', name: '\uD83D\uDCC7\u250Avet-staff-roster' },
+      { id: '1485396520042758255', name: '\uD83D\uDCD6\u250Avet-handbook' },
+      { id: '1485397848928550912', name: '\u23F0\u250Avet-time-clock' },
       { id: '1485396534773284954', name: '\uD83D\uDCCB\u250Aappointments' },
       { id: '1485396542088155136', name: '\uD83E\uDE7A\u250Apatient-records' },
       { id: '1485396549864395013', name: '\uD83D\uDEA8\u250Aemergency-cases' },
-      { id: '1382372809296187442', name: '\uD83D\uDCDA\u250Aresources' },
-      { id: '1485396567853764668', name: '\uD83D\uDD0A\u250Avet-meeting' },
+      // Wildlife Reserve
+      { id: '1486982709174865941', name: '\uD83D\uDCC7\u250Areserve-staff-roster' },
+      { id: '1486982716871282729', name: '\uD83D\uDCD6\u250Areserve-handbook' },
+      { id: '1486982724458774571', name: '\u23F0\u250Areserve-time-clock' },
+      { id: '1486982732553781289', name: '\uD83E\uDD8C\u250Aanimal-tracking' },
+      { id: '1486982740745130004', name: '\uD83C\uDF3F\u250Ahabitat-reports' },
+      { id: '1486982760752087152', name: '\uD83D\uDC3E\u250Arescue-operations' },
     ],
   },
   'post-office': {
