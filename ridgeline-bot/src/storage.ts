@@ -110,7 +110,7 @@ export async function closeDiscordTicket(channelId: string, closedBy: string): P
 /** Touch the last_activity_at timestamp on a ticket (by channel ID). Fire-and-forget safe. */
 export async function updateTicketLastActivity(channelId: string): Promise<void> {
   await pool.query(
-    `UPDATE discord_tickets SET last_activity_at = NOW() WHERE channel_id = $1 AND is_closed = false`,
+    `UPDATE discord_tickets SET last_activity_at = NOW(), escalation_level = 0 WHERE channel_id = $1 AND is_closed = false`,
     [channelId]
   );
 }
@@ -376,7 +376,7 @@ export async function getUpcomingBirthdays(dates: Array<{ month: number; day: nu
 
 export async function updateTicketEscalationLevel(ticketId: number, level: number): Promise<void> {
   await pool.query(
-    `UPDATE discord_tickets SET escalation_level = $1 WHERE id = $2`,
+    `UPDATE discord_tickets SET escalation_level = $1 WHERE id = $2 AND is_closed = false`,
     [level, ticketId]
   );
 }
@@ -449,12 +449,13 @@ export async function hasMilestonePosted(discordUserId: string, milestoneDays: n
   return rows[0]?.exists ?? false;
 }
 
-export async function recordMilestonePost(discordUserId: string, milestoneDays: number): Promise<void> {
-  await pool.query(
+export async function recordMilestonePost(discordUserId: string, milestoneDays: number): Promise<boolean> {
+  const { rowCount } = await pool.query(
     `INSERT INTO discord_milestone_posts (discord_user_id, milestone_days)
      VALUES ($1, $2) ON CONFLICT DO NOTHING`,
     [discordUserId, milestoneDays]
   );
+  return (rowCount ?? 0) > 0;
 }
 
 /** Fetch all posted milestones in one query — returns Set of "userId:days" keys */
@@ -480,12 +481,13 @@ export async function hasBirthdayPosted(discordUserId: string, year: number): Pr
   return rows[0]?.exists ?? false;
 }
 
-export async function recordBirthdayPost(discordUserId: string, year: number): Promise<void> {
-  await pool.query(
+export async function recordBirthdayPost(discordUserId: string, year: number): Promise<boolean> {
+  const { rowCount } = await pool.query(
     `INSERT INTO discord_birthday_posts (discord_user_id, year)
      VALUES ($1, $2) ON CONFLICT DO NOTHING`,
     [discordUserId, year]
   );
+  return (rowCount ?? 0) > 0;
 }
 
 /** Fetch all birthday posts for a given year — returns Set of discord user IDs */

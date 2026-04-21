@@ -154,6 +154,9 @@ export async function handleTicketRate(interaction: ButtonInteraction, _client: 
     });
   } catch (err) {
     console.warn('[Peaches] Survey rating interaction.update() failed:', err);
+    try {
+      await interaction.reply({ embeds: [thankYouEmbed], components: [commentRow], flags: 64 });
+    } catch { /* both update and reply failed — token likely expired */ }
   }
 
   console.log(`[Peaches] Ticket feedback: ticket ${ticketId} rated ${rating}/5`);
@@ -185,7 +188,14 @@ export async function handleTicketCommentButton(interaction: ButtonInteraction, 
     .setMaxLength(500);
 
   modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(commentInput));
-  await interaction.showModal(modal);
+  try {
+    await interaction.showModal(modal);
+  } catch (err) {
+    console.error('[Peaches] Failed to show feedback comment modal:', err);
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: 'Something went wrong showing the comment form, sugar. Try again! 🍑', flags: 64 }).catch(() => {});
+    }
+  }
 }
 
 // ─────────────────────────────────────────
@@ -204,7 +214,17 @@ export async function handleTicketFeedbackCommentModal(interaction: ModalSubmitI
   const comment = interaction.fields.getTextInputValue('feedback_comment').trim();
 
   // Update the existing feedback with the comment
-  await pool_updateFeedbackComment(ticketId, comment);
+  try {
+    const saved = await pool_updateFeedbackComment(ticketId, comment);
+    if (!saved) {
+      await interaction.reply({ content: "Couldn't find the feedback to add your comment to, sugar. The rating may not have been saved. 🍑", flags: 64 });
+      return;
+    }
+  } catch (err) {
+    console.error('[Peaches] Failed to save feedback comment:', err);
+    await interaction.reply({ content: "Something went wrong saving your comment, sugar. Try again! 🍑", flags: 64 });
+    return;
+  }
 
   await interaction.reply({
     content: "Thanks for the extra feedback, sugar! Your words help us do better. \uD83C\uDF51",
@@ -215,10 +235,11 @@ export async function handleTicketFeedbackCommentModal(interaction: ModalSubmitI
 }
 
 // Helper to update comment on existing feedback row
-async function pool_updateFeedbackComment(ticketId: number, comment: string): Promise<void> {
+async function pool_updateFeedbackComment(ticketId: number, comment: string): Promise<boolean> {
   const { pool } = await import('../db/index.js');
-  await pool.query(
+  const { rowCount } = await pool.query(
     `UPDATE discord_ticket_feedback SET comment = $1 WHERE ticket_id = $2`,
     [comment, ticketId]
   );
+  return (rowCount ?? 0) > 0;
 }

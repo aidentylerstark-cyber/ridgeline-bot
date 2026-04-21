@@ -477,7 +477,14 @@ export async function handleTicketConfirmClose(interaction: ButtonInteraction, c
     new ActionRowBuilder<TextInputBuilder>().addComponents(resolutionInput),
   );
 
-  await interaction.showModal(modal);
+  try {
+    await interaction.showModal(modal);
+  } catch (err) {
+    console.error('[Peaches] Failed to show resolution modal:', err);
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: 'Something went wrong showing the close form, sugar. Try again! 🍑', flags: 64 }).catch(() => {});
+    }
+  }
 }
 
 // ─────────────────────────────────────────
@@ -518,8 +525,17 @@ export async function handleTicketResolutionModal(interaction: ModalSubmitIntera
   const finalType = validTypes.includes(resolutionType) ? resolutionType : 'resolved';
 
   // Save resolution to ticket
-  if (resolution || finalType !== 'resolved') {
-    await updateTicketResolution(ticket.id, resolution ?? '', finalType);
+  try {
+    if (resolution || finalType !== 'resolved') {
+      await updateTicketResolution(ticket.id, resolution ?? '', finalType);
+    }
+  } catch (err) {
+    console.error('[Peaches] Failed to save ticket resolution:', err);
+    await interaction.reply({
+      content: "Couldn't save the resolution info, sugar. Please try closing again! 🍑",
+      flags: 64,
+    });
+    return;
   }
 
   await interaction.reply({
@@ -653,7 +669,14 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
     .setMaxLength(21);
 
   modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
-  await interaction.showModal(modal);
+  try {
+    await interaction.showModal(modal);
+  } catch (err) {
+    console.error('[Peaches] Failed to show add-user modal:', err);
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: 'Something went wrong showing the form, sugar. Try again! 🍑', flags: 64 }).catch(() => {});
+    }
+  }
 }
 
 // ─────────────────────────────────────────

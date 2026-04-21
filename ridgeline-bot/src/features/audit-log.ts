@@ -37,6 +37,8 @@ export type AuditAction =
   | 'suggestion_approve'
   | 'suggestion_deny'
   | 'suggestion_review'
+  | 'suggestion_in_progress'
+  | 'suggestion_implement'
   | 'member_timeout'
   | 'role_assign'
   | 'role_remove'
@@ -76,9 +78,11 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   warn_issue:         'Warning Issued',
   warn_clear:         'Warning Cleared',
   warning_clear_all:  'All Warnings Cleared',
-  suggestion_approve: 'Suggestion Approved',
-  suggestion_deny:    'Suggestion Denied',
-  suggestion_review:  'Suggestion Under Review',
+  suggestion_approve:     'Suggestion Approved',
+  suggestion_deny:        'Suggestion Denied',
+  suggestion_review:      'Suggestion Under Review',
+  suggestion_in_progress: 'Suggestion In Progress',
+  suggestion_implement:   'Suggestion Implemented',
   member_timeout:     'Member Timed Out',
   role_assign:        'Role Assigned',
   role_remove:        'Role Removed',
@@ -103,9 +107,11 @@ const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
   warn_issue:         0xFEE75C,
   warn_clear:         0x57F287,
   warning_clear_all:  0x57F287,
-  suggestion_approve: 0x57F287,
-  suggestion_deny:    0xED4245,
-  suggestion_review:  0xFEE75C,
+  suggestion_approve:     0x57F287,
+  suggestion_deny:        0xED4245,
+  suggestion_review:      0xFEE75C,
+  suggestion_in_progress: 0x3498DB,
+  suggestion_implement:   0xF1C40F,
   member_timeout:     0xED4245,
   role_assign:        0x5865F2,
   role_remove:        0xCC8844,
@@ -130,9 +136,11 @@ const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
   warn_issue:         '\u26A0\uFE0F',
   warn_clear:         '\u2705',
   warning_clear_all:  '\uD83E\uDDF9',
-  suggestion_approve: '\u2705',
-  suggestion_deny:    '\u274C',
-  suggestion_review:  '\uD83D\uDD0D',
+  suggestion_approve:     '\u2705',
+  suggestion_deny:        '\u274C',
+  suggestion_review:      '\uD83D\uDD0D',
+  suggestion_in_progress: '\uD83D\uDD27',
+  suggestion_implement:   '\uD83D\uDE80',
   member_timeout:     '\u23F1\uFE0F',
   role_assign:        '\u2795',
   role_remove:        '\u2796',

@@ -40,7 +40,11 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
             continue;
           }
 
-          await recordBirthdayPost(bp.discordUserId, currentYear);
+          const wasRecorded = await recordBirthdayPost(bp.discordUserId, currentYear);
+          if (!wasRecorded) {
+            console.log(`[Peaches] Birthday for ${bp.discordUserId} already recorded (concurrent run?) — skipping`);
+            continue;
+          }
 
           const charName = bp.characterName ?? member.displayName;
           const embed = new EmbedBuilder()

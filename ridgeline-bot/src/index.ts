@@ -51,7 +51,8 @@ async function main() {
     await runMigrations();
     console.log('[Peaches] Database migrations complete');
   } catch (err) {
-    console.error('[Peaches] Migration error (non-fatal):', err);
+    console.error('[Peaches] Migration failed — cannot start without database:', err);
+    process.exit(1);
   }
 
   const client = new Client({

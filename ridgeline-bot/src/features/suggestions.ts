@@ -128,6 +128,26 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
     return;
   }
 
+  const statusConfig = {
+    approved:      { color: 0x57F287, label: '✅ Approved',       emoji: '✅' },
+    denied:        { color: 0xED4245, label: '❌ Denied',         emoji: '❌' },
+    reviewing:     { color: 0xFEE75C, label: '🔍 Under Review',  emoji: '🔍' },
+    'implemented': { color: 0xF1C40F, label: '🚀 Implemented',   emoji: '🚀' },
+    'in-progress': { color: 0x3498DB, label: '🔧 In Progress',   emoji: '🔧' },
+  };
+  const cfg = statusConfig[status];
+
+  const reviewerName = interaction.member && 'displayName' in interaction.member
+    ? (interaction.member as GuildMember).displayName
+    : interaction.user.username;
+
+  // Check embed exists BEFORE updating DB to avoid inconsistent state
+  const originalEmbed = interaction.message.embeds[0];
+  if (!originalEmbed) {
+    await interaction.reply({ content: 'Could not update the suggestion embed. 🍑', flags: 64 });
+    return;
+  }
+
   await updateSuggestionStatus(suggestionId, status, interaction.user.id);
 
   // DM the suggester with the outcome
@@ -143,26 +163,6 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
     await suggester.send(dmMessages[status] ?? `Your suggestion #${suggestionId} status was updated to **${status}**.`).catch(() => {});
   } catch {
     // User may have DMs disabled — silently skip
-  }
-
-  const statusConfig = {
-    approved:      { color: 0x57F287, label: '✅ Approved',       emoji: '✅' },
-    denied:        { color: 0xED4245, label: '❌ Denied',         emoji: '❌' },
-    reviewing:     { color: 0xFEE75C, label: '🔍 Under Review',  emoji: '🔍' },
-    'implemented': { color: 0xF1C40F, label: '🚀 Implemented',   emoji: '🚀' },
-    'in-progress': { color: 0x3498DB, label: '🔧 In Progress',   emoji: '🔧' },
-  };
-  const cfg = statusConfig[status];
-
-  const reviewerName = interaction.member && 'displayName' in interaction.member
-    ? (interaction.member as GuildMember).displayName
-    : interaction.user.username;
-
-  // Rebuild embed with new status
-  const originalEmbed = interaction.message.embeds[0];
-  if (!originalEmbed) {
-    await interaction.reply({ content: 'Could not update the suggestion embed. 🍑', flags: 64 });
-    return;
   }
 
   const updatedEmbed = EmbedBuilder.from(originalEmbed)
@@ -193,7 +193,7 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   }
   console.log(`[Peaches] Suggestion #${suggestionId} ${status} by ${interaction.user.username}`);
 
-  const auditActionMap: Record<string, string> = { approved: 'suggestion_approve', denied: 'suggestion_deny', reviewing: 'suggestion_review', 'in-progress': 'suggestion_review', implemented: 'suggestion_approve' };
+  const auditActionMap: Record<string, string> = { approved: 'suggestion_approve', denied: 'suggestion_deny', reviewing: 'suggestion_review', 'in-progress': 'suggestion_in_progress', implemented: 'suggestion_implement' };
   if (interaction.guild) {
     logAuditEvent(_client, interaction.guild, {
       action: (auditActionMap[status] ?? 'suggestion_review') as import('./audit-log.js').AuditAction,

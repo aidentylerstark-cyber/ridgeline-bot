@@ -51,8 +51,16 @@ export function scheduleMilestoneCheck(client: Client): cron.ScheduledTask {
         if (!highestUnposted) continue;
 
         // Record ALL qualifying milestones (so lower tiers don't post on subsequent runs)
+        // Record the highest tier FIRST as the dedup gate — if it fails (concurrent run), skip
+        const wasRecorded = await recordMilestonePost(member.id, highestUnposted.days);
+        if (!wasRecorded) {
+          console.log(`[Peaches] Milestone ${highestUnposted.days}d for ${member.displayName} already recorded (concurrent run?) — skipping`);
+          continue;
+        }
         for (const m of unrecordedMilestones) {
-          await recordMilestonePost(member.id, m.days);
+          if (m.days !== highestUnposted.days) {
+            await recordMilestonePost(member.id, m.days);
+          }
         }
 
         // Only POST the highest tier
