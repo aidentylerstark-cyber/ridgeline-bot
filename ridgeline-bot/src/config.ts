@@ -59,6 +59,30 @@ export const CITIZEN_ROLE = 'Ridgeline Citizen';
 export const NEW_ARRIVAL_ROLE = 'New Arrival'; // Temporary role removed after 7 days
 export const BIRTHDAY_ROLE = 'Birthday';        // Temporary role assigned for 24h on birthday
 
+// Leadership highlighted in the welcome message. Resolved to clickable profile
+// mentions at runtime by Discord username; they are NOT pinged on each join.
+export const LEADERSHIP: { username: string; title: string; emoji: string }[] = [
+  { username: 'aiden.zip',           title: 'Owner',                          emoji: '👑' },
+  { username: 'misunderstoodbeauty', title: 'Community Manager & Lead Designer', emoji: '🎨' },
+];
+
+// ─────────────────────────────────────────
+// Anti-spam / troll guard (mention-spam raids)
+// ─────────────────────────────────────────
+export const ANTI_SPAM = {
+  windowMs: 10_000,          // sliding window for evaluating a user's activity
+  channelThreshold: 3,       // posting in this many distinct channels in the window → spam
+  messageThreshold: 6,       // this many messages in the window → spam
+  mentionSpamThreshold: 2,   // this many @everyone/@here/mass-mention messages in the window → spam
+  massMentionCount: 5,       // a single message with this many user/role mentions counts as mass-mention
+  timeoutMs: 24 * 60 * 60 * 1000, // auto-timeout duration (24h)
+  handledCooldownMs: 60_000, // don't re-trigger on the same user within this window
+};
+
+// Role or user pinged in the #mod-log troll report to review a ban. Resolved as a
+// role mention if the ID matches a guild role, otherwise a user mention.
+export const SPAM_ALERT_PING_ID = '1097007372918071419';
+
 export const SELF_ASSIGN_ROLES: Record<string, string[]> = {
   '\uD83D\uDD14 Notifications': [
     'Event Notifications',

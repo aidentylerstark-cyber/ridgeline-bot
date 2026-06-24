@@ -250,6 +250,9 @@ export async function runMigrations(): Promise<void> {
       )
     `);
 
+    // Severity column (added later — backfills existing rows to 'info')
+    await client.query(`ALTER TABLE discord_audit_log ADD COLUMN IF NOT EXISTS severity VARCHAR(10) NOT NULL DEFAULT 'info'`);
+
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_discord_audit_log_action
         ON discord_audit_log (action)

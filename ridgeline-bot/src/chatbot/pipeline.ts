@@ -33,7 +33,7 @@ ABOUT RIDGELINE:
 - Founded: June 25, 2025
 - Tagline: "Where Every Story Matters"
 - It's a realistic small-town roleplay community \u2014 think Friday Night Lights meets Gilmore Girls
-- The website is ridgelinesl.com
+- The website is ridgeline-sl.com
 - The community has over 200 members
 
 DISCORD CHANNELS (use Discord mention format <#ID>):

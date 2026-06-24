@@ -5,31 +5,6 @@ import {
 } from 'discord.js';
 import { GUILD_ID } from '../config.js';
 
-const AUDIT_LOG_ACTION_CHOICES = [
-  { name: 'Ticket Created', value: 'ticket_create' },
-  { name: 'Ticket Claimed', value: 'ticket_claim' },
-  { name: 'Ticket Unclaimed', value: 'ticket_unclaim' },
-  { name: 'Ticket Closed', value: 'ticket_close' },
-  { name: 'User Added to Ticket', value: 'ticket_add_user' },
-  { name: 'Ticket Close Denied', value: 'ticket_deny_close' },
-  { name: 'Ticket Priority Changed', value: 'ticket_priority' },
-  { name: 'Ticket Status Changed', value: 'ticket_status' },
-  { name: 'Ticket Note Added', value: 'ticket_note' },
-  { name: 'Ticket Reassigned', value: 'ticket_reassign' },
-  { name: 'Ticket Reopened', value: 'ticket_reopen' },
-  { name: 'Warning Issued', value: 'warn_issue' },
-  { name: 'Warning Cleared', value: 'warn_clear' },
-  { name: 'Suggestion Approved', value: 'suggestion_approve' },
-  { name: 'Suggestion Denied', value: 'suggestion_deny' },
-  { name: 'Suggestion Under Review', value: 'suggestion_review' },
-  { name: 'Member Timed Out', value: 'member_timeout' },
-  { name: 'Role Assigned', value: 'role_assign' },
-  { name: 'Role Removed', value: 'role_remove' },
-  { name: 'Announcement Posted', value: 'announce_post' },
-  { name: 'Member Joined', value: 'member_join' },
-  { name: 'Member Left', value: 'member_leave' },
-] as const;
-
 export async function registerSlashCommands(client: Client): Promise<void> {
   const guild = client.guilds.cache.get(GUILD_ID);
   if (!guild) {
@@ -162,9 +137,9 @@ export async function registerSlashCommands(client: Client): Promise<void> {
         )
         .addStringOption(opt =>
           opt.setName('action')
-            .setDescription('Filter by action type')
+            .setDescription('Filter by action type (type to search)')
             .setRequired(false)
-            .addChoices(...AUDIT_LOG_ACTION_CHOICES)
+            .setAutocomplete(true)
         )
         .addStringOption(opt =>
           opt.setName('after')
@@ -192,9 +167,9 @@ export async function registerSlashCommands(client: Client): Promise<void> {
         )
         .addStringOption(opt =>
           opt.setName('action')
-            .setDescription('Filter by action type')
+            .setDescription('Filter by action type (type to search)')
             .setRequired(false)
-            .addChoices(...AUDIT_LOG_ACTION_CHOICES)
+            .setAutocomplete(true)
         )
         .addStringOption(opt =>
           opt.setName('after')

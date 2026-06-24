@@ -10,6 +10,7 @@ import { postSuggestionPanel } from '../panels/suggestion-panel.js';
 import { postTriggerReference } from '../panels/trigger-reference.js';
 import { handleSetupBusinesses } from './setup-business.js';
 import { GLOBAL_STAFF_ROLES } from '../config.js';
+import { logAuditEvent } from './audit-log.js';
 
 /** Only Ridgeline Owner / First Lady can use /admin */
 function isOwner(member: GuildMember): boolean {
@@ -32,6 +33,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
       await interaction.deferReply({ flags: 64 });
       try {
         await reorganizeCategoryByKey(client, category);
+        if (interaction.guild) logAuditEvent(client, interaction.guild, {
+          action: 'admin_reorg', actorId: interaction.user.id,
+          details: `Reorganized category **${category}** (channels renamed)`, severity: 'warning',
+        });
         await interaction.editReply({ content: `\u2705 **${category}** reorganization complete! Channels have been renamed. \uD83C\uDF51` });
       } catch (err) {
         console.error('[Peaches] Admin reorg failed:', err);
@@ -45,6 +50,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
       await interaction.deferReply({ flags: 64 });
       try {
         await setChannelPermissions(client, category);
+        if (interaction.guild) logAuditEvent(client, interaction.guild, {
+          action: 'admin_permissions', actorId: interaction.user.id,
+          details: `Reset channel permissions for category **${category}**`, severity: 'warning',
+        });
         await interaction.editReply({ content: `\u2705 **${category}** permissions set! \uD83C\uDF51` });
       } catch (err) {
         console.error('[Peaches] Admin permissions failed:', err);
@@ -57,6 +66,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
       await interaction.deferReply({ flags: 64 });
       try {
         const result = await handleSetupBusinesses(client);
+        if (interaction.guild) logAuditEvent(client, interaction.guild, {
+          action: 'admin_setup', actorId: interaction.user.id,
+          details: `Ran business setup`, severity: 'warning',
+        });
         await interaction.editReply({ content: `✅ **Business setup complete!**\n${result} 🍑` });
       } catch (err) {
         console.error('[Peaches] Admin setup failed:', err);
@@ -89,6 +102,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
           default:
             await interaction.editReply({ content: `Unknown panel type, sugar.` });
         }
+        if (interaction.guild) logAuditEvent(client, interaction.guild, {
+          action: 'admin_panel', actorId: interaction.user.id,
+          details: `Posted **${panelType}** panel`,
+        });
       } catch (err) {
         console.error('[Peaches] Admin panel failed:', err);
         await interaction.editReply({ content: `Oh honey, that panel didn't want to cooperate. Check the logs for what went wrong! \uD83C\uDF51` });

@@ -32,7 +32,8 @@ src/
     birthdays.ts               — /birthday set/check/delete/upcoming — birthday registration & celebrations
     suggestions.ts             — /suggest — suggestion board with approve/deny/reviewing workflow
     warnings.ts                — /warn, /warnings, /clearwarn — user warning system
-    audit-log.ts               — /auditlog search/export/stats/config — comprehensive audit trail
+    anti-spam.ts               — Troll guard: detects mention-spam / cross-channel raids, auto-timeouts 24h, bulk-deletes, posts #mod-log report (pings SPAM_ALERT_PING_ID) with Ban/Kick/Remove-Timeout buttons. Staff exempt. Config: ANTI_SPAM in config.ts. Hooked in events/message.ts; buttons in events/interaction.ts (spam_ban_/spam_kick_/spam_untimeout_).
+    audit-log.ts               — /auditlog search/export/stats/config — comprehensive audit trail (60+ action types, severity, `action` filter uses autocomplete). Most gateway events (bans, kicks, role/timeout changes, msg delete/edit, voice, channel/role/thread/invite/webhook changes) are persisted to the DB by modlog.ts via logAuditEvent({ dbOnly }). Manual mod actions are attributed to the executing staff via Discord's native audit log (resolveExecutor); bot-initiated changes are deduped.
     region-monitoring.ts       — /region — SL region FPS/dilation alerts & daily summary
     userinfo.ts                — /userinfo — staff-only member overview (roles, warnings, tickets, onboarding, birthday, satisfaction)
     serverstats.ts             — /serverstats — public community stats (members, birthdays, tickets, satisfaction)
@@ -111,7 +112,7 @@ Global staff (all depts): Ridgeline Owner, First Lady, Ridgeline Management, Rid
 | discordMilestonePosts | Milestone dedup | discordUserId + milestoneDays (UNIQUE) |
 | discordBirthdayPosts | Birthday post dedup | discordUserId + year (UNIQUE) |
 | discordScheduledRoleRemovals | Auto role removal | discordUserId + roleName, removeAt |
-| discordAuditLog | Full audit trail | action, actorDiscordId, targetDiscordId, referenceId |
+| discordAuditLog | Full audit trail | action, actorDiscordId, targetDiscordId, referenceId, severity |
 | regionSnapshots | SL region history | regionName, fps, dilation, agentCount, eventType |
 | discordTicketFeedback | Satisfaction surveys | ticketId (FK), rating (1-5), comment |
 | discordOnboarding | Interactive DM onboarding state | userId (PK), characterName, interests, step, completedAt |

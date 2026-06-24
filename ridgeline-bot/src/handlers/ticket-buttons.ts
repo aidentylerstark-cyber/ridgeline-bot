@@ -8,12 +8,15 @@ import {
   TextInputStyle,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  UserSelectMenuBuilder,
   type ButtonInteraction,
   type ModalSubmitInteraction,
+  type UserSelectMenuInteraction,
   type Client,
   type GuildMember,
   type TextChannel,
 } from 'discord.js';
+import type { DiscordTicket } from '../db/schema.js';
 import * as storage from '../storage.js';
 import { updateTicketLastActivity } from '../storage.js';
 import {
@@ -629,7 +632,7 @@ export async function handleTicketCancelClose(interaction: ButtonInteraction) {
 }
 
 // ─────────────────────────────────────────
-// ticket_adduser — shows modal for user ID input
+// ticket_adduser — shows a member picker (user-select dropdown)
 // ─────────────────────────────────────────
 
 export async function handleTicketAddUser(interaction: ButtonInteraction, _client: Client) {
@@ -654,43 +657,41 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
     return;
   }
 
-  const addUserTicketId = String(ticket.ticketNumber).padStart(4, '0');
-  const modal = new ModalBuilder()
-    .setCustomId(`ticket_adduser_modal_${addUserTicketId}`)
-    .setTitle('Add User to Ticket');
+  // Present a native member picker — no copying user IDs.
+  const selectMenu = new UserSelectMenuBuilder()
+    .setCustomId('ticket_adduser_select')
+    .setPlaceholder('Pick a member to add to this ticket, sugar...')
+    .setMinValues(1)
+    .setMaxValues(1);
 
-  const input = new TextInputBuilder()
-    .setCustomId('ticket_adduser_input')
-    .setLabel('Discord User ID')
-    .setPlaceholder('Right-click a user → Copy User ID (e.g. 123456789012345678)')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setMinLength(17)
-    .setMaxLength(21);
+  const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(selectMenu);
 
-  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
   try {
-    await interaction.showModal(modal);
+    await interaction.reply({
+      content: '**Who would you like to add to this ticket?**',
+      components: [row],
+      flags: 64,
+    });
   } catch (err) {
-    console.error('[Peaches] Failed to show add-user modal:', err);
+    console.error('[Peaches] Failed to show add-user picker:', err);
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: 'Something went wrong showing the form, sugar. Try again! 🍑', flags: 64 }).catch(() => {});
+      await interaction.reply({ content: 'Something went wrong showing the picker, sugar. Try again! 🍑', flags: 64 }).catch(() => {});
     }
   }
 }
 
 // ─────────────────────────────────────────
-// ticket_adduser_modal submit
+// ticket_adduser_select — member chosen from dropdown
 // ─────────────────────────────────────────
 
-export async function handleTicketAddUserModal(interaction: ModalSubmitInteraction, _client: Client) {
-  if (!interaction.channelId) { console.warn('[Discord Bot] Modal interaction missing channelId (ticket_adduser_modal)'); return; }
-  // Defer immediately — DB/API calls below may exceed the 3-second interaction timeout
-  await interaction.deferReply({ flags: 64 });
+export async function handleTicketAddUserSelect(interaction: UserSelectMenuInteraction, client: Client) {
+  if (!interaction.channelId) { console.warn('[Discord Bot] Select interaction missing channelId (ticket_adduser_select)'); return; }
+  // Acknowledge the select immediately; we edit the original ephemeral reply below.
+  await interaction.deferUpdate();
 
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.editReply({ content: `This doesn't seem to be an active ticket, sugar.` });
+    await interaction.editReply({ content: `This doesn't seem to be an active ticket, sugar.`, components: [] });
     return;
   }
 
@@ -705,14 +706,9 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
     return;
   }
 
-  const rawInput = interaction.fields.getTextInputValue('ticket_adduser_input').trim();
-  // Accept a raw user ID or a <@mention>
-  const userId = rawInput.match(/^<@!?(\d+)>$/)?.[1] ?? (rawInput.match(/^\d{17,21}$/) ? rawInput : null);
-
+  const userId = interaction.values[0];
   if (!userId) {
-    await interaction.editReply({
-      content: `That doesn't look like a valid User ID, sugar! Right-click a user, hit "Copy User ID", and paste it in. \uD83C\uDF51`,
-    });
+    await interaction.editReply({ content: `No member selected, sugar! Try again. \uD83C\uDF51`, components: [] });
     return;
   }
 
@@ -753,13 +749,13 @@ export async function handleTicketAddUserModal(interaction: ModalSubmitInteracti
       EmbedLinks: true,
     });
 
-    await interaction.editReply({ content: `\uD83C\uDF51 ${targetMember} has been added to this ticket!` });
+    await interaction.editReply({ content: `\uD83C\uDF51 ${targetMember} has been added to this ticket!`, components: [] });
     await channel.send(`\uD83C\uDF51 ${targetMember} was added to this ticket by ${interaction.user}.`);
     console.log(`[Peaches] Ticket #${ticket.ticketNumber}: ${targetMember.displayName} added by ${interaction.user.displayName}`);
     updateTicketLastActivity(channel.id).catch(() => {});
 
     if (guild) {
-      logAuditEvent(_client, guild, {
+      logAuditEvent(client, guild, {
         action: 'ticket_add_user',
         actorId: member.id,
         targetId: targetMember.id,

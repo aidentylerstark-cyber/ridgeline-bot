@@ -10,7 +10,7 @@ import {
   handleTicketDenyClose,
   handleTicketCancelClose,
   handleTicketAddUser,
-  handleTicketAddUserModal,
+  handleTicketAddUserSelect,
   handleTicketResolutionModal,
 } from '../handlers/ticket-buttons.js';
 import { handleTicketDepartmentSelect, handleTicketModalSubmit } from '../handlers/ticket-modal.js';
@@ -21,7 +21,7 @@ import { handleBirthdayCommand } from '../features/birthdays.js';
 import { handleSuggestCommand, handleSuggestionReview } from '../features/suggestions.js';
 import { handleAnnounceCommand } from '../features/announce.js';
 import { handleWarnCommand, handleWarningsCommand, handleClearWarnCommand } from '../features/warnings.js';
-import { handleAuditLogCommand } from '../features/audit-log.js';
+import { handleAuditLogCommand, handleAuditLogAutocomplete } from '../features/audit-log.js';
 import { handleRegionCommand } from '../features/region-monitoring.js';
 import { handleTicketCommand } from '../features/ticket-commands.js';
 import { handleAdminCommand } from '../features/admin.js';
@@ -35,6 +35,7 @@ import {
   handleOnboardSkipDetails,
   handleOnboardModalSubmit,
 } from '../handlers/onboarding-buttons.js';
+import { handleSpamBan, handleSpamKick, handleSpamUntimeout } from '../features/anti-spam.js';
 import { CHANNELS } from '../config.js';
 import { isStaff } from '../utilities/permissions.js';
 
@@ -169,6 +170,10 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     // Ticket feedback buttons
     { match: 'ticket_rate_', handler: handleTicketRate },
     { match: 'ticket_comment_', handler: handleTicketCommentButton },
+    // Troll guard report actions (staff only)
+    { match: 'spam_ban_', handler: handleSpamBan },
+    { match: 'spam_kick_', handler: handleSpamKick },
+    { match: 'spam_untimeout_', handler: handleSpamUntimeout },
     // Onboarding flow buttons
     { match: 'onboard_start', exact: true, handler: handleOnboardStart },
     { match: 'onboard_rules_ack', exact: true, handler: handleOnboardRulesAck },
@@ -180,6 +185,12 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
     if (!isBotActive()) return;
 
     try {
+      // ── AUTOCOMPLETE INTERACTIONS ──
+      if (interaction.isAutocomplete()) {
+        if (interaction.commandName === 'auditlog') await handleAuditLogAutocomplete(interaction);
+        return;
+      }
+
       // ── SLASH COMMAND INTERACTIONS ──
       if (interaction.isChatInputCommand()) {
         const handler = SLASH_COMMANDS[interaction.commandName];
@@ -205,14 +216,19 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
         return;
       }
 
+      // ── USER SELECT MENU ──
+      if (interaction.isUserSelectMenu()) {
+        if (interaction.customId === 'ticket_adduser_select') {
+          await handleTicketAddUserSelect(interaction, client);
+          return;
+        }
+        return;
+      }
+
       // ── MODAL SUBMISSIONS ──
       if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('ticket_modal_')) {
           await handleTicketModalSubmit(interaction, client, ticketCooldowns);
-          return;
-        }
-        if (interaction.customId.startsWith('ticket_adduser_modal_')) {
-          await handleTicketAddUserModal(interaction, client);
           return;
         }
         if (interaction.customId.startsWith('ticket_resolution_modal_')) {

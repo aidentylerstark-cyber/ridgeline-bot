@@ -10,6 +10,7 @@ import {
 import * as storage from '../storage.js';
 import { isValidDepartment } from '../config.js';
 import { isStaffForTicket } from './tickets.js';
+import { logAuditEvent } from './audit-log.js';
 
 // ─────────────────────────────────────────
 // Quick Reply Templates
@@ -135,6 +136,10 @@ export async function handleQuickReply(interaction: ChatInputCommandInteraction,
     try {
       await channel.send(message);
       await selectInteraction.update({ content: `Quick reply sent! \uD83C\uDF51`, components: [] });
+      if (interaction.guild) logAuditEvent(client, interaction.guild, {
+        action: 'ticket_quickreply', actorId: member.id, channelId, referenceId: `#${ticket.ticketNumber}`,
+        details: `Sent "${template.label}" quick reply in ticket #${ticket.ticketNumber}`,
+      });
     } catch (err) {
       console.error('[Peaches] Failed to send quick reply:', err);
       try {

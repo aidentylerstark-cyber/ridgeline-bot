@@ -1,4 +1,4 @@
-import { ActivityType, ChannelType, EmbedBuilder, GuildVerificationLevel, REST, Routes, type Client, type TextChannel } from 'discord.js';
+import { ActivityType, ChannelType, EmbedBuilder, GuildSystemChannelFlags, GuildVerificationLevel, REST, Routes, type Client, type TextChannel } from 'discord.js';
 import { GUILD_ID, CHANNELS } from '../config.js';
 import { claimInstanceLock, startInstanceHeartbeat } from '../utilities/instance-lock.js';
 import { registerSlashCommands } from '../commands/index.js';
@@ -44,6 +44,26 @@ export function setupReadyHandler(client: Client) {
       }
     } catch {
       console.log('[Discord Bot] Could not set nickname (may already be set)');
+    }
+
+    // Suppress Discord's native "X joined — wave to say hi! 👋" system messages.
+    // Peaches posts her own welcome in #welcome, so the native ones are just clutter.
+    // Members can still react to the welcome message with any emoji. Idempotent — only
+    // writes when the flags aren't already set, and preserves other system-channel flags.
+    try {
+      const guild = client.guilds.cache.get(GUILD_ID);
+      if (guild) {
+        const desired = guild.systemChannelFlags.add(
+          GuildSystemChannelFlags.SuppressJoinNotifications,
+          GuildSystemChannelFlags.SuppressJoinNotificationReplies,
+        );
+        if (guild.systemChannelFlags.bitfield !== desired.bitfield) {
+          await guild.setSystemChannelFlags(desired);
+          console.log('[Discord Bot] Suppressed native join (wave) notifications — Peaches handles welcomes');
+        }
+      }
+    } catch (err) {
+      console.error('[Peaches] Could not suppress native join notifications (non-fatal):', err);
     }
 
     // Set activity

@@ -4,7 +4,7 @@ import { runMigrations } from './db/migrate.js';
 import { TICKET_COOLDOWN_MS } from './config.js';
 import { CooldownManager } from './utilities/cooldowns.js';
 import { setupReadyHandler, destroyStatsInterval } from './events/ready.js';
-import { setupMemberJoinHandler } from './events/member-join.js';
+import { setupMemberJoinHandler, destroyWelcomeQueue } from './events/member-join.js';
 import { setupInteractionHandler } from './events/interaction.js';
 import { setupMessageHandler, destroyMessageCooldowns } from './events/message.js';
 import { stopInstanceHeartbeat } from './utilities/instance-lock.js';
@@ -22,6 +22,7 @@ import { reorganizeCategoryByKey, setChannelPermissions } from './utilities/chan
 import { postSuggestionPanel } from './panels/suggestion-panel.js';
 import { setupModLog, clearRaidModeTimer } from './features/modlog.js';
 import { destroyAuditLogInterval } from './features/audit-log.js';
+import { destroyAntiSpam } from './features/anti-spam.js';
 import { startRegionWebhookServer } from './api/region-webhook.js';
 import { scheduleRegionDailySummary } from './scheduled/region-daily-summary.js';
 import { scheduleBirthdayMonthlySummary } from './scheduled/birthday-monthly-summary.js';
@@ -63,15 +64,22 @@ async function main() {
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildPresences,        // Required for online count in stats VCs (privileged — enable in Dev Portal)
       GatewayIntentBits.GuildModeration,       // Required for guildBanAdd/guildBanRemove events (mod log)
+      GatewayIntentBits.GuildVoiceStates,      // Required for voiceStateUpdate (audit log: voice join/leave/move)
+      GatewayIntentBits.GuildInvites,          // Required for inviteCreate/inviteDelete (audit log)
+      GatewayIntentBits.GuildWebhooks,         // Required for webhooksUpdate (audit log)
+      GatewayIntentBits.GuildEmojisAndStickers, // Required for emojiCreate/emojiDelete (audit log)
     ],
     partials: [
-      Partials.Message,  // Required so messageDelete fires for uncached messages (mod log)
+      Partials.Message,      // Required so messageDelete fires for uncached messages (mod log)
+      Partials.GuildMember,  // Reliable data for guildMemberRemove/Update on uncached members (audit log)
+      Partials.User,         // Reliable author data for uncached message edits/deletes (audit log)
     ],
     makeCache: Options.cacheWithLimits({
       MessageManager: 50,
       GuildEmojiManager: 0,
       GuildStickerManager: 0,
-      VoiceStateManager: 0,
+      // VoiceStateManager left at default (cached) so voiceStateUpdate can see the
+      // previous channel on leave/move — required for accurate voice audit logging.
       ThreadManager: 25,
     }),
     sweepers: {
@@ -134,6 +142,8 @@ async function main() {
     destroyAnnounceCooldowns();
     destroyStatsInterval();
     destroyAuditLogInterval();
+    destroyWelcomeQueue();
+    destroyAntiSpam();
     clearRaidModeTimer();
     regionServer.close();
     client.destroy();

@@ -13,6 +13,8 @@ import {
 } from 'discord.js';
 import * as storage from '../storage.js';
 import type { DiscordTicket } from '../db/schema.js';
+import { logAuditEvent } from '../features/audit-log.js';
+import { GUILD_ID } from '../config.js';
 
 // ─────────────────────────────────────────
 // Send satisfaction survey DM after ticket close
@@ -98,7 +100,7 @@ export async function sendTicketSurveyDM(
 // Handle rating button click
 // ─────────────────────────────────────────
 
-export async function handleTicketRate(interaction: ButtonInteraction, _client: Client): Promise<void> {
+export async function handleTicketRate(interaction: ButtonInteraction, client: Client): Promise<void> {
   // Parse: ticket_rate_{ticketId}_{rating}
   const parts = interaction.customId.split('_');
   const rating = parseInt(parts[parts.length - 1], 10);
@@ -127,10 +129,17 @@ export async function handleTicketRate(interaction: ButtonInteraction, _client: 
   // Save rating
   await storage.saveTicketFeedback(ticketId, rating);
 
+  // Feedback arrives via DM button, so resolve the guild from the client cache
+  const fbGuild = client.guilds.cache.get(GUILD_ID);
+  if (fbGuild) logAuditEvent(client, fbGuild, {
+    action: 'ticket_feedback', actorId: interaction.user.id, referenceId: `ticket:${ticketId}`,
+    details: `Rated ticket (id ${ticketId}) ${rating}/5 stars`,
+  });
+
   const stars = '\u2B50'.repeat(rating);
   const thankYouEmbed = new EmbedBuilder()
     .setColor(0x4A7C59)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: _client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setTitle("Thanks for the Feedback, Darlin'!")
     .setDescription(
       `You rated your experience: **${stars}** (${rating}/5)\n\n` +

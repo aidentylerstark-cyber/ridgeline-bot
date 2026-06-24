@@ -125,6 +125,7 @@ export const discordAuditLog = pgTable('discord_audit_log', {
   details: text('details').notNull(),
   channelId: varchar('channel_id', { length: 30 }),
   referenceId: varchar('reference_id', { length: 100 }),
+  severity: varchar('severity', { length: 10 }).notNull().default('info'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 

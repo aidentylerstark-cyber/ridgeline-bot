@@ -103,6 +103,11 @@ export async function handleSuggestCommand(interaction: ChatInputCommandInteract
   // Update suggestion with the posted message/thread ID
   if (postedId) await updateSuggestionMessageId(suggestion.id, postedId);
 
+  if (interaction.guild) logAuditEvent(_client, interaction.guild, {
+    action: 'suggestion_create', actorId: interaction.user.id, referenceId: `#${suggestion.id}`,
+    details: `Submitted suggestion #${suggestion.id}: ${idea.slice(0, 150)}`,
+  });
+
   await interaction.editReply({ content: `✅ Your suggestion has been submitted to <#${CHANNELS.suggestions}>! Thanks for helping make Ridgeline better, sugar! 🍑` });
   console.log(`[Peaches] Suggestion #${suggestion.id} submitted by ${interaction.user.username}`);
 }

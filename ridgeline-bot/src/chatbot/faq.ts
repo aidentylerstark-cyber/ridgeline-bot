@@ -34,7 +34,7 @@ const RAW_FAQ: Array<{ triggers: string[]; response: string }> = [
   },
   {
     triggers: ['website', 'the website', 'ridgeline website', 'the site', 'your site', 'ridgeline site'],
-    response: `Our website is at **ridgelinesl.com** \u2014 property listings, community news, the works. It's fancier than a Sunday hat, and that's sayin' somethin'. \uD83C\uDF10`,
+    response: `Our website is at **ridgeline-sl.com** \u2014 property listings, community news, the works. It's fancier than a Sunday hat, and that's sayin' somethin'. \uD83C\uDF10`,
   },
   {
     triggers: ['character name', 'character intro', 'create a character', 'my character', 'introduce myself'],

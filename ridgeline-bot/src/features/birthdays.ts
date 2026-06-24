@@ -1,5 +1,6 @@
 import { EmbedBuilder, type ChatInputCommandInteraction, type Client } from 'discord.js';
 import * as storage from '../storage.js';
+import { logAuditEvent } from './audit-log.js';
 
 // ─────────────────────────────────────────
 // Birthday Date Parsing
@@ -82,6 +83,10 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
       return;
     }
     await registerBirthday(interaction.user.id, parsed.month, parsed.day);
+    if (client && interaction.guild) logAuditEvent(client, interaction.guild, {
+      action: 'birthday_set', actorId: interaction.user.id, targetId: interaction.user.id,
+      details: `Set birthday to ${formatBirthdayDate(parsed.month, parsed.day)}`,
+    });
     await interaction.reply({
       content: `🎂 Got it! I've written down **${formatBirthdayDate(parsed.month, parsed.day)}** for you. I'll make sure the whole town knows when your big day arrives! 🍑`,
       flags: 64,
@@ -108,6 +113,10 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
   if (sub === 'delete') {
     const deleted = await storage.deleteBirthday(interaction.user.id);
     if (deleted) {
+      if (client && interaction.guild) logAuditEvent(client, interaction.guild, {
+        action: 'birthday_delete', actorId: interaction.user.id, targetId: interaction.user.id,
+        details: `Removed their birthday from the registry`,
+      });
       await interaction.reply({
         content: `🗑️ Your birthday has been removed from the records, sugar. You can always re-register with \`/birthday set\`! 🍑`,
         flags: 64,

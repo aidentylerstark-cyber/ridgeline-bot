@@ -3,6 +3,7 @@ import { GUILD_ID, CHANNELS, TICKET_CATEGORIES, CHATBOT_DENIED_CHANNELS } from '
 import { CooldownManager } from '../utilities/cooldowns.js';
 import { isBotActive } from '../utilities/instance-lock.js';
 import { processChatbotMessage } from '../chatbot/pipeline.js';
+import { handleSpamCheck } from '../features/anti-spam.js';
 import { updateTicketLastActivity, updateFirstResponseTime } from '../storage.js';
 import { GLOBAL_STAFF_ROLES } from '../config.js';
 
@@ -38,6 +39,9 @@ export function setupMessageHandler(client: Client) {
     }
     if (message.guild.id !== GUILD_ID) return;
     if (!isBotActive()) return; // Another instance took over — stop processing
+
+    // Troll guard: catch mention-spam / cross-channel raids before anything else.
+    if (await handleSpamCheck(message, client)) return;
 
     // Check if message is in a ticket channel (child of a ticket category)
     const parentId = 'parentId' in message.channel ? message.channel.parentId : null;
