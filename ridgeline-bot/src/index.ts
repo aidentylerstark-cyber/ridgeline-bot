@@ -31,6 +31,18 @@ import { destroySuggestCooldowns } from './features/suggestions.js';
 import { destroyAnnounceCooldowns } from './features/announce.js';
 import { pool } from './db/index.js';
 
+// Single-instance guard: the live bot runs ONLY on Railway. A second instance on
+// the same token (e.g. a Replit Deployment) fights Railway over the DB instance-lock,
+// flapping the gateway connection and causing "This interaction failed" for users.
+// Railway never sets REPLIT_DEPLOYMENT; Replit Deployments do. The Replit dev Run
+// button (npm run dev) does NOT set it, so local editing still works. Override with
+// ALLOW_REPLIT_BOT=true if you ever intentionally want Replit to be the primary host.
+if (process.env.REPLIT_DEPLOYMENT && process.env.ALLOW_REPLIT_BOT !== 'true') {
+  console.error('[Peaches] Refusing to start on a Replit Deployment — Railway is the primary instance. ' +
+    'Set ALLOW_REPLIT_BOT=true to override.');
+  process.exit(0);
+}
+
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) {
   console.error('[Peaches] No DISCORD_BOT_TOKEN found — cannot start bot');
