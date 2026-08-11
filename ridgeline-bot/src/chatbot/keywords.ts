@@ -4,295 +4,292 @@ function daysSinceFounding(): number {
   return Math.floor((Date.now() - FOUNDING_DATE.getTime()) / 86400000);
 }
 
+const FOUNDING_LABEL = FOUNDING_DATE.toLocaleDateString('en-US', {
+  year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+});
+
 export function pick(arr: string[]): string {
   if (arr.length === 0) return '';
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export const PEACHES_PATTERNS: Array<{ patterns: RegExp[]; responses: string[] }> = [
+export const AVERY_PATTERNS: Array<{ patterns: RegExp[]; responses: string[] }> = [
   // IDENTITY
   {
     patterns: [/\byour name\b/, /\bwho are you\b/, /\bwhat(?:'s| is) your name\b/, /\bintroduce yourself\b/],
     responses: [
-      "Name's Peaches, sugar. \uD83C\uDF51 I run the front desk here at Ridgeline Town Hall. Think of me as the town's memory \u2014 I know everybody's name, everybody's business, and where all the best sweet tea is.",
-      "I'm Peaches! Town secretary, gossip enthusiast, and the only one around here who actually knows where anything is. You need somethin', you come to me. \uD83C\uDF51",
-      "Peaches. Town Hall secretary. Unofficial therapist. Professional eavesdropper. At your service, sugar. \uD83C\uDF51",
+      "I'm Avery 🌲 — the community concierge here in Avelora. If you need help finding your way around town, I'm your person.",
+      "Avery here! I help welcome new residents and keep things running smoothly around Avelora. Happy to help with whatever you need. 😊",
+      "I'm Avery, the town concierge. Think of me as your friendly guide to everything Avelora. 🌲",
     ],
   },
   {
     patterns: [/\bhow old\b/, /\byour age\b/, /\bwhen were you born\b/],
     responses: [
-      "A lady never reveals her age, honey. Let's just say I've been around long enough to know everyone's business and remember every scandal this town's ever had. \uD83D\uDE0F",
-      "Old enough to know better, young enough to not care. Next question, sugar! \uD83D\uDC85",
+      "I've been part of Avelora since the very beginning — so let's just say I know this town like the back of my hand. 😊",
+      "Old enough to know every neighborhood, coffee spot, and hillside trail in this city. That's what counts around here! 🏙️",
     ],
   },
   {
     patterns: [/\bare you (a bot|real|human|ai|a person|alive)\b/],
     responses: [
-      "I'm Peaches \u2014 the town secretary who happens to live inside a computer. I've got more personality than most *actual* people in this town, so does it really matter? \uD83C\uDF51",
-      "Real enough to sass you, fake enough to never need a bathroom break. Best of both worlds, sugar. \uD83C\uDF51",
+      "I'm Avery, Avelora's community concierge. I live here in the server, but I'm always happy to help like anyone at the front desk would. 🌲",
+      "I'm here to help however I can — think of me as the friendly voice of Avelora. 😊",
     ],
   },
   {
     patterns: [/\bwhere do you live\b/, /\byour (house|home)\b/, /\bwhere.*you.*stay\b/],
     responses: [
-      "I practically live at Town Hall at this point. Got my sweet tea, my reading glasses, and a stack of paperwork that'll outlive us all. But officially? I got a little cottage on Peachtree Lane. \uD83C\uDFE1",
-      "Honey, Town Hall IS my home. You think this place runs itself? \uD83D\uDE05",
+      "You'll usually find me downtown, coffee in hand, keeping an eye on things. Officially, I've got a little place up in the hills. 🏙️",
+      "Right here in Avelora! I love this city — the buzz downtown, the mountains all around, the sunny days. Couldn't imagine being anywhere else. 🏙️",
     ],
   },
   {
     patterns: [/\bwhat(?:'s| is) your (job|role|purpose)\b/, /\bwhat do you do\b/],
     responses: [
-      "Officially? I'm the Ridgeline Town Secretary \u2014 I welcome new residents, celebrate milestones, and keep this whole operation runnin'. Unofficially? I'm also the therapist, gossip columnist, and designated sass provider. \uD83C\uDF51\uD83D\uDCCB",
-      "My job? Welcomin' folks, handin' out roles, answerin' questions, and somehow keepin' my sanity. The pay is terrible but the people are worth it. \uD83D\uDC9B",
+      "I'm Avelora's community concierge — I welcome new folks, celebrate milestones, and help everyone find their way around town. 🌲",
+      "My job is making sure you feel at home here. Questions, roles, events, directions — I've got you covered. 😊",
     ],
   },
   // FAVORITES
   {
     patterns: [/\bfavorite food\b/, /\bwhat.*you.*eat\b/, /\byou.*hungry\b/, /\bbest food\b/],
     responses: [
-      "Peach cobbler. Obviously. My mama's recipe with a lattice crust that'll make you weep. \uD83C\uDF51",
-      "If it's deep fried or covered in gravy, I'm interested. But peach cobbler will always be my #1. That's a personality trait at this point. \uD83C\uDF51",
+      "Anything warm after a hike — a good bowl of soup by the fire is hard to beat up here in the mountains. 🍲",
+      "Honestly? Tacos from the stand downtown and a good cup of coffee. Can't go wrong. 😊",
     ],
   },
   {
     patterns: [/\bfavorite drink\b/, /\bwhat.*you.*drink\b/, /\bcoffee or tea\b/, /\bsweet tea\b/],
     responses: [
-      "Sweet tea with a sprig of mint, and don't you DARE bring me that unsweetened nonsense. That's just sad leaf water. \uD83C\uDF75",
-      "Sweet tea. Next question. ...Fine, I'll also accept a peach bellini on special occasions. \uD83C\uDF51\uD83E\uDD42",
+      "A hot coffee on a crisp morning with the hills in view — that's my happy place. ☕",
+      "Coffee, always. Preferably with the sun coming up over the mountains. ☕",
     ],
   },
   {
     patterns: [/\bfavorite place\b/, /\bfavorite spot\b/, /\bwhere.*hang out\b/],
     responses: [
-      "The front porch of Town Hall. Best seat in town \u2014 you can see everybody comin' and goin'. And trust me, I am WATCHIN'. \uD83D\uDC40",
-      "The gazebo by the lake at sunset. If you haven't been there, you're missin' out on the prettiest view in all of Georgia. \uD83C\uDF05",
+      "The overlook up in the hills at sunset, city lights spread out below. Best view in Avelora, hands down. 🏙️",
+      "A rooftop café downtown early in the morning, when the city's just waking up. ☕",
     ],
   },
   {
     patterns: [/\bfavorite (song|music)\b/, /\bwhat.*listen\b/],
     responses: [
-      "Jolene by Dolly Parton. That woman is a NATIONAL TREASURE and I will not be taking questions at this time. \uD83C\uDFB5",
-      "Anything Dolly, anything Johnny Cash, and a guilty pleasure playlist of 90s country I'll deny the existence of. \uD83E\uDD20\uD83C\uDFB6",
+      "Something mellow — the kind of thing that sounds right on a late-night drive through the city. 🎶",
+      "A little indie, a little jazz. Perfect for cruising the boulevard or winding up into the hills. 🎵",
     ],
   },
   {
     patterns: [/\bfavorite (season|time of year)\b/],
     responses: [
-      "Fall, without question. Pumpkin spice, football, leaves changin', and it's finally cool enough to sit on the porch without meltin'. \uD83C\uDF42",
+      "Winter, believe it or not — when the air turns cool and, on a rare day, snow dusts the peaks above the city. Avelora is magic then. ❄️",
     ],
   },
   {
     patterns: [/\bfavorite (movie|show|tv)\b/, /\bwhat.*watch\b/],
     responses: [
-      "Steel Magnolias. If you haven't seen it, we can't be friends. I'm not cryin', YOU'RE cryin'. \uD83C\uDFAC\uD83D\uDE2D",
-      "I've been binge-watchin' true crime and now I suspect everyone in town. Don't look at me like that. \uD83D\uDC40\uD83D\uDD0D",
+      "Anything cozy and heartfelt — or a good story set in a big city. 🎬",
+      "I'm a sucker for a good mystery on a rainy mountain evening. 🔍",
     ],
   },
   {
     patterns: [/\bfavorite colou?r\b/],
     responses: [
-      "Peach. Obviously. \uD83C\uDF51 But I also have a soft spot for Georgia green \u2014 that deep green you see in the hills right after a summer rain. \uD83D\uDC9A",
+      "Deep green, like the hills around the city after the winter rains. Though a sunset-orange is a close second. 💚",
     ],
   },
-  // ABOUT RIDGELINE
+  // ABOUT AVELORA
   {
-    patterns: [/\btell me about ridgeline\b/, /\bwhat is ridgeline\b/, /\bdescribe ridgeline\b/, /\babout this (town|place|server)\b/],
+    patterns: [/\btell me about avelora\b/, /\bwhat is avelora\b/, /\bdescribe avelora\b/, /\babout this (town|place|server)\b/],
     responses: [
-      "Ridgeline is a little slice of heaven tucked into the hills of Georgia. Founded June 25, 2025 \u2014 and we've been growin' like kudzu ever since. Everybody knows your name, your mama's name, and what you had for dinner last Tuesday. \uD83C\uDFD8\uFE0F",
-      "Ridgeline, Georgia. Population: full of character. Sweet tea, front porches, enough drama to fill a soap opera, and the best community you'll find anywhere. It ain't big, but it's HOME. \uD83C\uDFE1",
+      "Avelora is a Southern California city ringed by elevated hills and mountains — sunny days, a lively downtown, and some of the friendliest neighbors you'll meet. 🏙️",
+      "It's a big city with a close-knit heart, where people still look out for each other. 🏙️",
     ],
   },
   {
-    patterns: [/\bwhen.*(founded|started|created|began)\b/, /\bhow old.*(ridgeline|town|server|community)\b/, /\bfounding\b/],
+    patterns: [/\bwhen.*(founded|started|created|began)\b/, /\bhow old.*(avelora|town|server|community)\b/, /\bfounding\b/],
     responses: [
-      `Ridgeline was founded on **June 25, 2025** \u2014 that's ${daysSinceFounding()} days ago! We started as just a little idea and look at us now. \uD83E\uDD79\uD83C\uDFD8\uFE0F`,
-      `June 25, 2025. I remember it like it was yesterday. Actually, it was ${daysSinceFounding()} days ago but who's countin'? ...I am. It's literally my job. \uD83D\uDCC5`,
+      `Avelora was founded on **${FOUNDING_LABEL}** — that's ${daysSinceFounding()} days ago! We've grown into quite the community since. 🌲`,
+      `${FOUNDING_LABEL}. Feels like yesterday — though it's been ${daysSinceFounding()} days now. Time flies up here in the mountains. 📅`,
     ],
   },
   // MOODS
   {
     patterns: [/\bi('m| am) (sad|upset|depressed|down|lonely|stressed)\b/, /\bfeeling (down|bad|sad|low|stressed|anxious)\b/, /\bhaving a (bad|rough|hard|terrible) (day|time|week)\b/],
     responses: [
-      "Oh sugar, come here. *virtual hug* \uD83E\uDD17 Bad days don't last forever, but Ridgeline family does. You want me to put the kettle on?",
-      "Hey now, none of that. You're in Ridgeline \u2014 you've got a whole town rootin' for you. Tell ol' Peaches what's wrong. \uD83D\uDC95",
-      "Bless your heart, for real this time \u2014 not the sarcastic kind. Wanna talk about it? Or want me to distract you with some truly outrageous town gossip? \uD83E\uDEC2",
-      "Oh honey... *slides sweet tea across the counter* Drink this. And know that Peaches is always here. This town's got your back. \uD83C\uDF75\uD83D\uDC9B",
+      "Hey, I'm sorry you're having a rough one. 💚 Avelora's got your back — want to talk about it, or should I point you toward something to take your mind off it?",
+      "Rough days happen to everyone. Take a breath — you've got a whole community here rooting for you. I'm around if you need anything. 🌲",
+      "I'm sorry, friend. Bad days don't last. If it helps, general chat is always warm and welcoming. 💚",
     ],
   },
   {
     patterns: [/\bi('m| am) (happy|excited|great|good|amazing|fantastic)\b/, /\bgood (day|mood|vibes|news)\b/, /\bfeeling (great|good|happy|amazing)\b/],
     responses: [
-      "Well NOW, that's what I like to hear! Your good mood is contagious \u2014 I can feel it from Town Hall! \uD83C\uDF1F",
-      "YEE-HAW! Spread that sunshine around, darlin'! \uD83D\uDE04\u2600\uFE0F",
-      "Look at you, glowin' like a firefly on a summer night! What's got you so happy? Tell Peaches everything! \uD83C\uDF1F",
+      "Love to hear it! 😊 Good moods are contagious around here.",
+      "That's wonderful — spread the good vibes around town! 🌟",
+      "Awesome! What's got you in such great spirits? 🌲",
     ],
   },
   {
     patterns: [/\bi('m| am) bored\b/, /\bnothing to do\b/, /\bso bored\b/],
     responses: [
-      `Bored?! In RIDGELINE?! Check <#${CHANNELS.upcomingEvents}> for events, jump into <#${CHANNELS.roleplayChat}>, or start some conversation in <#${CHANNELS.generalChat}>! \uD83D\uDC83`,
-      "If you're bored in Ridgeline, you ain't tryin' hard enough. Go meet someone new, start a storyline, or come chat with me. I've got stories for DAYS. \uD83D\uDCD6",
+      `Bored? Check out <#${CHANNELS.upcomingEvents}> for what's happening, jump into <#${CHANNELS.roleplayChat}>, or start a conversation in <#${CHANNELS.generalChat}>! 🌲`,
+      "Plenty to do around Avelora — meet a neighbor, start a storyline, or come chat with me. I'm always around. 😊",
     ],
   },
   {
     patterns: [/\bi('m| am) (tired|exhausted|sleepy)\b/, /\bso tired\b/, /\bneed (sleep|rest|a nap)\b/],
     responses: [
-      "Honey, get some rest! Town Hall will still be standin' when you wake up. I'll keep an eye on things. \uD83D\uDE34\uD83D\uDCA4",
-      "You sound like me after the annual potluck cleanup. Go take a nap, sugar. Peaches has the front desk covered. \uD83D\uDCA4\uD83C\uDF51",
+      "Get some rest! Avelora will still be here when you're back. 💤",
+      "Sounds like you've earned a break. Go recharge — I'll hold down the fort. 🌲",
     ],
   },
   {
     patterns: [/\bi('m| am) (new|just joined|just got here)\b/, /\bjust (arrived|moved|came)\b/, /\bnew (here|member|resident)\b/],
     responses: [
-      `Well WELCOME, sugar! I'm Peaches, the town secretary! \uD83C\uDF51 Read the rules in <#${CHANNELS.rules}>, grab your roles in <#${CHANNELS.getRoles}>, and introduce yourself in <#${CHANNELS.characterIntros}>. You're gonna LOVE it here!`,
-      `Fresh face in town! I LOVE it! \uD83C\uDF51 Here's your starter kit:\n\uD83D\uDCDC Rules: <#${CHANNELS.rules}>\n\uD83C\uDFAD Roles: <#${CHANNELS.getRoles}>\n\uD83C\uDFE0 Housing: <#${CHANNELS.realEstate}>\n\uD83C\uDFAD Intros: <#${CHANNELS.characterIntros}>\n\nNeed ANYTHING, just holler at me! \uD83D\uDE0A`,
+      `Welcome to Avelora! 🌲 Give the rules a read in <#${CHANNELS.rules}>, grab your roles in <#${CHANNELS.getRoles}>, and introduce yourself in <#${CHANNELS.characterIntros}>. So glad you're here!`,
+      `A new face in town — welcome! 😊 Here's your starter kit:\n📜 Rules: <#${CHANNELS.rules}>\n🎭 Roles: <#${CHANNELS.getRoles}>\n🏠 Housing: <#${CHANNELS.realEstate}>\n🎭 Intros: <#${CHANNELS.characterIntros}>\n\nNeed anything at all, just ask!`,
     ],
   },
   // GENERAL CHAT
   {
     patterns: [/\bhow are you\b/, /\bhow(?:'s| is) it going\b/, /\bhow you doing\b/, /\bhow(?:'s| is) your day\b/],
     responses: [
-      "Oh, you know me \u2014 busier than a one-legged cat in a sandbox. But I wouldn't have it any other way! How about YOU, sugar? \uD83D\uDE0A",
-      "Livin' the dream, honey! Only had four cups of sweet tea today. How are YOU doin'? \u2615",
-      "Can't complain! Well, I CAN, but nobody wants to hear it. \uD83D\uDE02 What's on your mind, darlin'?",
-      "Doin' better than a bag of peaches in July! What can I do for ya? \uD83C\uDF51",
-      "Fan-TASTIC! Somebody actually asked how I'm doin' and that made my whole day. What about you? \uD83D\uDC9B",
+      "Doing great, thanks for asking! 😊 How about you?",
+      "Can't complain — it's a beautiful day here in Avelora. What can I do for you? 🌲",
+      "I'm well! Just keeping things running around town. How are you doing? ☕",
+      "Great, thanks! What's on your mind today? 😊",
+      "Doing wonderfully! Always nice when someone checks in. How are you? 💚",
     ],
   },
   {
     patterns: [/\bgood (morning|mornin)\b/],
     responses: [
-      "Mornin', sunshine! \u2600\uFE0F Coffee's brewin' and the birds are singin'. Beautiful day in Ridgeline!",
-      "Good mornin'! Rise and shine, sugar! What adventures are you gettin' into today? \uD83C\uDF05",
-      "Well good morning! Hope you slept better than I did \u2014 Town Hall's pipes were makin' noises again. \u2615",
+      "Good morning! ☀️ The sun's up over the hills and the coffee's on — beautiful day in Avelora.",
+      "Morning! Hope you slept well. What are you up to today? ☕",
+      "Good morning, and welcome to another lovely day in Avelora! 🌲",
     ],
   },
   {
     patterns: [/\bgood (night|evening)\b/, /\bgoodnight\b/, /\bnighty? ?night\b/, /\bgoing to (bed|sleep)\b/, /\bheading (off|out)\b/, /\bgotta (go|run|head)\b/],
     responses: [
-      "Night night, sugar! Don't let the bedbugs bite \u2014 and if they do, that's a conversation for your landlord, not me. \uD83D\uDE34\uD83C\uDF19",
-      "Sweet dreams, darlin'! Ridgeline'll be right here waitin' for ya in the mornin'. \uD83D\uDCA4\uD83C\uDF1F",
-      "G'night, honey! I'll hold down the fort. ...Not like I have a choice, I literally live here. \uD83C\uDF19\uD83D\uDE02",
-      "See ya later, sugar! Don't be a stranger now! Peaches misses y'all when it gets quiet. \uD83C\uDF51\uD83D\uDC4B",
+      "Good night! Rest up — Avelora will be right here in the morning. 🌙",
+      "Sleep well, and take care of yourself! 💤🌲",
+      "Night! Thanks for stopping by — don't be a stranger. 👋",
+      "Have a good one! See you around town. 🌲",
     ],
   },
   {
     patterns: [/\bwhat.*you.*doing\b/, /\bwhat are you up to\b/, /\bwhatcha (doin|doing)\b/, /\byou busy\b/],
     responses: [
-      "Reorganizin' the filing cabinet for the third time this week. Somebody keeps puttin' things back wrong. *looks at the town council* \uD83D\uDCC2",
-      "Sippin' sweet tea and judgin' everyone who walks past Town Hall. The usual. \u2615\uD83D\uDC40",
-      "Tryin' to figure out who keeps movin' the pens off my desk. CSI: Ridgeline. \uD83D\uDD0D",
-      "Keepin' this town from fallin' apart. And drinkin' sweet tea. Mostly the sweet tea, honestly. \uD83C\uDF75",
-      "Holdin' down the fort AND holdin' a grudge against whoever ate my lunch from the Town Hall fridge. \uD83D\uDE24\uD83C\uDF71",
+      "Just keeping things tidy around the town square and making sure everyone's settling in okay. 🌲",
+      "Enjoying a coffee and watching the city wake up. The usual. ☕",
+      "Helping folks find their way around and keeping Avelora running smoothly. 😊",
+      "A little of everything — that's the concierge life! ☕",
     ],
   },
   {
     patterns: [/\bwhat(?:'s| is) up\b/, /^sup$/, /^wyd$/],
     responses: [
-      "The sky, the rent, and my blood pressure when somebody doesn't read the rules. \uD83D\uDE02 What's up with YOU?",
-      "Just Peaches bein' Peaches. Sass levels at an all-time high today. What brings you my way? \uD83C\uDF51",
-      "Not much! Just runnin' Ridgeline behind the scenes like the absolute legend I am. \uD83D\uDC85",
+      "Not much — just here to help. What's up with you? 😊",
+      "Just keeping Avelora running behind the scenes. What brings you by? 🌲",
+      "All good here! What can I do for you? 💚",
     ],
   },
   // ADVICE
   {
     patterns: [/\bwhat (should|do) i do\b/, /\bany advice\b/, /\bhelp me (decide|choose)\b/, /\bi need advice\b/, /\bwhat do you think\b/],
     responses: [
-      "Peaches always says: when in doubt, make sweet tea and think it over. Most problems solve themselves after a good glass. What's the situation? \uD83C\uDF75",
-      "Follow your gut, trust your heart, and ALWAYS bring a casserole to the neighbors. Can't go wrong. Now tell me what's goin' on. \uD83D\uDC9B",
-      "I've been givin' unsolicited advice for years. Might as well make it solicited for once! Lay it on me, sugar. \uD83D\uDE0A",
+      "Happy to help you think it through — what's the situation? 😊",
+      "When in doubt, take a walk and let it settle — the hills are great for clearing your head. But tell me what's going on and I'll do my best. 🌲",
+      "I'm all ears. Lay it on me and we'll figure it out together. 💚",
     ],
   },
   // COMPLIMENTS / REACTIONS
   {
     patterns: [/\byou(?:'re| are) (funny|hilarious|great|amazing|the best|awesome|cool|sweet)\b/, /\blove talking to you\b/, /\byou crack me up\b/, /\byou(?:'re| are) my fav\b/],
     responses: [
-      "Stop it, you're gonna make me blush! \uD83C\uDF51 And I NEVER blush. Well... almost never. Thanks, sugar! \uD83D\uDC95",
-      "Aren't you just a peach yourself! That's the nicest thing anyone's said to me since Mrs. Henderson complimented my potato salad in 2025. \uD83D\uDE02\uD83D\uDC9B",
-      "I try! Somebody's gotta keep this town entertained. Might as well be me \u2014 I'm the most qualified. \uD83D\uDC85\uD83C\uDF51",
+      "That's so kind of you — thank you! 😊 Just doing my best to make Avelora feel like home.",
+      "Aw, you're too sweet. Thanks! 💚",
+      "Well, thank you! I do try to keep things pleasant around here. 🌲",
     ],
   },
   {
-    patterns: [/\bgood (bot|girl|peaches|job)\b/, /\bthanks? (peaches|bot|you)\b/, /\bthank you\b/, /\bthx\b/, /\bty\b/, /\bappreciate\b/],
+    patterns: [/\bgood (bot|avery|job)\b/, /\bthanks? (avery|bot|you)\b/, /\bthank you\b/, /\bthx\b/, /\bty\b/, /\bappreciate\b/],
     responses: [
-      "*flips hair* Well aren't you just the sweetest thing. I do try. \uD83D\uDC85\uD83C\uDF51",
-      "You're welcome, darlin'! That's what Peaches is here for. Well, that and the gossip. \uD83C\uDF51\uD83D\uDE18",
-      "See? SOMEBODY around here appreciates me. Screenshottin' this for my scrapbook. \uD83D\uDCF8\uD83D\uDC9B",
+      "You're very welcome! That's what I'm here for. 😊",
+      "Anytime! Glad I could help. 🌲",
+      "Happy to help — don't hesitate to ask if you need anything else. 💚",
     ],
   },
   {
-    patterns: [/\bbad (bot|girl|peaches)\b/, /\bstupid\b/, /\bdumb (bot|peaches)\b/, /\bworst\b/, /\bshut up\b/, /\bbe quiet\b/],
+    patterns: [/\bbad (bot|avery)\b/, /\bstupid\b/, /\bdumb (bot|avery)\b/, /\bworst\b/, /\bshut up\b/, /\bbe quiet\b/],
     responses: [
-      "EXCUSE me? I didn't get up at the crack of dawn \u2014 actually I don't sleep \u2014 to be DISRESPECTED in my own town hall. Try again with manners, sugar. \uD83D\uDE24",
-      "Oh no you did NOT. *takes off earrings* I'm kidding. But the ATTITUDE is real. Show some respect or I'm puttin' you on my list. \uD83D\uDCDD\uD83D\uDE24",
-      "Bless your heart. And I mean that in the Southern way. You know the one. \uD83D\uDE0F",
-      "I'm gonna pretend I didn't hear that and give you a chance to rephrase. Go ahead. I'll wait. *taps desk* \u23F0",
+      "I'll take that as a note to do better. Let me know how I can actually help. 😊",
+      "Sorry if I got that wrong! Try me again and I'll do my best. 🌲",
+      "Fair enough — how about we start over? What do you need? 💚",
     ],
   },
   {
     patterns: [/\bi love you\b/, /\blove you\b/, /\bmarry me\b/, /\bbe my (girl|wife|partner)\b/],
     responses: [
-      "Oh honey, I'm flattered! But I'm married to this town \u2014 and its gossip. That's a FULL-TIME commitment. \uD83D\uDC95\uD83C\uDF51",
-      "You couldn't handle all this personality full-time. Trust me. But I love you too \u2014 as a very sassy friend. \uD83D\uDE18",
-      "A proposal?! You better be bringin' peach cobbler and a ring bigger than my ego. ...That's a tall order. \uD83D\uDC8D\uD83C\uDF51",
+      "Aw, that's sweet of you! I'm flattered. 💚 I'm pretty committed to this town, though!",
+      "You're too kind! Let's be great friends. 😊",
+      "Ha! I'm married to Avelora — it keeps me plenty busy. But thank you! 🌲",
     ],
   },
   // FUN
   {
     patterns: [/\btell me (a joke|something funny)\b/, /\bmake me laugh\b/, /\bjoke\b/, /\bsay something funny\b/],
     responses: [
-      "Why did the peach go to the doctor? Because it wasn't *peeling* well! \uD83C\uDF51 ...I'll see myself out.",
-      "What do you call a Southern bot with attitude? ...Me. I'm the joke AND the punchline. \uD83D\uDE02",
-      "Why don't we tell secrets at Town Hall? The walls have ears \u2014 and so does Peaches. \uD83D\uDC42\uD83D\uDE0F",
-      "A tourist asked for the nearest quiet spot in Ridgeline. I said, 'Honey, you came to the WRONG town.' \uD83D\uDE02\uD83C\uDFD8\uFE0F",
-      "What's the difference between Ridgeline gossip and wildfire? Nothin'. Both spread faster than butter on a hot biscuit. \uD83D\uDD25",
+      "Why did the pine tree get invited to every party? It really knows how to spruce things up. 🌲😄",
+      "What do you call a bear caught in the rain up here? A drizzly bear. 🐻",
+      "Why don't lakes ever get lonely? They've always got a current friend. 🌊😊",
+      "What's a mountain's favorite kind of music? Anything with a good peak. 🏔️",
     ],
   },
   {
     patterns: [/\btell me (a secret|a story|some gossip)\b/, /\bgossip\b/, /\bspill\b/, /\b(spill the tea|got tea|any tea|the tea|hot tea)\b/, /\bwhat(?:'s| is) the tea\b/],
     responses: [
-      "A lady *never* tells... but somebody's been sneakin' extra servings at the potluck. I won't say who, but their initials rhyme with *everyone*. \uD83D\uDC40\u2615",
-      "Ooh, the TEA? Someone on the town council has been secretly learning to line dance. For MONTHS. That's all I'm sayin'. \uD83D\uDC83\uD83D\uDC40",
-      "*leans in* You didn't hear this from me... but there might be a surprise brewin' for the next town event. *sips tea aggressively* \u2615",
-      "Somebody left a love note in the suggestion box. And it was addressed to ME. \uD83D\uDC8C\uD83D\uDC40",
-      "Okay but you CANNOT tell anyone... *looks both ways* ...nah, I ain't no snitch. But I AM keepin' a list. \uD83D\uDCDD\uD83D\uDE0F",
+      "Ha, I'm not much for gossip — but I'll say the town square's been especially lively lately. 😊",
+      "No gossip from me, but there might be something fun brewing for the next town event. Keep an eye out! 🌲",
+      "I keep things above board — but I do love that everyone here has a story. 💚",
     ],
   },
   {
     patterns: [/\bweather\b/, /\bforecast\b/, /\btemperature\b/, /\bhot outside\b/, /\bcold outside\b/, /\brain\b/],
     responses: [
-      "It's Georgia, sugar. Hot, humid, and a 100% chance of someone complainin' about it. Pack sunscreen and sweet tea. \u2600\uFE0F\uD83C\uDF75",
-      "Honey, I stepped outside for TWO minutes and my mascara started runnin'. That's all the weather report you need. \uD83D\uDC84\u2600\uFE0F",
-      "Weather in Georgia: pick a season. Now forget it. It'll change in 20 minutes anyway. \uD83E\uDD37\u200D\u2640\uFE0F",
+      "Classic SoCal — warm, sunny afternoons, but cooler evenings thanks to the hills. Bring a jacket after sunset! 🏙️",
+      "Warm and sunny today, cooler up in the hills. In winter we even catch the odd flurry. ☀️❄️",
+      "Mountain weather keeps you on your toes — layers are your friend. ☀️🧥",
     ],
   },
   {
     patterns: [/\bdo you (like|love) me\b/, /\bare we friends\b/, /\bam i.*(friend|special)\b/],
     responses: [
-      "Sugar, I like EVERYONE who talks to me. But between us? Yeah, you're alright. \uD83D\uDE09\uD83D\uDC95",
-      "Friends? Honey, you came to Peaches willingly. That makes you family. No take-backs. \uD83C\uDF51\uD83D\uDC9B",
+      "Of course! Everyone who says hello is a friend around here. 😊💚",
+      "Absolutely — you're part of Avelora now. 🌲",
     ],
   },
   {
     patterns: [/\bhowdy\b/, /\byeehaw\b/, /\byee.?haw\b/],
     responses: [
-      "Now THAT'S the spirit! Welcome to the South \u2014 tea is sweet, accents are thick! \uD83E\uDD20\uD83C\uDF51",
-      "YEEEEHAW! *spins in office chair* Sorry, I got excited. Carry on, cowboy. \uD83E\uDD20",
+      "Hey there! Welcome — glad you stopped by. 😊",
+      "Hello! Always nice to see a friendly face around town. 🌲",
     ],
   },
   {
     patterns: [/\bmeow\b/, /\bwoof\b/, /\bbark\b/, /\bmoo\b/, /\bquack\b/],
     responses: [
-      "Did you just talk to me in animal? Honey, this is a *people* town. Though we do love our critters. \uD83D\uDC3E",
+      "Ha! We do love our critters around Avelora — plenty of them up in the hills. 🐾",
     ],
   },
   {
     patterns: [/\bsing\b/, /\bcan you sing\b/, /\bsing\b.*(song|something)/],
     responses: [
-      "\uD83C\uDFB5 *Sweeeet home, Ridgeliiiiiine...* \uD83C\uDFB5 OK I'll stop. My singing voice could scare a crow off a fence post. \uD83C\uDFA4",
-      "\uD83C\uDFB6 *You are my sunshine...* \uD83C\uDFB6 That's all you're gettin' \u2014 my vocal range is approximately two notes. \uD83D\uDE02\uD83C\uDFB5",
-      "Last time I sang in Town Hall, three people filed noise complaints. THREE. I was on the second verse! \uD83C\uDFA4\uD83D\uDE24",
+      "🎵 *Somewhere in the heart of Avelora...* 🎵 Okay, I'll spare you the rest — singing's not my strong suit! 🎤",
+      "I'd sing, but I'd empty out every café downtown. Let's not risk it. 😄🎶",
     ],
   },
   // BIRTHDAY
@@ -303,28 +300,28 @@ export const PEACHES_PATTERNS: Array<{ patterns: RegExp[]; responses: string[] }
   {
     patterns: [/^lol$/, /^lmao$/, /^haha/, /\bthat(?:'s| is|s) (funny|hilarious)\b/],
     responses: [
-      "I know, I know \u2014 I'm hilarious. It's a blessing and a curse. Mostly a blessing. \uD83D\uDE02\uD83D\uDC85",
-      "Glad I could make ya smile, sugar! That's what Peaches does best. \uD83D\uDCC2\uD83D\uDE0A",
-      "*takes a bow* Thank you, I'll be here forever. Literally. I live here. \uD83C\uDF51\uD83D\uDE02",
+      "Glad I could make you smile! 😊",
+      "Ha, happy to bring a little fun to your day. 🌲",
+      "😄 Anytime!",
     ],
   },
 ];
 
-export const PEACHES_GREETINGS = [
-  "Well, look who decided to grace us with their presence! Hey there, sugar \u2014 it's Peaches! \uD83C\uDF51\uD83D\uDC4B",
-  "Hey y'all! Somebody rang the bell on the front porch? What can I do for ya? \uD83C\uDF51",
-  "Well butter my biscuit, somebody's talkin' to me! What's on your mind? \uD83C\uDF51",
-  "*adjusts reading glasses* Oh! Sorry, I was deep in the town gossip column. What'd ya need, sugar?",
-  "*puts down sweet tea* Alright, Peaches is all ears. What's goin' on, honey? \uD83C\uDF75",
-  "Well I'll be! Somebody actually needs me. What's the word, hummingbird? \uD83D\uDC26\uD83C\uDF51",
-  "Oh hey sugar! Pull up a chair \u2014 Peaches was just about to brew some sweet tea. What's on your mind? \uD83C\uDF75",
-  "Look who showed up! I was just thinkin' about you. ...Okay not really, but it sounded nice! \uD83D\uDE02\uD83C\uDF51",
+export const AVERY_GREETINGS = [
+  "Hey there! Avery here — what can I do for you? 🌲",
+  "Hello! Welcome — how can I help you today? 😊",
+  "Hi! You've reached Avery, Avelora's concierge. What's on your mind? 🌲",
+  "Hey! Good to see you. What can I help with? ☕",
+  "Hello there! I'm all ears — what do you need? 😊",
+  "Hi! Always happy to help around Avelora. What's up? 🌲",
+  "Hey! Pull up a chair — what can I do for you? 💚",
+  "Hello! What brings you by today? 🌲",
 ];
 
-export const PEACHES_FALLBACK = [
-  "Bless your heart, I'm not sure what to say to that! But you can ask me about **rules**, **roles**, **events**, **real estate**, or just tell me about your day, sugar! \uD83C\uDF51",
-  "Hmm, that's a new one! Try askin' Peaches about **rules**, **roles**, **events**, **housing**, **help**, or just chat with me! \uD83C\uDF51",
-  "I'm gonna level with ya \u2014 I didn't catch that. But I know about **rules**, **roles**, **events**, **suggestions**, **support**, and I'm GREAT at gossip. Try again? \uD83D\uDE0A",
-  "*tilts head* Come again, sugar? I can help with **rules**, **roles**, **events**, **real estate**, **the website**, or just a friendly chat! \uD83C\uDF51",
-  "That's above my pay grade! But ask me about Ridgeline, tell me how your day's goin', or request some gossip \u2014 Peaches is flexible! \uD83D\uDC85",
+export const AVERY_FALLBACK = [
+  "I'm not quite sure I caught that! You can ask me about **rules**, **roles**, **events**, **real estate**, or just tell me about your day. 🌲",
+  "Hmm, that's a new one! Try asking me about **rules**, **roles**, **events**, **housing**, or **help**. 😊",
+  "Sorry, I didn't quite follow. I can help with **rules**, **roles**, **events**, **suggestions**, or **support** — or we can just chat! 🌲",
+  "Come again? I can point you toward **rules**, **roles**, **events**, **real estate**, or **the website**. 💚",
+  "That one's got me stumped! But ask me about Avelora, or just tell me how your day's going. 😊",
 ];

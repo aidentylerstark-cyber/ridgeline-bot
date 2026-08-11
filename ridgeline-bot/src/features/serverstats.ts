@@ -4,13 +4,23 @@ import {
   type ChatInputCommandInteraction,
 } from 'discord.js';
 import * as storage from '../storage.js';
+import { TtlCache } from '../utilities/ttl-cache.js';
+
+// 60s TTL cache \u2014 stats are read-heavy and a minute of staleness is harmless.
+const statsCache = new TtlCache<EmbedBuilder>(60_000);
 
 export async function handleServerStatsCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   await interaction.deferReply();
 
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.editReply({ content: "Something went wrong, sugar. \uD83C\uDF51" });
+    await interaction.editReply({ content: "Something went wrong. \uD83C\uDF32" });
+    return;
+  }
+
+  const cached = statsCache.get('serverstats');
+  if (cached) {
+    await interaction.editReply({ embeds: [cached] });
     return;
   }
 
@@ -57,11 +67,11 @@ export async function handleServerStatsCommand(interaction: ChatInputCommandInte
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
     .setAuthor({
-      name: 'Peaches \uD83C\uDF51 \u2014 Community Stats',
+      name: 'Avery \uD83C\uDF32 \u2014 Community Stats',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
-    .setTitle('\uD83D\uDCCA Ridgeline Community Stats')
-    .setDescription("Here's a look at how our little town is doin', sugar!")
+    .setTitle('\uD83D\uDCCA Avelora Community Stats')
+    .setDescription("Here's a look at how our little town is doing!")
     .addFields(
       { name: '\uD83D\uDC65 Total Members', value: `**${totalMembers.toLocaleString()}**`, inline: true },
       { name: '\uD83D\uDFE2 Currently Online', value: `**${onlineCount.toLocaleString()}**`, inline: true },
@@ -75,8 +85,9 @@ export async function handleServerStatsCommand(interaction: ChatInputCommandInte
       { name: '\u2B50 Avg Support Satisfaction', value: satisfactionDisplay, inline: false },
       { name: '\uD83C\uDFD8\uFE0F Community Age', value: `**${communityDays.toLocaleString()}** days since founding`, inline: false },
     )
-    .setFooter({ text: 'Ridgeline, Georgia \u2014 Where Every Story Matters \uD83C\uDF51' })
+    .setFooter({ text: 'Avelora, California \u2014 Where Every Story Matters \uD83C\uDF32' })
     .setTimestamp();
 
+  statsCache.set('serverstats', embed);
   await interaction.editReply({ embeds: [embed] });
 }

@@ -12,10 +12,10 @@ export function scheduleRegionDailySummary(client: Client): cron.ScheduledTask {
       await withRetry(async () => {
         if (!isBotActive()) return; // Re-check after retry delay
         await postDailySummary(client);
-        console.log('[Peaches] Posted daily region summary');
+        console.log('[Avery] Posted daily region summary');
       }, { label: 'Region daily summary' });
     } catch (err) {
-      console.error('[Peaches] Failed to post daily region summary after retries:', err);
+      console.error('[Avery] Failed to post daily region summary after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 

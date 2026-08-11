@@ -32,17 +32,17 @@ export function scheduleBirthdayMonthlySummary(client: Client): cron.ScheduledTa
         if (birthdays.length === 0) {
           const embed = new EmbedBuilder()
             .setColor(0xFF69B4)
-            .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Monthly Birthday Summary', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+            .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Monthly Birthday Summary', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
             .setTitle(`\uD83C\uDF82 ${monthName} Birthdays`)
             .setDescription(
-              `No birthdays registered for ${monthName}, sugar.\n\n` +
-              `Set yours with \`/birthday set\`! We'd love to celebrate with you! \uD83C\uDF51`
+              `No birthdays registered for ${monthName}.\n\n` +
+              `Set yours with \`/birthday set\`! We'd love to celebrate with you! \uD83C\uDF32`
             )
-            .setFooter({ text: 'Ridgeline Birthday Celebrations' })
+            .setFooter({ text: 'Avelora Birthday Celebrations' })
             .setTimestamp();
 
           await birthdayChannel.send({ embeds: [embed] }).catch(() => {});
-          console.log(`[Peaches] Monthly birthday summary posted for ${monthName} (no birthdays)`);
+          console.log(`[Avery] Monthly birthday summary posted for ${monthName} (no birthdays)`);
           return;
         }
 
@@ -56,24 +56,24 @@ export function scheduleBirthdayMonthlySummary(client: Client): cron.ScheduledTa
           lines.push(`\uD83C\uDF82 **${formatBirthdayDate(bd.month, bd.day)}** \u2014 ${nameDisplay}`);
         }
 
-        let description = `Here are all the birthdays this month, sugar! Mark your calendars!\n\n${lines.join('\n')}`;
+        let description = `Here are all the birthdays this month! Mark your calendars!\n\n${lines.join('\n')}`;
         if (description.length > 4000) {
           description = description.slice(0, 3990) + '\n\u2026 *(and more!)*';
         }
 
         const embed = new EmbedBuilder()
           .setColor(0xFF69B4)
-          .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Monthly Birthday Summary', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+          .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Monthly Birthday Summary', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
           .setTitle(`\uD83C\uDF82 ${monthName} Birthdays`)
           .setDescription(description)
-          .setFooter({ text: `${birthdays.length} birthday(s) this month \u2022 Ridgeline Birthday Celebrations` })
+          .setFooter({ text: `${birthdays.length} birthday(s) this month \u2022 Avelora Birthday Celebrations` })
           .setTimestamp();
 
         await birthdayChannel.send({ embeds: [embed] }).catch(() => {});
-        console.log(`[Peaches] Monthly birthday summary posted for ${monthName} (${birthdays.length} birthdays)`);
+        console.log(`[Avery] Monthly birthday summary posted for ${monthName} (${birthdays.length} birthdays)`);
       }, { label: 'Birthday monthly summary' });
     } catch (err) {
-      console.error('[Peaches] Birthday monthly summary failed after retries:', err);
+      console.error('[Avery] Birthday monthly summary failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 

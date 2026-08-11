@@ -16,7 +16,7 @@ export async function updateStatsChannels(client: Client): Promise<void> {
         }
       }
     } catch (err) {
-      console.error('[Peaches] Stats channels: failed to update member count VC:', err);
+      console.error('[Avery] Stats channels: failed to update member count VC:', err);
     }
   }
 
@@ -35,7 +35,7 @@ export async function updateStatsChannels(client: Client): Promise<void> {
         }
       }
     } catch (err) {
-      console.error('[Peaches] Stats channels: failed to update online count VC:', err);
+      console.error('[Avery] Stats channels: failed to update online count VC:', err);
     }
   }
 }

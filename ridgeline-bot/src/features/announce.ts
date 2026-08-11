@@ -26,7 +26,7 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
   const memberIsStaff = member ? isStaff(member) : false;
 
   if (!memberIsStaff) {
-    await interaction.reply({ content: "Sorry sugar, only staff can post announcements! 🍑", flags: 64 });
+    await interaction.reply({ content: "Sorry, only staff can post announcements! 🌲", flags: 64 });
     return;
   }
 
@@ -34,7 +34,7 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
   if (announceCooldowns.isOnCooldown(interaction.user.id)) {
     const remaining = Math.ceil(announceCooldowns.getRemainingMs(interaction.user.id) / 1000);
     await interaction.reply({
-      content: `Hold on, sugar! You just posted an announcement. Wait **${remaining} more seconds** before posting another. 🍑`,
+      content: `Hold on! You just posted an announcement. Wait **${remaining} more seconds** before posting another. 🌲`,
       flags: 64,
     });
     return;
@@ -59,7 +59,7 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
   }
 
   if (!destChannel) {
-    await interaction.editReply({ content: "Couldn't find the announcement channel, sugar! 🍑" });
+    await interaction.editReply({ content: "Couldn't find the announcement channel! 🌲" });
     return;
   }
 
@@ -67,7 +67,7 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
   if (member) {
     const memberPerms = destChannel.permissionsFor(member);
     if (!memberPerms?.has(PermissionFlagsBits.ViewChannel) || !memberPerms?.has(PermissionFlagsBits.SendMessages)) {
-      await interaction.editReply({ content: "You don't have permission to post in that channel, sugar! Pick one you can access. 🍑" });
+      await interaction.editReply({ content: "You don't have permission to post in that channel! Pick one you can access. 🌲" });
       return;
     }
   }
@@ -80,7 +80,7 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
       name: member?.displayName ?? interaction.user.username,
       iconURL: interaction.user.displayAvatarURL({ size: 128 }),
     })
-    .setFooter({ text: 'Ridgeline, Georgia — Where Every Story Matters 🍑' })
+    .setFooter({ text: 'Avelora, California — Where Every Story Matters 🌲' })
     .setTimestamp();
 
   const content = pingRole ? `<@&${pingRole.id}>` : undefined;
@@ -98,6 +98,6 @@ export async function handleAnnounceCommand(interaction: ChatInputCommandInterac
     });
   }
 
-  await interaction.editReply({ content: `✅ Announcement posted to <#${destChannel.id}>! 🍑` });
-  console.log(`[Peaches] Announcement posted by ${interaction.user.username}: "${title}" → #${destChannel.name}`);
+  await interaction.editReply({ content: `✅ Announcement posted to <#${destChannel.id}>! 🌲` });
+  console.log(`[Avery] Announcement posted by ${interaction.user.username}: "${title}" → #${destChannel.name}`);
 }

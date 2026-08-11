@@ -26,7 +26,7 @@ import { logAuditEvent } from '../features/audit-log.js';
 // ─────────────────────────────────────────
 
 /**
- * Step 1 -> Step 2: "Come on in, sugar!" button
+ * Step 1 -> Step 2: "Come on in!" button
  */
 export async function handleOnboardStart(interaction: ButtonInteraction, client: Client): Promise<void> {
   try {
@@ -34,10 +34,10 @@ export async function handleOnboardStart(interaction: ButtonInteraction, client:
     const { embed, row } = buildStep2Embed(client);
     await interaction.update({ embeds: [embed], components: [row] });
   } catch (err) {
-    console.error('[Peaches] Error in onboard_start handler:', err);
+    console.error('[Avery] Error in onboard_start handler:', err);
     try {
       await interaction.reply({
-        content: "Something went a little sideways, sugar. Try clickin' that button again! \uD83C\uDF51",
+        content: "Something went a little sideways. Try clicking that button again! \uD83C\uDF32",
         flags: 64,
       });
     } catch {
@@ -47,7 +47,7 @@ export async function handleOnboardStart(interaction: ButtonInteraction, client:
 }
 
 /**
- * Step 2 -> Step 3: "I understand, Peaches!" button
+ * Step 2 -> Step 3: "I understand, Avery!" button
  */
 export async function handleOnboardRulesAck(interaction: ButtonInteraction, client: Client): Promise<void> {
   try {
@@ -55,10 +55,10 @@ export async function handleOnboardRulesAck(interaction: ButtonInteraction, clie
     const { embed, row } = buildStep3Embed(client);
     await interaction.update({ embeds: [embed], components: [row] });
   } catch (err) {
-    console.error('[Peaches] Error in onboard_rules_ack handler:', err);
+    console.error('[Avery] Error in onboard_rules_ack handler:', err);
     try {
       await interaction.reply({
-        content: "Something went a little sideways, sugar. Try clickin' that button again! \uD83C\uDF51",
+        content: "Something went a little sideways. Try clicking that button again! \uD83C\uDF32",
         flags: 64,
       });
     } catch {
@@ -74,7 +74,7 @@ export async function handleOnboardDetailsModal(interaction: ButtonInteraction):
   try {
     const modal = new ModalBuilder()
       .setCustomId('onboard_details_modal')
-      .setTitle('Your Ridgeline Resident Card');
+      .setTitle('Your Avelora Resident Card');
 
     const characterNameInput = new TextInputBuilder()
       .setCustomId('character_name')
@@ -86,7 +86,7 @@ export async function handleOnboardDetailsModal(interaction: ButtonInteraction):
 
     const interestsInput = new TextInputBuilder()
       .setCustomId('interests')
-      .setLabel('What brings you to Ridgeline?')
+      .setLabel('What brings you to Avelora?')
       .setStyle(TextInputStyle.Short)
       .setPlaceholder('e.g., Roleplay, Socializing, Exploring')
       .setRequired(false)
@@ -99,10 +99,10 @@ export async function handleOnboardDetailsModal(interaction: ButtonInteraction):
 
     await interaction.showModal(modal);
   } catch (err) {
-    console.error('[Peaches] Error showing onboarding modal:', err);
+    console.error('[Avery] Error showing onboarding modal:', err);
     try {
       await interaction.reply({
-        content: "Something went a little sideways, sugar. Try clickin' that button again! \uD83C\uDF51",
+        content: "Something went a little sideways. Try clicking that button again! \uD83C\uDF32",
         flags: 64,
       });
     } catch {
@@ -136,7 +136,7 @@ export async function handleOnboardSkipDetails(interaction: ButtonInteraction, c
       await interaction.update({
         embeds: [],
         components: [],
-        content: "You're all set, sugar! Welcome to Ridgeline! \uD83C\uDF51",
+        content: "You're all set! Welcome to Avelora! \uD83C\uDF32",
       });
     }
 
@@ -151,12 +151,12 @@ export async function handleOnboardSkipDetails(interaction: ButtonInteraction, c
       });
     }
 
-    console.log(`[Peaches] Onboarding completed (skipped details) for ${interaction.user.username}`);
+    console.log(`[Avery] Onboarding completed (skipped details) for ${interaction.user.username}`);
   } catch (err) {
-    console.error('[Peaches] Error in onboard_skip_details handler:', err);
+    console.error('[Avery] Error in onboard_skip_details handler:', err);
     try {
       await interaction.reply({
-        content: "Something went a little sideways, sugar. Try again! \uD83C\uDF51",
+        content: "Something went a little sideways. Try again! \uD83C\uDF32",
         flags: 64,
       });
     } catch {
@@ -196,14 +196,14 @@ export async function handleOnboardModalSubmit(interaction: ModalSubmitInteracti
       await interaction.editReply({
         embeds: [],
         components: [],
-        content: "You're all set, sugar! Welcome to Ridgeline! \uD83C\uDF51",
+        content: "You're all set! Welcome to Avelora! \uD83C\uDF32",
       });
     }
 
     // Sync character name to birthday table if provided
     if (characterName) {
       setCharacterName(interaction.user.id, characterName).catch(err =>
-        console.error('[Peaches] Failed to sync character name to birthday table:', err)
+        console.error('[Avery] Failed to sync character name to birthday table:', err)
       );
     }
 
@@ -218,13 +218,13 @@ export async function handleOnboardModalSubmit(interaction: ModalSubmitInteracti
       });
     }
 
-    console.log(`[Peaches] Onboarding completed for ${interaction.user.username} (name: ${characterName ?? 'none'}, interests: ${interests ?? 'none'})`);
+    console.log(`[Avery] Onboarding completed for ${interaction.user.username} (name: ${characterName ?? 'none'}, interests: ${interests ?? 'none'})`);
   } catch (err) {
-    console.error('[Peaches] Error in onboard modal submit handler:', err);
+    console.error('[Avery] Error in onboard modal submit handler:', err);
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
-          content: "Something went a little sideways, sugar. Try again! \uD83C\uDF51",
+          content: "Something went a little sideways. Try again! \uD83C\uDF32",
           flags: 64,
         });
       }

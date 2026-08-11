@@ -1,4 +1,4 @@
-# Ridgeline Bot — Claude Reference
+# Avelora Bot — Claude Reference
 
 > Auto-generated project map. Keep in sync when adding features.
 
@@ -12,7 +12,7 @@ src/
     pipeline.ts                — 6-step chatbot pipeline (FAQ → Birthday → Keywords → Greeting → AI → Fallback)
     memory.ts                  — Per-channel conversation history
     faq.ts                     — FAQ trigger patterns & responses
-    keywords.ts                — Peaches personality patterns & fallback responses
+    keywords.ts                — Avery personality patterns & fallback responses
   commands/
     index.ts                   — Slash command registration (all commands defined here)
   db/
@@ -51,7 +51,7 @@ src/
     ticket-panel.ts            — Posts "Open a Ticket" button panel
     role-panel.ts              — Posts role selection panels (Notifications, Pronouns, Community)
     polls.ts                   — Community poll posting
-    trigger-reference.ts       — Peaches trigger reference guide
+    trigger-reference.ts       — Avery trigger reference guide
   scheduled/
     birthday-check.ts          — Daily 8 AM ET: birthday celebrations + role assignment
     milestone-check.ts         — Daily 9 AM ET: member anniversary milestones
@@ -73,6 +73,10 @@ src/
 ```
 
 ## Key Channel IDs
+
+> ⚠️ Migration note: the channel/category IDs and role names in the tables below are
+> still the OLD Ridgeline values. They are being replaced with Avelora server values
+> (see `TODO(avelora)` markers in `src/config.ts`). Guild ID is now `1536851087078858852`.
 
 | Channel | ID | Notes |
 |---|---|---|
@@ -97,7 +101,7 @@ src/
 | marketing | Marketing | +Marketing Director, Marketing Team | `1437260751537705122` |
 | roleplay | Roleplay Support | Community Manager, Community Moderator | `1437263205402415265` |
 
-Global staff (all depts): Ridgeline Owner, First Lady, Ridgeline Management, Ridgeline Manager
+Global staff (all depts): Avelora Owner, First Lady, Avelora Management, Avelora Manager
 
 ## Database Tables
 
@@ -123,10 +127,10 @@ Runs in order, returns at first match:
 1. **FAQ** — Pre-compiled regex triggers → instant response
 2. **Birthday** — "my birthday is [date]" → store + respond
 3. **Character Name** — "my name is [name]" → store + respond
-4. **Keywords** — Peaches personality patterns (with `__BIRTHDAY_CHECK__` sentinel)
+4. **Keywords** — Avery personality patterns (with `__BIRTHDAY_CHECK__` sentinel)
 5. **Greeting** — hi/hey/sup → random greeting
 6. **AI** — Claude Haiku (5 concurrent max, 250 tokens, 10s timeout)
-7. **Fallback** — Random sassy response
+7. **Fallback** — Random friendly response
 
 ## Ticket Close Flow
 

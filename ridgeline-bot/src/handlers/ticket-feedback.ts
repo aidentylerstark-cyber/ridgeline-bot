@@ -52,17 +52,17 @@ export async function sendTicketSurveyDM(
     }
 
     description += `\nWe'd love to know how your experience was!\n\n` +
-      `Tap a star below to rate us, darlin'.`;
+      `Tap a star below to rate us.`;
 
     const embed = new EmbedBuilder()
       .setColor(0xD4A574)
       .setAuthor({
-        name: 'Peaches \uD83C\uDF51 \u2014 Feedback',
+        name: 'Avery \uD83C\uDF32 \u2014 Feedback',
         iconURL: client.user?.displayAvatarURL({ size: 64 }),
       })
-      .setTitle("How'd We Do, Sugar?")
+      .setTitle("How'd We Do?")
       .setDescription(description)
-      .setFooter({ text: 'Ridgeline Ticket System \u2014 Powered by Peaches \uD83C\uDF51' })
+      .setFooter({ text: 'Avelora Ticket System \u2014 Powered by Avery \uD83C\uDF32' })
       .setTimestamp();
 
     const ratingRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -89,10 +89,10 @@ export async function sendTicketSurveyDM(
     );
 
     await member.send({ embeds: [embed], components: [ratingRow] }).catch(() => {
-      console.log(`[Peaches] Could not send survey DM to ${member.displayName} (DMs may be disabled)`);
+      console.log(`[Avery] Could not send survey DM to ${member.displayName} (DMs may be disabled)`);
     });
   } catch (err) {
-    console.error('[Peaches] Failed to send ticket survey DM:', err);
+    console.error('[Avery] Failed to send ticket survey DM:', err);
   }
 }
 
@@ -107,7 +107,7 @@ export async function handleTicketRate(interaction: ButtonInteraction, client: C
   const ticketId = parseInt(parts[parts.length - 2], 10);
 
   if (isNaN(rating) || rating < 1 || rating > 5 || isNaN(ticketId)) {
-    await interaction.reply({ content: "Something went wrong with that rating, sugar. \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Something went wrong with that rating. \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -116,12 +116,12 @@ export async function handleTicketRate(interaction: ButtonInteraction, client: C
   if (existing) {
     try {
       await interaction.update({
-        content: "You've already rated this ticket, sugar! Thanks for the feedback. \uD83C\uDF51",
+        content: "You've already rated this ticket! Thanks for the feedback. \uD83C\uDF32",
         embeds: [],
         components: [],
       });
     } catch {
-      await interaction.reply({ content: "You've already rated this ticket, sugar! \uD83C\uDF51", flags: 64 });
+      await interaction.reply({ content: "You've already rated this ticket! \uD83C\uDF32", flags: 64 });
     }
     return;
   }
@@ -139,13 +139,13 @@ export async function handleTicketRate(interaction: ButtonInteraction, client: C
   const stars = '\u2B50'.repeat(rating);
   const thankYouEmbed = new EmbedBuilder()
     .setColor(0x4A7C59)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
-    .setTitle("Thanks for the Feedback, Darlin'!")
+    .setAuthor({ name: 'Avery \uD83C\uDF32', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setTitle("Thanks for the Feedback!")
     .setDescription(
       `You rated your experience: **${stars}** (${rating}/5)\n\n` +
       `We appreciate you takin' the time! If you'd like to leave a comment, click the button below.`
     )
-    .setFooter({ text: 'Ridgeline Ticket System' })
+    .setFooter({ text: 'Avelora Ticket System' })
     .setTimestamp();
 
   const commentRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -162,13 +162,13 @@ export async function handleTicketRate(interaction: ButtonInteraction, client: C
       components: [commentRow],
     });
   } catch (err) {
-    console.warn('[Peaches] Survey rating interaction.update() failed:', err);
+    console.warn('[Avery] Survey rating interaction.update() failed:', err);
     try {
       await interaction.reply({ embeds: [thankYouEmbed], components: [commentRow], flags: 64 });
     } catch { /* both update and reply failed — token likely expired */ }
   }
 
-  console.log(`[Peaches] Ticket feedback: ticket ${ticketId} rated ${rating}/5`);
+  console.log(`[Avery] Ticket feedback: ticket ${ticketId} rated ${rating}/5`);
 }
 
 // ─────────────────────────────────────────
@@ -180,7 +180,7 @@ export async function handleTicketCommentButton(interaction: ButtonInteraction, 
   const ticketId = parseInt(parts[parts.length - 1], 10);
 
   if (isNaN(ticketId)) {
-    await interaction.reply({ content: "Something went wrong, sugar. \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Something went wrong. \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -191,7 +191,7 @@ export async function handleTicketCommentButton(interaction: ButtonInteraction, 
   const commentInput = new TextInputBuilder()
     .setCustomId('feedback_comment')
     .setLabel("Anything you'd like us to know?")
-    .setPlaceholder("Tell us how we did, sugar...")
+    .setPlaceholder("Tell us how we did...")
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(true)
     .setMaxLength(500);
@@ -200,9 +200,9 @@ export async function handleTicketCommentButton(interaction: ButtonInteraction, 
   try {
     await interaction.showModal(modal);
   } catch (err) {
-    console.error('[Peaches] Failed to show feedback comment modal:', err);
+    console.error('[Avery] Failed to show feedback comment modal:', err);
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: 'Something went wrong showing the comment form, sugar. Try again! 🍑', flags: 64 }).catch(() => {});
+      await interaction.reply({ content: 'Something went wrong showing the comment form. Try again! 🌲', flags: 64 }).catch(() => {});
     }
   }
 }
@@ -216,7 +216,7 @@ export async function handleTicketFeedbackCommentModal(interaction: ModalSubmitI
   const ticketId = parseInt(parts[parts.length - 1], 10);
 
   if (isNaN(ticketId)) {
-    await interaction.reply({ content: "Something went wrong, sugar. \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Something went wrong. \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -226,21 +226,21 @@ export async function handleTicketFeedbackCommentModal(interaction: ModalSubmitI
   try {
     const saved = await pool_updateFeedbackComment(ticketId, comment);
     if (!saved) {
-      await interaction.reply({ content: "Couldn't find the feedback to add your comment to, sugar. The rating may not have been saved. 🍑", flags: 64 });
+      await interaction.reply({ content: "Couldn't find the feedback to add your comment to. The rating may not have been saved. 🌲", flags: 64 });
       return;
     }
   } catch (err) {
-    console.error('[Peaches] Failed to save feedback comment:', err);
-    await interaction.reply({ content: "Something went wrong saving your comment, sugar. Try again! 🍑", flags: 64 });
+    console.error('[Avery] Failed to save feedback comment:', err);
+    await interaction.reply({ content: "Something went wrong saving your comment. Try again! 🌲", flags: 64 });
     return;
   }
 
   await interaction.reply({
-    content: "Thanks for the extra feedback, sugar! Your words help us do better. \uD83C\uDF51",
+    content: "Thanks for the extra feedback! Your words help us do better. \uD83C\uDF32",
     flags: 64,
   });
 
-  console.log(`[Peaches] Ticket feedback comment added for ticket ${ticketId}`);
+  console.log(`[Avery] Ticket feedback comment added for ticket ${ticketId}`);
 }
 
 // Helper to update comment on existing feedback row

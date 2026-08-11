@@ -7,12 +7,12 @@ export async function postCommunityPoll(client: Client, question: string, option
 
   const pollChannel = guild.channels.cache.get(CHANNELS.communityPolls) as TextChannel | undefined;
   if (!pollChannel) {
-    console.log('[Peaches] Community polls channel not found');
+    console.log('[Avery] Community polls channel not found');
     return;
   }
 
   await pollChannel.send({
-    content: `\uD83C\uDF51 *Peaches taps the podium* Alright y'all, time to make your voices heard!`,
+    content: `\uD83C\uDF32 *Avery steps up to the podium* Alright everyone, time to make your voices heard!`,
     poll: {
       question: { text: question },
       answers: options.map(text => ({ text })),
@@ -20,6 +20,6 @@ export async function postCommunityPoll(client: Client, question: string, option
       allowMultiselect: false,
     },
   });
-  console.log(`[Peaches] Community poll posted: "${question}"`);
+  console.log(`[Avery] Community poll posted: "${question}"`);
 }
 

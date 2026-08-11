@@ -1,5 +1,6 @@
 import { EmbedBuilder, type Client, type Interaction, type GuildMember, type ChatInputCommandInteraction, type ButtonInteraction } from 'discord.js';
 import { handleRoleButton } from '../handlers/role-buttons.js';
+import { handleRulesAgree, handleAgeVerify } from '../handlers/verify-button.js';
 import {
   handleTicketOpen,
   handleTicketClaim,
@@ -49,13 +50,13 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
     .setAuthor({
-      name: 'Peaches 🍑 — Town Secretary',
+      name: 'Avery 🌲 — Community Concierge',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
-    .setTitle('📋 Ridgeline Bot — Help Guide')
+    .setTitle('📋 Avelora Bot — Help Guide')
     .setDescription(
-      `Well hey there, sugar! I'm **Peaches**, your friendly town secretary. Here's everything I can do for ya!\n\n` +
-      `**Talk to me:** Just say \`hey Peaches\` or mention me in any channel.`
+      `Hi there! I'm **Avery**, your friendly community concierge. Here's everything I can do for you!\n\n` +
+      `**Talk to me:** Just say \`hey Avery\` or mention me in any channel.`
     )
     .addFields(
       {
@@ -66,7 +67,7 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
           '`/birthday delete` — Remove your birthday from the records\n' +
           '`/birthday upcoming` — See birthdays in the next 7 days',
       },
-      { name: '💡 Suggestions', value: '`/suggest <idea>` — Submit a suggestion for Ridgeline' },
+      { name: '💡 Suggestions', value: '`/suggest <idea>` — Submit a suggestion for Avelora' },
       {
         name: '\uD83C\uDFAB Tickets',
         value:
@@ -120,7 +121,7 @@ async function handleHelpCommand(interaction: ChatInputCommandInteraction, clien
         },
       ] : []),
     )
-    .setFooter({ text: 'Ridgeline, Georgia — Where Every Story Matters 🍑' })
+    .setFooter({ text: 'Avelora, California — Where Every Story Matters 🌲' })
     .setTimestamp();
 
   await interaction.reply({ embeds: [embed], flags: 64 });
@@ -152,6 +153,8 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
 
   const BUTTON_HANDLERS: Array<{ match: string; exact?: boolean; handler: (i: ButtonInteraction, c: Client) => Promise<void> }> = [
     { match: 'role_', handler: handleRoleButton },
+    { match: 'rules_agree', exact: true, handler: handleRulesAgree },
+    { match: 'age_verify', exact: true, handler: handleAgeVerify },
     { match: 'suggestion_approve_', handler: (i, c) => handleSuggestionReview(i, 'approved', c) },
     { match: 'suggestion_deny_', handler: (i, c) => handleSuggestionReview(i, 'denied', c) },
     { match: 'suggestion_reviewing_', handler: (i, c) => handleSuggestionReview(i, 'reviewing', c) },
@@ -246,13 +249,13 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
         return;
       }
     } catch (err) {
-      console.error('[Peaches] Interaction handler error:', err);
+      console.error('[Avery] Interaction handler error:', err);
       try {
         if (interaction.isRepliable()) {
           if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: `Something went sideways, sugar. Try again in a sec! 🍑`, flags: 64 });
+            await interaction.reply({ content: `Something went sideways. Try again in a sec! 🌲`, flags: 64 });
           } else if (interaction.deferred && !interaction.replied) {
-            await interaction.editReply({ content: `Something went sideways, sugar. Try again in a sec! 🍑` });
+            await interaction.editReply({ content: `Something went sideways. Try again in a sec! 🌲` });
           }
         }
       } catch {

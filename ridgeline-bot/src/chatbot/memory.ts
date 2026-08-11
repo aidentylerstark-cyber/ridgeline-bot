@@ -1,5 +1,5 @@
 /**
- * Conversation memory for Peaches chatbot — per-channel rolling history
+ * Conversation memory for Avery chatbot — per-channel rolling history
  * with periodic cleanup to prevent memory leaks.
  */
 

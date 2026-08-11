@@ -26,7 +26,7 @@ import type { CooldownManager } from '../utilities/cooldowns.js';
 export async function handleTicketDepartmentSelect(interaction: StringSelectMenuInteraction, _client: Client) {
   const department = interaction.values[0] as string | undefined;
   if (!department || !isValidDepartment(department)) {
-    await interaction.reply({ content: 'Invalid department selection, sugar. Try again!', flags: 64 });
+    await interaction.reply({ content: 'Invalid department selection. Try again!', flags: 64 });
     return;
   }
   const config = TICKET_CATEGORIES[department];
@@ -168,7 +168,7 @@ export async function handleTicketDepartmentSelect(interaction: StringSelectMenu
 
   modal.addComponents(...rows);
   await interaction.showModal(modal);
-  console.log(`[Peaches] Ticket modal shown to ${(interaction.member as GuildMember).displayName} for ${department}`);
+  console.log(`[Avery] Ticket modal shown to ${(interaction.member as GuildMember).displayName} for ${department}`);
 }
 
 // ─────────────────────────────────────────
@@ -182,13 +182,13 @@ export async function handleTicketModalSubmit(
 ) {
   const department = interaction.customId.replace('ticket_modal_', '');
   if (!isValidDepartment(department)) {
-    await interaction.reply({ content: 'Invalid ticket department, sugar. Try again!', flags: 64 });
+    await interaction.reply({ content: 'Invalid ticket department. Try again!', flags: 64 });
     return;
   }
   const member = interaction.member as GuildMember;
   const guild = interaction.guild;
   if (!member || !guild) {
-    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    await interaction.reply({ content: 'Something went wrong. Try again! \uD83C\uDF32', flags: 64 });
     return;
   }
 
@@ -223,19 +223,19 @@ export async function handleTicketModalSubmit(
       if (location) extraFields = [{ name: '\uD83D\uDCCD Location', value: location }];
     }
   } catch (err) {
-    console.error('[Peaches] Failed to read ticket modal fields:', err);
-    await interaction.editReply({ content: 'Something went wrong reading your ticket info, sugar. Please try again! \uD83C\uDF51' });
+    console.error('[Avery] Failed to read ticket modal fields:', err);
+    await interaction.editReply({ content: 'Something went wrong reading your ticket info. Please try again! \uD83C\uDF32' });
     return;
   }
 
-  // Per-department limit check (bypass for First Lady / Ridgeline Owner)
+  // Per-department limit check (bypass for Owner)
   if (!hasTicketLimitBypass(member)) {
     const deptCount = await countUserOpenTicketsInDepartment(member.id, department);
     if (deptCount >= MAX_TICKETS_PER_DEPARTMENT) {
       const config = TICKET_CATEGORIES[department];
       await interaction.editReply({
-        content: `Sugar, you already have an open ticket in **${config.emoji} ${config.label}**! ` +
-          `Close that one first before openin' another in the same department. \uD83C\uDF51`,
+        content: `You already have an open ticket in **${config.emoji} ${config.label}**! ` +
+          `Close that one first before opening another in the same department. \uD83C\uDF32`,
       });
       return;
     }
@@ -245,7 +245,7 @@ export async function handleTicketModalSubmit(
   const result = await createTicketChannel(client, guild, member, department, subject, slName);
   if (!result) {
     await interaction.editReply({
-      content: `Oh no, sugar \u2014 somethin' went wrong creatin' your ticket. Try again or holler at a moderator! \uD83C\uDF51`,
+      content: `Oh no \u2014 something went wrong creating your ticket. Try again or reach out to a moderator! \uD83C\uDF32`,
     });
     return;
   }
@@ -282,11 +282,11 @@ export async function handleTicketModalSubmit(
     // Post urgent notice if auto-detected
     if (isAutoUrgent) {
       await channel.send(
-        '\u26A0\uFE0F **Peaches flagged this as potentially urgent based on keywords.** Staff, please review the priority!'
+        '\u26A0\uFE0F **Avery flagged this as potentially urgent based on keywords.** Staff, please review the priority!'
       ).catch(() => {});
     }
   } catch (err) {
-    console.error(`[Peaches] Failed to send opening embed for ticket #${ticketNumber}:`, err);
+    console.error(`[Avery] Failed to send opening embed for ticket #${ticketNumber}:`, err);
     // Still usable — post a minimal fallback so staff can see the ticket
     await channel.send(
       `\u26A0\uFE0F Opening embed failed to post. **Ticket #${String(ticketNumber).padStart(4, '0')}** opened by ${member} for **${TICKET_CATEGORIES[department].label}**.\n**Subject:** ${subject}\n**Details:** ${details.slice(0, 500)}`
@@ -295,10 +295,10 @@ export async function handleTicketModalSubmit(
 
   // Reply to user
   await interaction.editReply({
-    content: `Your ticket's been opened in ${channel}, sugar! Head on over and a staff member will be with you shortly. \uD83C\uDF51`,
+    content: `Your ticket's been opened in ${channel}! Head on over and a staff member will be with you shortly. \uD83C\uDF32`,
   });
 
-  console.log(`[Peaches] Ticket #${ticketNumber} opened by ${member.displayName} (${department})`);
+  console.log(`[Avery] Ticket #${ticketNumber} opened by ${member.displayName} (${department})`);
 
   logAuditEvent(client, guild, {
     action: 'ticket_create',

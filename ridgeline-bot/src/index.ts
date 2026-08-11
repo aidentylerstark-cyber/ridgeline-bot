@@ -21,6 +21,7 @@ import { destroyMemory } from './chatbot/memory.js';
 import { reorganizeCategoryByKey, setChannelPermissions } from './utilities/channel-reorg.js';
 import { postSuggestionPanel } from './panels/suggestion-panel.js';
 import { setupModLog, clearRaidModeTimer } from './features/modlog.js';
+import { setupBoostShoutout } from './features/boost.js';
 import { destroyAuditLogInterval } from './features/audit-log.js';
 import { destroyAntiSpam } from './features/anti-spam.js';
 import { startRegionWebhookServer } from './api/region-webhook.js';
@@ -38,19 +39,19 @@ import { pool } from './db/index.js';
 // button (npm run dev) does NOT set it, so local editing still works. Override with
 // ALLOW_REPLIT_BOT=true if you ever intentionally want Replit to be the primary host.
 if (process.env.REPLIT_DEPLOYMENT && process.env.ALLOW_REPLIT_BOT !== 'true') {
-  console.error('[Peaches] Refusing to start on a Replit Deployment — Railway is the primary instance. ' +
+  console.error('[Avery] Refusing to start on a Replit Deployment — Railway is the primary instance. ' +
     'Set ALLOW_REPLIT_BOT=true to override.');
   process.exit(0);
 }
 
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) {
-  console.error('[Peaches] No DISCORD_BOT_TOKEN found — cannot start bot');
+  console.error('[Avery] No DISCORD_BOT_TOKEN found — cannot start bot');
   process.exit(1);
 }
 
 if (!process.env.DATABASE_URL) {
-  console.error('[Peaches] No DATABASE_URL found — cannot connect to database');
+  console.error('[Avery] No DATABASE_URL found — cannot connect to database');
   process.exit(1);
 }
 
@@ -62,9 +63,9 @@ async function main() {
   // Run database migrations
   try {
     await runMigrations();
-    console.log('[Peaches] Database migrations complete');
+    console.log('[Avery] Database migrations complete');
   } catch (err) {
-    console.error('[Peaches] Migration failed — cannot start without database:', err);
+    console.error('[Avery] Migration failed — cannot start without database:', err);
     process.exit(1);
   }
 
@@ -101,7 +102,7 @@ async function main() {
 
   // Global error handler
   client.on('error', (err) => {
-    console.error('[Peaches] Client error:', err.message);
+    console.error('[Avery] Client error:', err.message);
   });
 
   // Ticket cooldown manager with auto-cleanup
@@ -113,6 +114,7 @@ async function main() {
   setupInteractionHandler(client, ticketCooldowns);
   setupMessageHandler(client);
   setupModLog(client);
+  setupBoostShoutout(client);
 
   // Attach admin utility methods to client for console/external access
   client.postRoleButtons = () => postRoleButtons(client);
@@ -143,7 +145,7 @@ async function main() {
   shutdown = async () => {
     if (isShuttingDown) return;
     isShuttingDown = true;
-    console.log('[Peaches] Shutting down...');
+    console.log('[Avery] Shutting down...');
     stopInstanceHeartbeat();
     cronTasks.forEach(t => t.stop());
     destroyMemory();
@@ -159,7 +161,7 @@ async function main() {
     clearRaidModeTimer();
     regionServer.close();
     client.destroy();
-    await pool.end().catch(err => console.error('[Peaches] Failed to close DB pool:', err));
+    await pool.end().catch(err => console.error('[Avery] Failed to close DB pool:', err));
     process.exit(0);
   };
 
@@ -169,11 +171,11 @@ async function main() {
 
 // Global error handlers — prevent silent crashes without cleanup
 process.on('unhandledRejection', (reason) => {
-  console.error('[Peaches] Unhandled promise rejection:', reason);
+  console.error('[Avery] Unhandled promise rejection:', reason);
 });
 
 process.on('uncaughtException', async (err) => {
-  console.error('[Peaches] Uncaught exception — shutting down:', err);
+  console.error('[Avery] Uncaught exception — shutting down:', err);
   if (shutdown) {
     await shutdown().catch(() => {});
   } else {
@@ -183,6 +185,6 @@ process.on('uncaughtException', async (err) => {
 });
 
 main().catch((err) => {
-  console.error('[Peaches] Fatal startup error:', err);
+  console.error('[Avery] Fatal startup error:', err);
   process.exit(1);
 });

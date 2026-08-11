@@ -326,7 +326,7 @@ const SEVERITY_EMOJI_PREFIX: Record<AuditSeverity, string> = {
 function formatActor(id: string | null | undefined): string {
   if (!id) return 'Unknown';
   if (/^\d+$/.test(id)) return `<@${id}>`;
-  if (id === 'system') return 'Peaches (system)';
+  if (id === 'system') return 'Avery (system)';
   if (id === 'unknown') return 'Unknown';
   return id;
 }
@@ -334,20 +334,44 @@ function formatActor(id: string | null | undefined): string {
 // Actions that only record to DB (no #mod-log embed) — either modlog.ts already
 // posts a richer custom embed, or the event is too high-volume/minor to embed.
 const SKIP_EMBED_ACTIONS: AuditAction[] = [
-  // modlog.ts posts its own rich embeds for these
-  'member_join', 'member_leave',
-  'member_ban', 'member_unban', 'member_kick',
+  // modlog.ts posts its own rich embeds for these (to their routed log channels)
+  'member_join', 'member_leave', 'member_kick',
+  'member_ban', 'member_unban',
   'message_delete', 'message_edit', 'message_bulk_delete',
   'raid_mode_activate', 'raid_mode_deactivate',
-  'spam_timeout',
-  // High-volume / minor — searchable in /auditlog but kept out of #mod-log
-  'voice_join', 'voice_leave', 'voice_move',
-  'nickname_change',
-  'channel_update', 'role_update', 'server_update', 'webhook_update', 'emoji_update',
-  'invite_create', 'invite_delete', 'thread_create', 'thread_delete',
+  'spam_timeout', // anti-spam posts its own troll report
+  // Minor / posted elsewhere
   'suggestion_create', 'birthday_set', 'birthday_delete',
   'ticket_quickreply', 'ticket_feedback',
 ];
+
+/**
+ * Route each audit action to its dedicated staff-log channel. Everything not
+ * matched here (moderation, warnings, suggestions, admin) falls back to #mod-log.
+ */
+function logChannelIdFor(action: AuditAction): string {
+  if (action.startsWith('ticket_')) return CHANNELS.ticketLogs;
+  if (action.startsWith('message_')) return CHANNELS.messageLog;
+  if (action.startsWith('voice_')) return CHANNELS.voiceLog;
+  switch (action) {
+    case 'member_join':
+    case 'member_leave':
+    case 'member_onboard_complete':
+      return CHANNELS.memberLog;
+    case 'role_assign':
+    case 'role_remove':
+    case 'nickname_change':
+      return CHANNELS.roleLog;
+    case 'channel_create': case 'channel_delete': case 'channel_update':
+    case 'role_create': case 'role_delete': case 'role_update':
+    case 'thread_create': case 'thread_delete':
+    case 'invite_create': case 'invite_delete':
+    case 'webhook_update': case 'emoji_update': case 'server_update':
+      return CHANNELS.serverLog;
+    default:
+      return CHANNELS.modLog;
+  }
+}
 
 // ─────────────────────────────────────────
 // Batch Suppression System
@@ -413,7 +437,7 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
       // Escalate critical actions to console.error with full context for investigation
       const isCritical = ['ticket_close', 'warn_issue', 'member_timeout'].includes(data.action);
       const logFn = isCritical ? console.error : console.warn;
-      logFn(`[Peaches] Audit log DB insert failed (action=${data.action}, actor=${data.actorId}):`, err);
+      logFn(`[Avery] Audit log DB insert failed (action=${data.action}, actor=${data.actorId}):`, err);
 
       // Surface critical failures in #mod-log so staff are aware
       if (isCritical) {
@@ -439,7 +463,8 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
     if (data.dbOnly || SKIP_EMBED_ACTIONS.includes(data.action)) return;
 
     try {
-      const rawLogChannel = guild.channels.cache.get(CHANNELS.modLog);
+      const targetChannelId = logChannelIdFor(data.action) || CHANNELS.modLog;
+      const rawLogChannel = guild.channels.cache.get(targetChannelId);
       const modLogChannel = rawLogChannel?.isTextBased() && !rawLogChannel.isDMBased() ? rawLogChannel as TextChannel : undefined;
       if (!modLogChannel) return;
 
@@ -451,7 +476,7 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
       if (suppressResult === 'summary') {
         const summaryEmbed = new EmbedBuilder()
           .setColor(0xFFA500)
-          .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Audit Log', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+          .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Audit Log', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
           .setTitle('\u26A0\uFE0F Rapid Actions Detected')
           .setDescription(`${formatActor(data.actorId)} has performed **${BATCH_THRESHOLD}+** actions in the last 60 seconds. Individual embeds are suppressed \u2014 check \`/auditlog search\` for details.`)
           .setFooter({ text: 'Batch suppression active' })
@@ -469,7 +494,7 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
 
       const embed = new EmbedBuilder()
         .setColor(color)
-        .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Audit Log', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+        .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Audit Log', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
         .setTitle(`${severityPrefix}${emoji} ${label}`)
         .setDescription(data.details)
         .addFields(
@@ -483,7 +508,7 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
 
       await modLogChannel.send({ embeds: [embed] });
     } catch (err) {
-      console.error('[Peaches] Audit log embed post failed:', err);
+      console.error('[Avery] Audit log embed post failed:', err);
     }
   })();
 }
@@ -662,7 +687,7 @@ export async function handleAuditLogAutocomplete(interaction: AutocompleteIntera
 export async function handleAuditLogCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember | null;
   if (!member || !isStaff(member)) {
-    await interaction.reply({ content: "Only staff can view audit logs, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can view audit logs! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -674,7 +699,7 @@ export async function handleAuditLogCommand(interaction: ChatInputCommandInterac
     case 'stats':   return handleAuditStats(interaction, client);
     case 'config':  return handleAuditConfig(interaction);
     default:
-      await interaction.reply({ content: "Unknown subcommand, sugar! \uD83C\uDF51", flags: 64 });
+      await interaction.reply({ content: "Unknown subcommand! \uD83C\uDF32", flags: 64 });
   }
 }
 
@@ -695,7 +720,7 @@ async function handleAuditSearch(interaction: ChatInputCommandInteraction, clien
   const { rows } = await pool.query<AuditLogRow>(query, params);
 
   if (rows.length === 0) {
-    await interaction.editReply({ content: "No audit log entries found matching those filters, sugar. \uD83C\uDF51" });
+    await interaction.editReply({ content: "No audit log entries found matching those filters. \uD83C\uDF32" });
     return;
   }
 
@@ -715,7 +740,7 @@ async function handleAuditSearch(interaction: ChatInputCommandInteraction, clien
     pages.push(
       new EmbedBuilder()
         .setColor(0xD4A574)
-        .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Audit Log', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+        .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Audit Log', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
         .setTitle('\uD83D\uDCCB Audit Log Results')
         .setDescription(lines.join('\n\n'))
         .setFooter({ text: `Page ${Math.floor(start / PAGE_SIZE) + 1} of ${Math.ceil(rows.length / PAGE_SIZE)} \u2022 ${rows.length} result(s)` })
@@ -751,7 +776,7 @@ async function handleAuditSearch(interaction: ChatInputCommandInteraction, clien
     try {
       await i.update({ embeds: [pages[safePage]!], components: [buildRow()] });
     } catch {
-      console.warn('[Peaches] Audit log pagination update failed (token may have expired)');
+      console.warn('[Avery] Audit log pagination update failed (token may have expired)');
     }
   });
 
@@ -763,7 +788,7 @@ async function handleAuditSearch(interaction: ChatInputCommandInteraction, clien
       });
       await reply.edit({ embeds: [expiredEmbed], components: [] });
     } catch {
-      console.warn('[Peaches] Audit log pagination expired edit failed');
+      console.warn('[Avery] Audit log pagination expired edit failed');
     }
   });
 }
@@ -785,7 +810,7 @@ async function handleAuditExport(interaction: ChatInputCommandInteraction, clien
   const { rows } = await pool.query<AuditLogRow>(query, params);
 
   if (rows.length === 0) {
-    await interaction.editReply({ content: "No audit log entries found matching those filters, sugar. \uD83C\uDF51" });
+    await interaction.editReply({ content: "No audit log entries found matching those filters. \uD83C\uDF32" });
     return;
   }
 
@@ -796,13 +821,13 @@ async function handleAuditExport(interaction: ChatInputCommandInteraction, clien
     return `#${row.id} | ${ts} | ${row.action} | actor:${row.actor_discord_id}${target}${ref} | ${row.details}`;
   });
 
-  const header = `Ridgeline Audit Log Export — ${new Date().toISOString()}\n${'='.repeat(60)}\n\n`;
+  const header = `Avelora Audit Log Export — ${new Date().toISOString()}\n${'='.repeat(60)}\n\n`;
   const content = header + lines.join('\n');
   const buffer = Buffer.from(content, 'utf-8');
   const attachment = new AttachmentBuilder(buffer, { name: 'audit-log-export.txt' });
 
   await interaction.editReply({
-    content: `\uD83D\uDCCB Exported **${rows.length}** audit log entries. \uD83C\uDF51`,
+    content: `\uD83D\uDCCB Exported **${rows.length}** audit log entries. \uD83C\uDF32`,
     files: [attachment],
   });
 }
@@ -823,7 +848,7 @@ async function handleAuditStats(interaction: ChatInputCommandInteraction, client
   );
 
   if (rows.length === 0) {
-    await interaction.editReply({ content: "No audit log activity in the last 30 days, sugar. \uD83C\uDF51" });
+    await interaction.editReply({ content: "No audit log activity in the last 30 days. \uD83C\uDF32" });
     return;
   }
 
@@ -836,7 +861,7 @@ async function handleAuditStats(interaction: ChatInputCommandInteraction, client
 
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Audit Log', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Audit Log', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setTitle('\uD83D\uDCCA Audit Log Stats \u2014 Last 30 Days')
     .setDescription(lines.join('\n'))
     .setFooter({ text: `${total} total actions` })
@@ -858,19 +883,19 @@ async function handleAuditConfig(interaction: ChatInputCommandInteraction): Prom
     // Read current
     const current = await getContentByKey('audit_log_retention_days') as number | undefined;
     await interaction.editReply({
-      content: `\uD83D\uDCCB Current audit log retention: **${current ?? 90}** days. Use \`/auditlog config <days>\` to change it (7-730). \uD83C\uDF51`,
+      content: `\uD83D\uDCCB Current audit log retention: **${current ?? 90}** days. Use \`/auditlog config <days>\` to change it (7-730). \uD83C\uDF32`,
     });
     return;
   }
 
   if (days < 7 || days > 730) {
-    await interaction.editReply({ content: "Retention must be between 7 and 730 days, sugar! \uD83C\uDF51" });
+    await interaction.editReply({ content: "Retention must be between 7 and 730 days! \uD83C\uDF32" });
     return;
   }
 
   await setContentByKey('audit_log_retention_days', days);
   await interaction.editReply({
-    content: `\u2705 Audit log retention updated to **${days}** days. Entries older than that will be purged on the next weekly cleanup. \uD83C\uDF51`,
+    content: `\u2705 Audit log retention updated to **${days}** days. Entries older than that will be purged on the next weekly cleanup. \uD83C\uDF32`,
   });
 }
 

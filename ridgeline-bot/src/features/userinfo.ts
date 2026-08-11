@@ -10,14 +10,14 @@ import { isStaff } from '../utilities/permissions.js';
 export async function handleUserInfoCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
   if (!isStaff(member)) {
-    await interaction.reply({ content: "Only staff can use this command, sugar! 🍑", flags: 64 });
+    await interaction.reply({ content: "Only staff can use this command! 🌲", flags: 64 });
     return;
   }
 
   const targetUser = interaction.options.getUser('user', true);
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.reply({ content: "Something went wrong, sugar. 🍑", flags: 64 });
+    await interaction.reply({ content: "Something went wrong. 🌲", flags: 64 });
     return;
   }
 
@@ -44,7 +44,7 @@ export async function handleUserInfoCommand(interaction: ChatInputCommandInterac
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
     .setAuthor({
-      name: 'Peaches \uD83C\uDF51 \u2014 Member Info',
+      name: 'Avery \uD83C\uDF32 \u2014 Member Info',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
     .setTitle(`\uD83D\uDC64 ${targetMember?.displayName ?? targetUser.displayName}`)
@@ -123,7 +123,7 @@ export async function handleUserInfoCommand(interaction: ChatInputCommandInterac
     { name: '\u2B50 Avg Satisfaction', value: satisfactionDisplay, inline: false },
   );
 
-  embed.setFooter({ text: 'Ridgeline, Georgia \u2014 Staff Tool \uD83C\uDF51' }).setTimestamp();
+  embed.setFooter({ text: 'Avelora, California \u2014 Staff Tool \uD83C\uDF32' }).setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
 }

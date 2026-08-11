@@ -43,14 +43,14 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
           const ticketNum = String(ticket.ticket_number).padStart(4, '0');
           const currentLevel = ticket.escalation_level;
 
-          // Tier 3: DM owner/first lady
+          // Tier 3: DM owner
           if (ageHours >= t3 && currentLevel < 3) {
             await storage.updateTicketEscalationLevel(ticket.id, 3);
 
             // Post to mod-log
             const embed = new EmbedBuilder()
               .setColor(0xFF0000)
-              .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Escalation', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+              .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Ticket Escalation', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
               .setTitle(`\uD83D\uDED1 TIER 3 \u2014 Ticket #${ticketNum}`)
               .setDescription(
                 `Ticket has been inactive for **${Math.floor(ageHours)}h**${isUrgent ? ' (URGENT)' : ''}.\n` +
@@ -72,6 +72,8 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
                     `User: ${ticket.user_name} \u2014 ${ticket.claimed_by ? `Claimed by <@${ticket.claimed_by}>` : 'Unclaimed'}\n` +
                     `Please review immediately.`
                   ).catch(() => {});
+                  // Space out DMs to avoid Discord rate limits (matches birthday/milestone loops)
+                  await new Promise(r => setTimeout(r, 1500));
                 } catch { /* graceful */ }
               }
             }
@@ -84,7 +86,7 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
 
             const embed = new EmbedBuilder()
               .setColor(0xFFA500)
-              .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Escalation', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+              .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Ticket Escalation', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
               .setTitle(`\u26A0\uFE0F TIER 2 \u2014 Ticket #${ticketNum}`)
               .setDescription(
                 `Ticket has been inactive for **${Math.floor(ageHours)}h**${isUrgent ? ' (URGENT)' : ''}.\n` +
@@ -105,7 +107,7 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
                   .join(' ');
                 if (mentions) {
                   await ticketChannel.send(
-                    `\u26A0\uFE0F **Escalation** \u2014 This ticket has been inactive for **${Math.floor(ageHours)}h**. ${mentions} \u2014 please review. \uD83C\uDF51`
+                    `\u26A0\uFE0F **Escalation** \u2014 This ticket has been inactive for **${Math.floor(ageHours)}h**. ${mentions} \u2014 please review. \uD83C\uDF32`
                   ).catch(() => {});
                 }
               }
@@ -119,7 +121,7 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
 
             const embed = new EmbedBuilder()
               .setColor(0xFEE75C)
-              .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Alert', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+              .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Ticket Alert', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
               .setTitle(`\u26A0\uFE0F Unclaimed Ticket \u2014 #${ticketNum}`)
               .setDescription(
                 `Ticket has been unclaimed for **${Math.floor(ageHours)}h**${isUrgent ? ' (URGENT)' : ''}.\n` +
@@ -132,7 +134,7 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
           }
         }
 
-        console.log(`[Peaches] Ticket escalation check complete: ${tickets.length} ticket(s) reviewed`);
+        console.log(`[Avery] Ticket escalation check complete: ${tickets.length} ticket(s) reviewed`);
 
         // ── Auto-close stale "waiting_on_user" tickets (7 days / 168 hours) ──
         const staleTickets = await storage.getStaleWaitingOnUserTickets(168);
@@ -147,7 +149,7 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
             }
 
             await ticketChannel.send(
-              "This ticket has been automatically closed after 7 days of waiting for a response. If you still need help, please open a new ticket! \uD83C\uDF51"
+              "This ticket has been automatically closed after 7 days of waiting for a response. If you still need help, please open a new ticket! \uD83C\uDF32"
             ).catch(() => {});
 
             const botMember = guild.members.cache.get(client.user?.id ?? '');
@@ -155,15 +157,15 @@ export function scheduleTicketInactivityCheck(client: Client): cron.ScheduledTas
               await closeTicket(client, ticketChannel, botMember);
             }
           } catch (err) {
-            console.error(`[Peaches] Failed to auto-close stale ticket #${staleTicket.ticket_number}:`, err);
+            console.error(`[Avery] Failed to auto-close stale ticket #${staleTicket.ticket_number}:`, err);
           }
         }
         if (staleTickets.length > 0) {
-          console.log(`[Peaches] Auto-closed ${staleTickets.length} stale waiting_on_user ticket(s)`);
+          console.log(`[Avery] Auto-closed ${staleTickets.length} stale waiting_on_user ticket(s)`);
         }
       }, { label: 'Ticket inactivity check' });
     } catch (err) {
-      console.error('[Peaches] Ticket inactivity check failed after retries:', err);
+      console.error('[Avery] Ticket inactivity check failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 }

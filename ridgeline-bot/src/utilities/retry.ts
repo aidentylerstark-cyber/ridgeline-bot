@@ -16,7 +16,7 @@ export async function withRetry<T>(
       lastError = err;
       if (attempt < maxAttempts) {
         const delay = baseDelayMs * Math.pow(2, attempt - 1);
-        console.warn(`[Peaches] ${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${Math.round(delay / 1000)}s...`);
+        console.warn(`[Avery] ${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${Math.round(delay / 1000)}s...`);
         await new Promise(r => setTimeout(r, delay));
       }
     }

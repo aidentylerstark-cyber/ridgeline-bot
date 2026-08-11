@@ -4,40 +4,46 @@ import { ButtonStyle } from 'discord.js';
 // Guild & Channel Configuration
 // ─────────────────────────────────────────
 
-export const GUILD_ID = '1096864059946709033';
+export const GUILD_ID = '1536851087078858852'; // Avelora server
 
 export const CHANNELS = {
-  welcome: '1096864061200793662',
-  rules: '1097039896209784863',
-  getRoles: '1097041761999786015',
-  generalChat: '1410765263099396246',
-  characterIntros: '1097063953231794257',
-  roleplayChat: '1383978576340324434',
-  realEstate: '1379054771197186099',
-  upcomingEvents: '1097074925455560765',
-  communityAnnouncements: '1388647632792064030',
-  ticketPanel: '1097052132949119067',
-  ticketLogs: '1097058478398373978',
-  suggestions: '1378183356885504000',
-  communityPolls: '1466235361658404981',
-  deptAnnouncements: '1383987811698348063',
-  birthdays: '1397796734947823778',
-  celebrationCorner: '1397573063997919272',
-  ridgelinePhotos: '1383231594248015912',
-  foodLovers: '1380939549185675344',
-  botCommands: '1097051267207008327',
+  welcome: '1536857667065348117',
+  rules: '1536857670743494876',
+  getRoles: '1536857673180516413',
+  generalChat: '1536857683028738130',
+  characterIntros: '1536874191918207006',
+  roleplayChat: '1536857709503053836',
+  realEstate: '1536874196410302596',
+  upcomingEvents: '1536857725529751634',
+  communityAnnouncements: '1536857675604688966',
+  ticketPanel: '1536857731527344278',
+  ticketLogs: '1536857734283005982',
+  suggestions: '1536857688364027977',
+  communityPolls: '1536857691228741642',
+  deptAnnouncements: '1536857677953503232',
+  birthdays: '1536857693724213368',
+  celebrationCorner: '1536857695938809856',
+  aveloraPhotos: '1536857698258395337',
+  foodLovers: '1536857701374763100',
+  botCommands: '1536857704537129010',
   // New feature channels — fill in IDs after creating channels in Discord
-  modLog: '1475717473989820489',           // Mod log channel (staff-only, #mod-log)
-  statsMembersVC: '1475717469791457352',   // Voice channel showing member count (e.g. "Members: 247")
-  statsOnlineVC: '1475717470936498176',    // Voice channel showing online count (e.g. "Online: 43")
-  regionMonitoring: '1420963602457825330', // SL region monitoring alerts & logs
+  statsMembersVC: '1536857749260996658',   // Voice channel showing member count (e.g. "Members: 247")
+  statsOnlineVC: '1536857752008392775',    // Voice channel showing online count (e.g. "Online: 43")
+  // ── Staff log channels (routed by audit-log.ts) ──
+  modLog: '1536857740180455555',           // Moderation: bans, kicks, timeouts, warns, raids
+  memberLog: '1536870380176806060',        // Joins, leaves, onboarding
+  messageLog: '1536870382869680218',       // Deleted / edited / bulk-deleted messages
+  roleLog: '1536870385193197629',          // Role assign/remove, nickname changes
+  voiceLog: '1536870387671892043',         // Voice join/leave/move
+  serverLog: '1536870390620753930',        // Channel/role/thread/invite/webhook/emoji/server changes
+  regionMonitoring: '0',                    // Region monitoring removed — channel deleted, feature dormant
 };
 
 // ─────────────────────────────────────────
 // Chatbot Channel Denylist
 // ─────────────────────────────────────────
 
-/** Channels where Peaches should NOT respond to chatbot triggers */
+/** Channels where Avery should NOT respond to chatbot triggers */
 export const CHATBOT_DENIED_CHANNELS = new Set([
   CHANNELS.rules,
   CHANNELS.communityAnnouncements,
@@ -55,15 +61,17 @@ export const CHATBOT_DENIED_CHANNELS = new Set([
 // Roles
 // ─────────────────────────────────────────
 
-export const CITIZEN_ROLE = 'Ridgeline Citizen';
+export const CITIZEN_ROLE = 'Avelora Citizen'; // Granted after agreeing to the rules — unlocks the city
+export const VISITOR_ROLE = 'Visitor';          // Assigned on join; can only see #welcome + #rules until verified
 export const NEW_ARRIVAL_ROLE = 'New Arrival'; // Temporary role removed after 7 days
 export const BIRTHDAY_ROLE = 'Birthday';        // Temporary role assigned for 24h on birthday
+export const NSFW_ROLE = '18+';                 // Granted via the 18+ agreement gate — unlocks the NSFW section
 
 // Leadership highlighted in the welcome message. Resolved to clickable profile
 // mentions at runtime by Discord username; they are NOT pinged on each join.
 export const LEADERSHIP: { username: string; title: string; emoji: string }[] = [
-  { username: 'aiden.zip',           title: 'Owner',                          emoji: '👑' },
-  { username: 'misunderstoodbeauty', title: 'Community Manager & Lead Designer', emoji: '🎨' },
+  { username: 'aiden.zip', title: 'Owner', emoji: '👑' },
+  { username: 'misunderstoodbeauty', title: 'Community Manager', emoji: '🌟' }, // gigi
 ];
 
 // ─────────────────────────────────────────
@@ -81,7 +89,7 @@ export const ANTI_SPAM = {
 
 // Role or user pinged in the #mod-log troll report to review a ban. Resolved as a
 // role mention if the ID matches a guild role, otherwise a user mention.
-export const SPAM_ALERT_PING_ID = '1097007372918071419';
+export const SPAM_ALERT_PING_ID = '1536857608655343686';
 
 export const SELF_ASSIGN_ROLES: Record<string, string[]> = {
   '\uD83D\uDD14 Notifications': [
@@ -99,7 +107,10 @@ export const SELF_ASSIGN_ROLES: Record<string, string[]> = {
     'Business Owner',
     'Adult',
     'roleplayers',
-    '\uD83E\uDDD2 Ridgeline Kids',
+    'Avelora Kids',
+  ],
+  '\uD83C\uDFAE Access': [
+    'Gamer',
   ],
 };
 
@@ -122,6 +133,12 @@ export const ROLE_CATEGORY_STYLE: Record<string, { color: number; icon: string; 
     description: 'Tell us a bit about yourself! These tags help people find like-minded neighbors.',
     buttonStyle: ButtonStyle.Success,
   },
+  '\uD83C\uDFAE Access': {
+    color: 0x5865F2,
+    icon: '\uD83C\uDFAE',
+    description: 'Unlock optional community spaces. Grab **Gamer** to open the Gaming Corner.',
+    buttonStyle: ButtonStyle.Primary,
+  },
 };
 
 // ─────────────────────────────────────────
@@ -133,36 +150,36 @@ export const TICKET_CATEGORIES = {
     label: 'General Support',
     emoji: '\u26A0\uFE0F',
     description: 'General questions, account issues, or anything else',
-    categoryId: '1437264115855786016',
-    staffRoles: ['Community Manager', 'Community Moderator'],
+    categoryId: '1536857754466263111',
+    staffRoles: ['Community Manager', 'Moderator'],
   },
   rental: {
     label: 'Rental / Landscaping',
     emoji: '\uD83C\uDFE0',
     description: 'Housing, rentals, landscaping, or property questions',
-    categoryId: '1437264818657689671',
-    staffRoles: ['Community Manager', 'Community Moderator', 'Rental Manager', 'Rental Moderator'],
+    categoryId: '1536857756806545512',
+    staffRoles: ['Community Manager', 'Moderator', 'Rental Manager', 'Rental Team'],
   },
   events: {
     label: 'Events',
     emoji: '\uD83D\uDCC6',
     description: 'Event planning, scheduling, or event-related issues',
-    categoryId: '1437261981819338823',
-    staffRoles: ['Community Manager', 'Community Moderator', 'Events Director', 'Events Team'],
+    categoryId: '1536857759709139074',
+    staffRoles: ['Community Manager', 'Moderator', 'Events Manager', 'Events Team'],
   },
   marketing: {
     label: 'Marketing',
     emoji: '\uD83D\uDCC1',
     description: 'Marketing requests, promotional materials, or media',
-    categoryId: '1437260751537705122',
-    staffRoles: ['Community Manager', 'Community Moderator', 'Marketing Director', 'Marketing Team'],
+    categoryId: '1536857762565464074',
+    staffRoles: ['Community Manager', 'Moderator', 'Marketing Manager', 'Marketing Team'],
   },
   roleplay: {
     label: 'Roleplay Support',
     emoji: '\uD83D\uDCCD',
     description: 'Roleplay questions, storyline help, or RP disputes',
-    categoryId: '1437263205402415265',
-    staffRoles: ['Community Manager', 'Community Moderator'],
+    categoryId: '1536857765622976613',
+    staffRoles: ['Community Manager', 'Moderator'],
   },
 };
 
@@ -174,8 +191,8 @@ export function isValidDepartment(value: string): value is TicketDepartment {
 
 export const TICKET_COOLDOWN_MS = 60_000;
 export const MAX_TICKETS_PER_DEPARTMENT = 1;
-export const TICKET_LIMIT_BYPASS_ROLES = ['First Lady', 'Ridgeline Owner'];
-export const GLOBAL_STAFF_ROLES = ['Ridgeline Owner', 'First Lady', 'Ridgeline Management', 'Ridgeline Manager'];
+export const TICKET_LIMIT_BYPASS_ROLES = ['Owner'];
+export const GLOBAL_STAFF_ROLES = ['Owner', 'Community Manager', 'Moderator'];
 
 // ── Ticket Escalation ──
 
@@ -183,17 +200,17 @@ export const GLOBAL_STAFF_ROLES = ['Ridgeline Owner', 'First Lady', 'Ridgeline M
 export const ESCALATION_THRESHOLDS_HOURS = {
   tier1: 24,   // Post to mod-log
   tier2: 48,   // Ping management in ticket channel
-  tier3: 72,   // DM owner/first lady
+  tier3: 72,   // DM owner
 } as const;
 
 /** Urgent tickets use half the normal thresholds */
 export const ESCALATION_URGENT_DIVISOR = 2;
 
 /** Roles to ping at tier 2 escalation */
-export const ESCALATION_MANAGEMENT_ROLES = ['Ridgeline Management', 'Ridgeline Manager'];
+export const ESCALATION_MANAGEMENT_ROLES = ['Community Manager'];
 
 /** Roles to DM at tier 3 escalation */
-export const ESCALATION_DM_ROLES = ['Ridgeline Owner', 'First Lady'];
+export const ESCALATION_DM_ROLES = ['Owner'];
 
 // ── Ticket priority colors ──
 
@@ -204,63 +221,13 @@ export const TICKET_PRIORITY_COLORS: Record<string, number> = {
 };
 
 // ─────────────────────────────────────────
-// Business Locations
-// ─────────────────────────────────────────
-
-export const BUSINESS_CATEGORIES = {
-  animalServices: {
-    label: 'Cloverdale Animal Services',
-    categoryId: '1485397337902678257',
-    staffRoles: ['Vet Clinic Director', 'Vet Clinic Staff', 'Wildlife Reserve Director', 'Wildlife Reserve Staff'],
-    shared: {
-      announcements: '1485396504033231032',
-      teamMeetingVC: '1485396567853764668',
-      resources: '1382372809296187442',
-      emergencyDispatch: '1486982701578977280',
-    },
-    vetClinic: {
-      staffChat: '1485396496282157128',
-      staffRoster: '1485396512283427007',
-      handBook: '1485396520042758255',
-      timeClock: '1485397848928550912',
-      appointments: '1485396534773284954',
-      patientRecords: '1485396542088155136',
-      emergencyCases: '1485396549864395013',
-    },
-    wildlifeReserve: {
-      staffRoster: '1486982709174865941',
-      handBook: '1486982716871282729',
-      timeClock: '1486982724458774571',
-      animalTracking: '1486982732553781289',
-      habitatReports: '1486982740745130004',
-      rescueOperations: '1486982760752087152',
-    },
-  },
-  postOffice: {
-    label: 'Ridgeline Post Office',
-    categoryId: '1485397422791463072',
-    staffRoles: ['Postmaster', 'Post Office Staff'],
-    channels: {
-      staffChat: '1485396595196563526',
-      announcements: '1485396602645381200',
-      staffRoster: '1485396609947930796',
-      handBook: '1485396617405272135',
-      timeClock: '1485396527491973321',
-      packageTracking: '1485396632643047474',
-      mailroom: '1485396640264356020',
-      deliveryRoutes: '1485396647465848975',
-      resources: '1485396557963595816',
-      postalMeetingVC: '1485396662229663827',
-    },
-  },
-};
-
-// ─────────────────────────────────────────
 // Region Monitoring (Second Life)
 // ─────────────────────────────────────────
 
+// Second Life sim name(s) monitored via the region webhook. Update if your SL
+// region is named differently (must match the sim name exactly).
 export const REGION_NAMES = [
-  'Cherokee Rose', 'Oakley Springs', 'Crescent Creek', 'MeadowView Heights',
+  'Avelora',
 ] as const;
 export type RegionName = typeof REGION_NAMES[number];
 
@@ -278,52 +245,61 @@ export const REGION_SNAPSHOT_RETENTION_DAYS = 7;
 // Milestones
 // ─────────────────────────────────────────
 
-export const FOUNDING_DATE = new Date('2025-06-25');
+export const FOUNDING_DATE = new Date('2026-08-11');
 
 export const MILESTONES = [
   {
     days: 30,
-    label: '1 Month',
-    tier: 'Fresh Sprout',
+    label: '30 Days',
+    tier: 'Newcomer',
     emoji: '\uD83C\uDF31',
     color: 0x87CEEB,
-    flavor: "Still gettin' the red clay off their boots, but they're already part of the family. The front porch light's on \u2014 they're home.",
+    flavor: "Just getting their bearings around the city, but they're already part of the community. The lights are on \u2014 they're home.",
     badge: '\uD83C\uDF96 Newcomer',
   },
   {
+    days: 60,
+    label: '60 Days',
+    tier: 'Settling In',
+    emoji: '🌿',
+    color: 0x5DBE7D,
+    flavor: "Two months in and finding their rhythm — favorite spots, familiar faces, and a place in the city's story.",
+    badge: '🎖 Local',
+  },
+  {
     days: 90,
-    label: '3 Months',
-    tier: 'Taking Root',
+    label: '90 Days',
+    tier: 'Local',
     emoji: '\uD83C\uDF3F',
     color: 0x3CB371,
-    flavor: "Knows where the best sweet tea is served, has a favorite porch to sit on, and the neighbors wave when they walk by. This one's stayin'.",
+    flavor: "Knows the best coffee downtown, has a favorite hillside overlook, and the neighbors wave when they walk by. This one's staying.",
     badge: '\uD83C\uDF96 Neighbor',
   },
   {
-    days: 180,
-    label: '6 Months',
-    tier: 'Deep Roots',
+    days: 120,
+    label: '120 Days',
+    tier: 'Established',
     emoji: '\uD83C\uDF33',
     color: 0x2E8B57,
-    flavor: "The mailman knows 'em by name. Half a year of stories, Sunday dinners, and small-town charm. Ridgeline wouldn't be the same without them.",
+    flavor: "Everyone at the corner café knows them by name. Four months of stories, city nights, and that Avelora charm. The city wouldn't be the same without them.",
     badge: '\uD83C\uDF96 Resident',
   },
   {
     days: 365,
     label: '1 Year',
-    tier: 'Ridgeline Star',
+    tier: 'Avelora Star',
     emoji: '\u2B50',
     color: 0xFFD700,
-    flavor: "A full year in Ridgeline! They've weathered every storm, danced at every festival, and earned their place on Main Street. A true pillar of this community.",
+    flavor: "A full year in Avelora! They've seen the city through every season and earned their place in the community. A true pillar of this city.",
     badge: '\uD83C\uDF1F Pillar of the Community',
   },
   {
     days: 730,
     label: '2 Years',
-    tier: 'Town Legend',
+    tier: 'City Legend',
     emoji: '\uD83C\uDFC6',
     color: 0xFF8C00,
-    flavor: "Two years! If Ridgeline had a Mount Rushmore, they'd be carved into it. A legend. A fixture. The kind of person folks tell stories about at the diner.",
+    flavor: "Two years! If Avelora put names up in lights downtown, theirs would be up there. A legend. A fixture. The kind of person folks tell stories about all over the city.",
     badge: '\uD83D\uDC51 Living Legend',
   },
 ];

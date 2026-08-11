@@ -12,7 +12,7 @@ import {
   SeparatorBuilder,
   ThumbnailBuilder,
 } from '@discordjs/builders';
-import { CHANNELS, CITIZEN_ROLE, NEW_ARRIVAL_ROLE, LEADERSHIP } from '../config.js';
+import { CHANNELS, VISITOR_ROLE, NEW_ARRIVAL_ROLE, LEADERSHIP } from '../config.js';
 import type { Guild } from 'discord.js';
 import { scheduleRoleRemoval } from '../storage.js';
 import { isBotActive } from '../utilities/instance-lock.js';
@@ -69,29 +69,28 @@ async function postWelcomeMessage(member: GuildMember, isReturning: boolean): Pr
 
   const title = isReturning
     ? `Welcome Back, ${member.displayName}!`
-    : `Welcome to Ridgeline, ${member.displayName}!`;
+    : `Welcome to Avelora, ${member.displayName}!`;
 
   const body = isReturning
     ? (
       `> *${greeting}*\n\n` +
-      `Hey there, sugar — I'm **Peaches**, and I remember you! ` +
-      `Welcome back to **Ridgeline, Georgia**. We missed ya around here. ` +
-      `Your **Ridgeline Citizen** badge is right back where it belongs. 🍑`
+      `Hi there — I'm **Avery**, and I remember you! ` +
+      `Welcome back to **Avelora, California**. We missed you around here.\n\n` +
+      `Just pop into <#${CHANNELS.rules}> and **stamp your passport** 🛂 to unlock the city again. 🌲`
     )
     : (
       `> *${greeting}*\n\n` +
-      `Hey there, sugar — I'm **Peaches**, the town secretary. ` +
-      `Welcome to **Ridgeline, Georgia** — a close-knit community nestled in the hills ` +
+      `Hi there — I'm **Avery**, the community concierge. ` +
+      `Welcome to **Avelora, California** — a bustling Southern California city ringed by hills and mountains, ` +
       `where neighbors look out for each other and there's always a story waiting to unfold.\n\n` +
-      `I went ahead and pinned that shiny **Ridgeline Citizen** badge on ya — ` +
-      `you're officially one of us now. You're resident **#${member.guild.memberCount}**! 🍑`
+      `Right now you're here as a **Visitor** 🛂 — head to <#${CHANNELS.rules}>, read them, and **stamp your passport** to become an **Avelora Citizen** and unlock the whole city. You'll be resident **#${member.guild.memberCount}**! 🌲`
     );
 
   const welcomeContainer = new ContainerBuilder().setAccentColor(0xD4A574);
 
   const welcomeHeader = new SectionBuilder()
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`## 🏡 ${title}\n${body}`)
+      new TextDisplayBuilder().setContent(`## 🏙️ ${title}\n${body}`)
     )
     .setThumbnailAccessory(
       new ThumbnailBuilder().setURL(member.user.displayAvatarURL({ size: 256 }))
@@ -104,9 +103,9 @@ async function postWelcomeMessage(member: GuildMember, isReturning: boolean): Pr
     welcomeContainer.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `### 🗺️ Your First Steps\n` +
-        `**Step 1** — Read the Rules in <#${CHANNELS.rules}>\n` +
-        `**Step 2** — Pick Your Roles in <#${CHANNELS.getRoles}>\n` +
-        `**Step 3** — Introduce Yourself in <#${CHANNELS.characterIntros}>\n` +
+        `**Step 1** — Read the rules & **stamp your passport** 🛂 in <#${CHANNELS.rules}>\n` +
+        `**Step 2** — Grab your roles in <#${CHANNELS.getRoles}>\n` +
+        `**Step 3** — Introduce your character in <#${CHANNELS.characterIntros}>\n` +
         `**Step 4** — Explore <#${CHANNELS.realEstate}>, <#${CHANNELS.upcomingEvents}>, or <#${CHANNELS.generalChat}>`
       )
     );
@@ -116,17 +115,16 @@ async function postWelcomeMessage(member: GuildMember, isReturning: boolean): Pr
   const leadershipLine = buildLeadershipLine(member.guild);
   if (leadershipLine) {
     welcomeContainer.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`### 🤝 Your Town Leadership\n${leadershipLine}`)
+      new TextDisplayBuilder().setContent(`### 🤝 Your City Leadership\n${leadershipLine}`)
     );
     welcomeContainer.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
   }
 
   welcomeContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `🌐 **[ridgeline-sl.com](https://ridgeline-sl.com)** — Town website, property listings, & more\n` +
-      `🍑 **Need help?** Just say "hey Peaches" in any channel\n` +
+      `🌲 **Need help?** Just say "hey Avery" in any channel\n` +
       `🆘 **Staff help?** Click "Open a Ticket" in <#${CHANNELS.ticketPanel}>\n\n` +
-      `-# 🍑 ${isReturning ? 'A familiar face returns!' : 'A new face in town!'} Welcome, <@${member.id}>!`
+      `-# 🌲 ${isReturning ? 'A familiar face returns!' : 'A new face in the city!'} Welcome, <@${member.id}>!`
     )
   );
 
@@ -136,7 +134,7 @@ async function postWelcomeMessage(member: GuildMember, isReturning: boolean): Pr
     // Ping ONLY the new member — leadership mentions stay clickable but silent.
     allowedMentions: { users: [member.id] },
   });
-  console.log(`[Peaches] Welcome message posted for ${member.displayName} in #${welcomeChannel.name}${isReturning ? ' (returning)' : ''}`);
+  console.log(`[Avery] Welcome message posted for ${member.displayName} in #${welcomeChannel.name}${isReturning ? ' (returning)' : ''}`);
 }
 
 // ─────────────────────────────────────────
@@ -195,9 +193,9 @@ async function flushPendingWelcomes(): Promise<void> {
   const container = new ContainerBuilder().setAccentColor(0xD4A574);
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## 🏡 Welcome to Ridgeline, y'all!\n` +
-      `A whole wave of new neighbors just rolled into town — **${present.length}** of 'em! ` +
-      `Pull up a rockin' chair and make yourselves at home, sugars. 🍑`
+      `## 🏙️ Welcome to Avelora, everyone!\n` +
+      `A whole wave of new neighbors just arrived in the city — **${present.length}** of you! ` +
+      `Pull up a chair and make yourselves at home. 🌲`
     )
   );
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
@@ -207,11 +205,11 @@ async function flushPendingWelcomes(): Promise<void> {
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `### 🗺️ Your First Steps\n` +
-      `**1** — Read the Rules in <#${CHANNELS.rules}>\n` +
-      `**2** — Pick Your Roles in <#${CHANNELS.getRoles}>\n` +
-      `**3** — Introduce Yourself in <#${CHANNELS.characterIntros}>\n` +
-      (batchLeadership ? `\n**🤝 Your Town Leadership**\n${batchLeadership}\n` : '') +
-      `\n🌐 **[ridgeline-sl.com](https://ridgeline-sl.com)** • 🍑 Say "hey Peaches" anytime`
+      `**1** — Read the rules & **stamp your passport** 🛂 in <#${CHANNELS.rules}>\n` +
+      `**2** — Grab your roles in <#${CHANNELS.getRoles}>\n` +
+      `**3** — Introduce your character in <#${CHANNELS.characterIntros}>\n` +
+      (batchLeadership ? `\n**🤝 Your City Leadership**\n${batchLeadership}\n` : '') +
+      `\n🌲 Say "hey Avery" anytime`
     )
   );
 
@@ -222,9 +220,9 @@ async function flushPendingWelcomes(): Promise<void> {
       // Ping the new members being welcomed; keep leadership mentions silent.
       allowedMentions: { users: present.map(p => p.member.id) },
     });
-    console.log(`[Peaches] Batched welcome posted for ${present.length} members after join burst`);
+    console.log(`[Avery] Batched welcome posted for ${present.length} members after join burst`);
   } catch (err) {
-    console.error('[Peaches] Failed to post batched welcome:', err);
+    console.error('[Avery] Failed to post batched welcome:', err);
   }
 }
 
@@ -238,14 +236,15 @@ export function setupMemberJoinHandler(client: Client) {
   client.on('guildMemberAdd', async (member: GuildMember) => {
     if (!isBotActive()) return;
     try {
-      // 1. Auto-assign Citizen role
-      const citizenRole = member.guild.roles.cache.find(r => r.name === CITIZEN_ROLE);
-      if (citizenRole) {
+      // 1. Auto-assign Visitor role — new arrivals can only see #welcome + #rules
+      //    until they stamp their passport (agree to the rules) to become a Citizen.
+      const visitorRole = member.guild.roles.cache.find(r => r.name === VISITOR_ROLE);
+      if (visitorRole) {
         try {
-          await member.roles.add(citizenRole);
-          console.log(`[Discord Bot] Assigned ${CITIZEN_ROLE} to ${member.displayName}`);
+          await member.roles.add(visitorRole);
+          console.log(`[Discord Bot] Assigned ${VISITOR_ROLE} to ${member.displayName}`);
         } catch (err) {
-          console.error(`[Discord Bot] Failed to assign ${CITIZEN_ROLE} to ${member.displayName}:`, err);
+          console.error(`[Discord Bot] Failed to assign ${VISITOR_ROLE} to ${member.displayName}:`, err);
         }
       }
 

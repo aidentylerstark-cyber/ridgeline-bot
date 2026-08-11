@@ -24,30 +24,30 @@ export function setupReadyHandler(client: Client) {
       await claimInstanceLock();
       startInstanceHeartbeat(client);
     } catch (err) {
-      console.error('[Peaches] Failed to claim instance lock (non-fatal):', err);
+      console.error('[Avery] Failed to claim instance lock (non-fatal):', err);
     }
 
     // Register slash commands with the guild
     try {
       await registerSlashCommands(client);
     } catch (err) {
-      console.error('[Peaches] Failed to register slash commands (non-fatal):', err);
+      console.error('[Avery] Failed to register slash commands (non-fatal):', err);
     }
 
-    // Set bot nickname to Peaches
+    // Set bot nickname to Avery
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
       if (guild && client.user) {
         const me = await guild.members.fetch(client.user.id);
-        await me.setNickname('Peaches 🍑');
-        console.log('[Discord Bot] Nickname set to Peaches 🍑');
+        await me.setNickname('Avery 🌲');
+        console.log('[Discord Bot] Nickname set to Avery 🌲');
       }
     } catch {
       console.log('[Discord Bot] Could not set nickname (may already be set)');
     }
 
     // Suppress Discord's native "X joined — wave to say hi! 👋" system messages.
-    // Peaches posts her own welcome in #welcome, so the native ones are just clutter.
+    // Avery posts her own welcome in #welcome, so the native ones are just clutter.
     // Members can still react to the welcome message with any emoji. Idempotent — only
     // writes when the flags aren't already set, and preserves other system-channel flags.
     try {
@@ -59,11 +59,11 @@ export function setupReadyHandler(client: Client) {
         );
         if (guild.systemChannelFlags.bitfield !== desired.bitfield) {
           await guild.setSystemChannelFlags(desired);
-          console.log('[Discord Bot] Suppressed native join (wave) notifications — Peaches handles welcomes');
+          console.log('[Discord Bot] Suppressed native join (wave) notifications — Avery handles welcomes');
         }
       }
     } catch (err) {
-      console.error('[Peaches] Could not suppress native join notifications (non-fatal):', err);
+      console.error('[Avery] Could not suppress native join notifications (non-fatal):', err);
     }
 
     // Set activity
@@ -111,10 +111,10 @@ export function setupReadyHandler(client: Client) {
           const restartEmbed = new EmbedBuilder()
             .setColor(0x57F287)
             .setTitle('\uD83D\uDD04 Bot Restarted')
-            .setDescription(`Peaches is back online and ready to serve! \uD83C\uDF51`)
+            .setDescription(`Avery is back online and ready to serve! \uD83C\uDF32`)
             .setFooter({ text: `Environment: ${process.env.RAILWAY_ENVIRONMENT ?? 'local'}` })
             .setTimestamp();
-          await modLogChannel.send({ embeds: [restartEmbed] });
+          await modLogChannel.send({ embeds: [restartEmbed] }).catch(() => {});
 
           // Warn if verification level is High — may be stale from a raid mode that wasn't cleared before restart
           if (guild.verificationLevel === GuildVerificationLevel.High || guild.verificationLevel === GuildVerificationLevel.VeryHigh) {
@@ -127,7 +127,7 @@ export function setupReadyHandler(client: Client) {
                 `If the raid is over, a moderator should lower it in **Server Settings \u2192 Safety Setup**.`
               )
               .setTimestamp();
-            await modLogChannel.send({ embeds: [raidWarnEmbed] });
+            await modLogChannel.send({ embeds: [raidWarnEmbed] }).catch(() => {});
           }
         }
       }
@@ -147,7 +147,7 @@ export function setupReadyHandler(client: Client) {
     }
 
     // Start stats channel update interval (every 10 minutes)
-    updateStatsChannels(client).catch(err => console.error('[Peaches] Stats channel update failed:', err));
-    _statsInterval = setInterval(() => updateStatsChannels(client).catch(err => console.error('[Peaches] Stats channel update failed:', err)), 10 * 60 * 1000);
+    updateStatsChannels(client).catch(err => console.error('[Avery] Stats channel update failed:', err));
+    _statsInterval = setInterval(() => updateStatsChannels(client).catch(err => console.error('[Avery] Stats channel update failed:', err)), 10 * 60 * 1000);
   });
 }

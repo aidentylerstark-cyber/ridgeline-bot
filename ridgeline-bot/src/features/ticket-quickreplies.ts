@@ -28,37 +28,37 @@ const QUICK_REPLY_TEMPLATES: QuickReplyTemplate[] = [
     key: 'greeting',
     label: 'Greeting',
     emoji: '\uD83D\uDC4B',
-    message: "Hey there, sugar! I'm {staff} and I'll be helpin' you out today. Let me take a look at this for ya!",
+    message: "Hi there! I'm {staff} and I'll be helping you out today. Let me take a look at this for you!",
   },
   {
     key: 'need_info',
     label: 'Need More Info',
     emoji: '\u2753',
-    message: "I'd love to help more, darlin', but I need a bit more information. Could you tell me more about what happened?",
+    message: "I'd love to help more, but I need a bit more information. Could you tell me more about what happened?",
   },
   {
     key: 'working_on_it',
     label: 'Working On It',
     emoji: '\uD83D\uDD27',
-    message: "I'm lookin' into this right now, hon. Sit tight and I'll have an update for you shortly!",
+    message: "I'm looking into this right now. Sit tight and I'll have an update for you shortly!",
   },
   {
     key: 'waiting',
     label: 'Waiting on User',
     emoji: '\u23F3',
-    message: "I've set this ticket to waiting on you, sugar. Just reply here when you're ready and we'll pick right back up!",
+    message: "I've set this ticket to waiting on you. Just reply here when you're ready and we'll pick right back up!",
   },
   {
     key: 'close_warning',
     label: 'Close Warning',
     emoji: '\u26A0\uFE0F',
-    message: "Just a heads up, darlin' \u2014 if I don't hear back in a couple days, I'll go ahead and close this out. You can always open a new one!",
+    message: "Just a heads up \u2014 if I don't hear back in a couple days, I'll go ahead and close this out. You can always open a new one!",
   },
   {
     key: 'escalating',
     label: 'Escalating',
     emoji: '\u2B06\uFE0F',
-    message: "I'm going to bring in someone with a bit more expertise on this one, sugar. They'll be jumping in shortly!",
+    message: "I'm going to bring in someone with a bit more expertise on this one. They'll be jumping in shortly!",
   },
   {
     key: 'resolved',
@@ -79,12 +79,12 @@ export async function handleQuickReply(interaction: ChatInputCommandInteraction,
   // Check it's a ticket channel
   const ticket = await storage.getOpenTicketByChannelId(channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
     return;
   }
 
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can use quick replies, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can use quick replies! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -98,7 +98,7 @@ export async function handleQuickReply(interaction: ChatInputCommandInteraction,
 
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId('ticket_quickreply_select')
-    .setPlaceholder("Pick a template, sugar...")
+    .setPlaceholder("Pick a template...")
     .addOptions(options);
 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
@@ -123,7 +123,7 @@ export async function handleQuickReply(interaction: ChatInputCommandInteraction,
     const template = QUICK_REPLY_TEMPLATES.find(t => t.key === selectedKey);
     if (!template) {
       try {
-        await selectInteraction.update({ content: "Couldn't find that template, sugar. \uD83C\uDF51", components: [] });
+        await selectInteraction.update({ content: "Couldn't find that template. \uD83C\uDF32", components: [] });
       } catch { /* token expired */ }
       return;
     }
@@ -135,15 +135,15 @@ export async function handleQuickReply(interaction: ChatInputCommandInteraction,
     const channel = interaction.channel as TextChannel;
     try {
       await channel.send(message);
-      await selectInteraction.update({ content: `Quick reply sent! \uD83C\uDF51`, components: [] });
+      await selectInteraction.update({ content: `Quick reply sent! \uD83C\uDF32`, components: [] });
       if (interaction.guild) logAuditEvent(client, interaction.guild, {
         action: 'ticket_quickreply', actorId: member.id, channelId, referenceId: `#${ticket.ticketNumber}`,
         details: `Sent "${template.label}" quick reply in ticket #${ticket.ticketNumber}`,
       });
     } catch (err) {
-      console.error('[Peaches] Failed to send quick reply:', err);
+      console.error('[Avery] Failed to send quick reply:', err);
       try {
-        await selectInteraction.update({ content: "Something went wrong sending that reply, sugar. \uD83C\uDF51", components: [] });
+        await selectInteraction.update({ content: "Something went wrong sending that reply. \uD83C\uDF32", components: [] });
       } catch { /* token expired */ }
     }
 
@@ -155,7 +155,7 @@ export async function handleQuickReply(interaction: ChatInputCommandInteraction,
   collector.on('end', async (collected) => {
     if (collected.size === 0) {
       try {
-        await interaction.editReply({ content: "Quick reply timed out, sugar. Run the command again if you need it! \uD83C\uDF51", components: [] });
+        await interaction.editReply({ content: "Quick reply timed out. Run the command again if you need it! \uD83C\uDF32", components: [] });
       } catch { /* token expired */ }
     }
   });

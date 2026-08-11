@@ -36,13 +36,13 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
           // Check member exists BEFORE recording the post (so left members can retry next year)
           const member = members.get(bp.discordUserId);
           if (!member) {
-            console.log(`[Peaches] Birthday user ${bp.discordUserId} not found in guild — skipping`);
+            console.log(`[Avery] Birthday user ${bp.discordUserId} not found in guild — skipping`);
             continue;
           }
 
           const wasRecorded = await recordBirthdayPost(bp.discordUserId, currentYear);
           if (!wasRecorded) {
-            console.log(`[Peaches] Birthday for ${bp.discordUserId} already recorded (concurrent run?) — skipping`);
+            console.log(`[Avery] Birthday for ${bp.discordUserId} already recorded (concurrent run?) — skipping`);
             continue;
           }
 
@@ -52,20 +52,20 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
             .setTitle(`\uD83C\uDF82  Happy Birthday, ${charName}!`)
             .setDescription(
               `Well ring the church bells and break out the cake \u2014 it's **${charName}'s** birthday today!\n\n` +
-              `> *The whole town of Ridgeline wishes you the sweetest day, sugar. ` +
-              `May your year be full of front-porch sittin', sweet tea sippin', and all the good things you deserve.*\n\n` +
+              `> *The whole town of Avelora wishes you the happiest day. ` +
+              `May your year be full of sunny days, city lights, and all the good things you deserve.*\n\n` +
               `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n` +
               `\uD83C\uDF89 **Resident:** ${member.displayName}\n` +
               `\uD83C\uDF82 **Birthday:** ${formatBirthdayDate(bp.month, bp.day)}\n` +
               `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n` +
-              `*Drop a birthday wish below! Let's make 'em feel the Ridgeline love!* \uD83C\uDF51\uD83C\uDF8A`
+              `*Drop a birthday wish below! Let's make 'em feel the Avelora love!* \uD83C\uDF32\uD83C\uDF8A`
             )
             .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-            .setFooter({ text: 'Ridgeline Birthday Celebrations \u2014 Powered by Peaches \uD83C\uDF51' })
+            .setFooter({ text: 'Avelora Birthday Celebrations \u2014 Powered by Avery \uD83C\uDF32' })
             .setTimestamp();
 
           await birthdayChannel.send({ content: `\uD83C\uDF82 Happy Birthday <@${bp.discordUserId}>!`, embeds: [embed] });
-          console.log(`[Peaches] Birthday posted for ${member.displayName} (${charName})`);
+          console.log(`[Avery] Birthday posted for ${member.displayName} (${charName})`);
 
           // Assign birthday role — schedule removal via DB (survives restarts)
           const birthdayRole = member.guild.roles.cache.find(r => r.name === BIRTHDAY_ROLE);
@@ -80,7 +80,7 @@ export function scheduleBirthdayCheck(client: Client): cron.ScheduledTask {
       }
       }, { label: 'Birthday check' });
     } catch (err) {
-      console.error('[Peaches] Birthday check failed after retries:', err);
+      console.error('[Avery] Birthday check failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 

@@ -53,7 +53,7 @@ function json(res: ServerResponse, status: number, data: unknown): void {
 export function startRegionWebhookServer(client: Client): Server {
   const secret = process.env.REGION_MONITORING_SECRET;
   if (!secret) {
-    console.warn('[Peaches] REGION_MONITORING_SECRET not set — region webhook will reject all requests');
+    console.warn('[Avery] REGION_MONITORING_SECRET not set — region webhook will reject all requests');
   }
 
   const server = createServer(async (req, res) => {
@@ -115,7 +115,7 @@ export function startRegionWebhookServer(client: Client): Server {
 
       // Fire-and-forget
       processRegionUpdate(client, payload as Record<string, unknown>).catch(err => {
-        console.error('[Peaches] Error processing region update:', err);
+        console.error('[Avery] Error processing region update:', err);
       });
       return;
     }
@@ -129,12 +129,12 @@ export function startRegionWebhookServer(client: Client): Server {
   server.keepAliveTimeout = 5_000;
 
   server.on('error', (err) => {
-    console.error('[Peaches] Region webhook server error:', err);
+    console.error('[Avery] Region webhook server error:', err);
   });
 
   const port = parseInt(process.env.PORT ?? '3001', 10);
   server.listen(port, () => {
-    console.log(`[Peaches] Region webhook server listening on port ${port}`);
+    console.log(`[Avery] Region webhook server listening on port ${port}`);
   });
 
   return server;

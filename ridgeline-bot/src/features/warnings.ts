@@ -7,7 +7,7 @@ import { isStaff } from '../utilities/permissions.js';
 export async function handleWarnCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   const member = interaction.member as GuildMember | null;
   if (!member || !isStaff(member)) {
-    await interaction.reply({ content: "Only staff can issue warnings, sugar! 🍑", flags: 64 });
+    await interaction.reply({ content: "Only staff can issue warnings! 🌲", flags: 64 });
     return;
   }
 
@@ -15,11 +15,11 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
   const reason = interaction.options.getString('reason', true);
 
   if (target.bot) {
-    await interaction.reply({ content: "Bots don't need warnings, darlin'! 🍑", flags: 64 });
+    await interaction.reply({ content: "Bots don't need warnings! 🌲", flags: 64 });
     return;
   }
   if (target.id === interaction.user.id) {
-    await interaction.reply({ content: "Sugar, you can't warn yourself! 🍑", flags: 64 });
+    await interaction.reply({ content: "You can't warn yourself! 🌲", flags: 64 });
     return;
   }
 
@@ -27,7 +27,7 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
   const targetMemberForCheck = interaction.guild?.members.cache.get(target.id);
   if (targetMemberForCheck && member) {
     if (targetMemberForCheck.roles.highest.position >= member.roles.highest.position) {
-      await interaction.reply({ content: "You can't warn someone with an equal or higher role than yours, sugar! 🍑", flags: 64 });
+      await interaction.reply({ content: "You can't warn someone with an equal or higher role than yours! 🌲", flags: 64 });
       return;
     }
   }
@@ -67,9 +67,9 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
   // DM the warned user
   try {
     await target.send(
-      `⚠️ **You received a warning in Ridgeline.**\n\n` +
+      `⚠️ **You received a warning in Avelora.**\n\n` +
       `**Reason:** ${reason}\n\n` +
-      `This is warning **#${totalWarnings}** on your account. Please review the server rules to keep Ridgeline a welcoming place for everyone. 🍑`
+      `This is warning **#${totalWarnings}** on your account. Please review the server rules to keep Avelora a welcoming place for everyone. 🌲`
     );
   } catch {
     // DMs disabled — skip silently
@@ -113,21 +113,21 @@ export async function handleWarnCommand(interaction: ChatInputCommandInteraction
         });
       }
       const timeoutMsg = timedOut ? `auto-timeout applied for ${timeoutLabel}` : 'auto-timeout **failed** (check bot permissions)';
-      await interaction.editReply({ content: `\u26A0\uFE0F Warning #${warning.id} issued to <@${target.id}>. **${totalWarnings} warnings** \u2014 ${timeoutMsg}. \uD83C\uDF51` });
+      await interaction.editReply({ content: `\u26A0\uFE0F Warning #${warning.id} issued to <@${target.id}>. **${totalWarnings} warnings** \u2014 ${timeoutMsg}. \uD83C\uDF32` });
       return;
     }
   }
 
   await interaction.editReply({
-    content: `⚠️ Warning #${warning.id} issued to <@${target.id}>. They now have **${totalWarnings}** warning(s) on record. 🍑`,
+    content: `⚠️ Warning #${warning.id} issued to <@${target.id}>. They now have **${totalWarnings}** warning(s) on record. 🌲`,
   });
-  console.log(`[Peaches] Warning #${warning.id}: ${target.username} warned by ${interaction.user.username} — "${reason}"`);
+  console.log(`[Avery] Warning #${warning.id}: ${target.username} warned by ${interaction.user.username} — "${reason}"`);
 }
 
 export async function handleWarningsCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   const member = interaction.member as GuildMember | null;
   if (!member || !isStaff(member)) {
-    await interaction.reply({ content: "Only staff can view warnings, sugar! 🍑", flags: 64 });
+    await interaction.reply({ content: "Only staff can view warnings! 🌲", flags: 64 });
     return;
   }
 
@@ -137,7 +137,7 @@ export async function handleWarningsCommand(interaction: ChatInputCommandInterac
   const warnings = await getWarnings(target.id);
 
   if (warnings.length === 0) {
-    await interaction.editReply({ content: `✅ <@${target.id}> has no warnings on record. Clean as a whistle! 🍑` });
+    await interaction.editReply({ content: `✅ <@${target.id}> has no warnings on record. Clean as a whistle! 🌲` });
     return;
   }
 
@@ -159,7 +159,7 @@ export async function handleWarningsCommand(interaction: ChatInputCommandInterac
 export async function handleClearWarnCommand(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   const member = interaction.member as GuildMember | null;
   if (!member || !isStaff(member)) {
-    await interaction.reply({ content: "Only staff can clear warnings, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can clear warnings! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -173,12 +173,12 @@ export async function handleClearWarnCommand(interaction: ChatInputCommandIntera
     const count = await clearAllWarnings(targetUser.id);
 
     if (count === 0) {
-      await interaction.editReply({ content: `<@${targetUser.id}> doesn't have any warnings to clear, sugar. \uD83C\uDF51` });
+      await interaction.editReply({ content: `<@${targetUser.id}> doesn't have any warnings to clear. \uD83C\uDF32` });
       return;
     }
 
-    await interaction.editReply({ content: `\u2705 Cleared **${count}** warning(s) from <@${targetUser.id}>'s record. Clean slate! \uD83C\uDF51` });
-    console.log(`[Peaches] All warnings (${count}) cleared for ${targetUser.username} by ${interaction.user.username}`);
+    await interaction.editReply({ content: `\u2705 Cleared **${count}** warning(s) from <@${targetUser.id}>'s record. Clean slate! \uD83C\uDF32` });
+    console.log(`[Avery] All warnings (${count}) cleared for ${targetUser.username} by ${interaction.user.username}`);
 
     if (interaction.guild) {
       logAuditEvent(_client, interaction.guild, {
@@ -193,7 +193,7 @@ export async function handleClearWarnCommand(interaction: ChatInputCommandIntera
 
   // Single warning by ID
   if (id === null) {
-    await interaction.reply({ content: "You need to provide either a warning `id` or a `user` to clear all, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "You need to provide either a warning `id` or a `user` to clear all! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -202,12 +202,12 @@ export async function handleClearWarnCommand(interaction: ChatInputCommandIntera
   const deletedWarning = await clearWarning(id);
 
   if (!deletedWarning) {
-    await interaction.editReply({ content: `Couldn't find warning #${id}, sugar. Double-check the ID with \`/warnings\`. \uD83C\uDF51` });
+    await interaction.editReply({ content: `Couldn't find warning #${id}. Double-check the ID with \`/warnings\`. \uD83C\uDF32` });
     return;
   }
 
-  await interaction.editReply({ content: `\u2705 Warning #${id} has been cleared from the record. \uD83C\uDF51` });
-  console.log(`[Peaches] Warning #${id} cleared by ${interaction.user.username}`);
+  await interaction.editReply({ content: `\u2705 Warning #${id} has been cleared from the record. \uD83C\uDF32` });
+  console.log(`[Avery] Warning #${id} cleared by ${interaction.user.username}`);
 
   if (interaction.guild) {
     logAuditEvent(_client, interaction.guild, {

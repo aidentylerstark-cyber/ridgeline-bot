@@ -15,9 +15,9 @@ if (dbUrl) {
 const pool = new Pool({
   connectionString: dbUrl,
   ssl: (process.env.RAILWAY_ENVIRONMENT === "production" || process.env.NODE_ENV === "production") ? { rejectUnauthorized: false } : undefined,
-  max: 5,
+  max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
   statement_timeout: 10000,
 });
 

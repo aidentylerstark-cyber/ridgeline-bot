@@ -54,7 +54,7 @@ export function scheduleMilestoneCheck(client: Client): cron.ScheduledTask {
         // Record the highest tier FIRST as the dedup gate — if it fails (concurrent run), skip
         const wasRecorded = await recordMilestonePost(member.id, highestUnposted.days);
         if (!wasRecorded) {
-          console.log(`[Peaches] Milestone ${highestUnposted.days}d for ${member.displayName} already recorded (concurrent run?) — skipping`);
+          console.log(`[Avery] Milestone ${highestUnposted.days}d for ${member.displayName} already recorded (concurrent run?) — skipping`);
           continue;
         }
         for (const m of unrecordedMilestones) {
@@ -72,19 +72,19 @@ export function scheduleMilestoneCheck(client: Client): cron.ScheduledTask {
         const embed = new EmbedBuilder()
           .setColor(milestone.color)
           .setAuthor({ name: `${milestone.emoji} ${milestone.tier}`, iconURL: member.user.displayAvatarURL({ size: 64 }) })
-          .setTitle(`\uD83C\uDF89  ${member.displayName} \u2014 ${milestone.label} in Ridgeline!`)
+          .setTitle(`\uD83C\uDF89  ${member.displayName} \u2014 ${milestone.label} in Avelora!`)
           .setDescription(
             `> *${milestone.flavor}*\n\n` +
             `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n` +
             `\uD83D\uDCC5  **Joined:** ${joinedFormatted}\n` +
             `${milestone.badge}\n` +
-            `\uD83D\uDCCA  **Days in Ridgeline:** ${daysInServer}\n` +
+            `\uD83D\uDCCA  **Days in Avelora:** ${daysInServer}\n` +
             (isFoundingMember ? `\uD83C\uDFDB\uFE0F  **Founding Member** \u2014 Here since the beginning!\n` : '') +
             `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n` +
-            `*Congratulations from all of Ridgeline! \uD83C\uDF8A*`
+            `*Congratulations from all of Avelora! \uD83C\uDF8A*`
           )
           .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-          .setFooter({ text: `Ridgeline, Georgia \u2014 Est. June 25, 2025 \u2022 ${daysSinceFounding} days strong` })
+          .setFooter({ text: `Avelora, California \u2014 Est. June 25, 2025 \u2022 ${daysSinceFounding} days strong` })
           .setTimestamp();
 
         await celebChannel.send({ embeds: [embed] });

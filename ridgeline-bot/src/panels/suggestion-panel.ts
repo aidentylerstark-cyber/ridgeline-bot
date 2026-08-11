@@ -17,7 +17,7 @@ export async function postSuggestionPanel(client: Client) {
 
   const channel = guild.channels.cache.get(CHANNELS.suggestions) as TextChannel | undefined;
   if (!channel) {
-    console.log('[Peaches] Suggestion box channel not found');
+    console.log('[Avery] Suggestion box channel not found');
     return;
   }
 
@@ -33,9 +33,9 @@ export async function postSuggestionPanel(client: Client) {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## \uD83D\uDCA1 Ridgeline Suggestion Box\n` +
-      `> *Peaches slides a notepad and pen across the counter*\n\n` +
-      `Got an idea to make Ridgeline even better? Drop it in the box, sugar! ` +
+      `## \uD83D\uDCA1 Avelora Suggestion Box\n` +
+      `> *Avery slides a notepad and pen across the counter*\n\n` +
+      `Got an idea to make Avelora even better? Drop it in the box! ` +
       `Our staff reviews every suggestion and you'll get notified when yours gets a response.`
     )
   );
@@ -60,7 +60,7 @@ export async function postSuggestionPanel(client: Client) {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `-# \uD83C\uDF51 Your suggestion will be posted in the suggestions channel for community feedback. Keep it constructive, sugar!`
+      `-# \uD83C\uDF32 Your suggestion will be posted in the suggestions channel for community feedback. Keep it constructive!`
     )
   );
 
@@ -68,5 +68,5 @@ export async function postSuggestionPanel(client: Client) {
     components: [container],
     flags: MessageFlags.IsComponentsV2,
   });
-  console.log('[Peaches] Suggestion box panel posted');
+  console.log('[Avery] Suggestion box panel posted');
 }

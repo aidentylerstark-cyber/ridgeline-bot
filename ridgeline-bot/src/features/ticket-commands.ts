@@ -46,7 +46,7 @@ export async function handleTicketCommand(interaction: ChatInputCommandInteracti
     case 'quickreply': return handleQuickReply(interaction, client);
     case 'feedback':   return handleFeedback(interaction, client);
     default:
-      await interaction.reply({ content: "Unknown subcommand, sugar! \uD83C\uDF51", flags: 64 });
+      await interaction.reply({ content: "Unknown subcommand! \uD83C\uDF32", flags: 64 });
   }
 }
 
@@ -58,11 +58,11 @@ async function handlePriority(interaction: ChatInputCommandInteraction, client: 
   const member = interaction.member as GuildMember;
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can change ticket priority, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can change ticket priority! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -75,7 +75,7 @@ async function handlePriority(interaction: ChatInputCommandInteraction, client: 
 
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setDescription(`Priority updated to **${priority.toUpperCase()}** by ${member}`)
     .setFooter({ text: `Ticket #${ticketId}` })
     .setTimestamp();
@@ -111,11 +111,11 @@ async function handleStatus(interaction: ChatInputCommandInteraction, client: Cl
   const member = interaction.member as GuildMember;
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can change ticket status, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can change ticket status! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -133,7 +133,7 @@ async function handleStatus(interaction: ChatInputCommandInteraction, client: Cl
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setDescription(`Status updated to **${statusLabels[status] ?? status}** by ${member}`)
     .setFooter({ text: `Ticket #${ticketId}` })
     .setTimestamp();
@@ -169,11 +169,11 @@ async function handleNote(interaction: ChatInputCommandInteraction, client: Clie
   const member = interaction.member as GuildMember;
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can add notes, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can add notes! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -183,7 +183,7 @@ async function handleNote(interaction: ChatInputCommandInteraction, client: Clie
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
   await interaction.reply({
-    content: `\uD83D\uDCDD Note added to Ticket #${ticketId}. \uD83C\uDF51`,
+    content: `\uD83D\uDCDD Note added to Ticket #${ticketId}. \uD83C\uDF32`,
     flags: 64,
   });
 
@@ -207,17 +207,17 @@ async function handleNotes(interaction: ChatInputCommandInteraction, _client: Cl
   const member = interaction.member as GuildMember;
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can view notes, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can view notes! \uD83C\uDF32", flags: 64 });
     return;
   }
 
   const notes = await storage.getTicketNotes(ticket.id);
   if (notes.length === 0) {
-    await interaction.reply({ content: "No notes on this ticket yet, sugar. \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "No notes on this ticket yet. \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -249,7 +249,7 @@ async function handleNotes(interaction: ChatInputCommandInteraction, _client: Cl
 async function handleSearch(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
   if (!isStaff(member)) {
-    await interaction.reply({ content: "Only staff can search tickets, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can search tickets! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -268,7 +268,7 @@ async function handleSearch(interaction: ChatInputCommandInteraction, client: Cl
   const rows = await storage.searchTickets(filters);
 
   if (rows.length === 0) {
-    await interaction.editReply({ content: "No tickets found matching those filters, sugar. \uD83C\uDF51" });
+    await interaction.editReply({ content: "No tickets found matching those filters. \uD83C\uDF32" });
     return;
   }
 
@@ -289,7 +289,7 @@ async function handleSearch(interaction: ChatInputCommandInteraction, client: Cl
     pages.push(
       new EmbedBuilder()
         .setColor(0xD4A574)
-        .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Search', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+        .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Ticket Search', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
         .setTitle('\uD83D\uDD0D Ticket Search Results')
         .setDescription(lines.join('\n\n'))
         .setFooter({ text: `Page ${Math.floor(start / PAGE_SIZE) + 1} of ${Math.ceil(rows.length / PAGE_SIZE)} \u2022 ${rows.length} result(s)` })
@@ -323,7 +323,7 @@ async function handleSearch(interaction: ChatInputCommandInteraction, client: Cl
     try {
       await i.update({ embeds: [pages[page]!], components: [buildRow()] });
     } catch {
-      console.warn('[Peaches] Ticket search pagination update failed (token may have expired)');
+      console.warn('[Avery] Ticket search pagination update failed (token may have expired)');
     }
   });
 
@@ -334,7 +334,7 @@ async function handleSearch(interaction: ChatInputCommandInteraction, client: Cl
       });
       await reply.edit({ embeds: [expiredEmbed], components: [] });
     } catch {
-      console.warn('[Peaches] Ticket search pagination expired edit failed');
+      console.warn('[Avery] Ticket search pagination expired edit failed');
     }
   });
 }
@@ -346,7 +346,7 @@ async function handleSearch(interaction: ChatInputCommandInteraction, client: Cl
 async function handleStats(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
   if (!isStaff(member)) {
-    await interaction.reply({ content: "Only staff can view ticket stats, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can view ticket stats! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -395,7 +395,7 @@ async function handleStats(interaction: ChatInputCommandInteraction, client: Cli
 
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Stats', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Ticket Stats', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setTitle(`\uD83D\uDCCA Ticket Statistics \u2014 ${periodStr === 'all' ? 'All Time' : `Last ${days} Days`}`)
     .addFields(
       { name: '\uD83D\uDCCB Overview', value: `\u2003Open: **${counts.total_open}**\n\u2003Closed: **${counts.total_closed}**`, inline: false },
@@ -404,7 +404,7 @@ async function handleStats(interaction: ChatInputCommandInteraction, client: Cli
       ...(deptLines.length > 0 ? [{ name: '\uD83C\uDFE2 By Department', value: deptLines.join('\n'), inline: false }] : []),
       ...(staffLines.length > 0 ? [{ name: '\uD83C\uDFC6 Top Staff', value: staffLines.join('\n'), inline: false }] : []),
     )
-    .setFooter({ text: 'Ridgeline Ticket System' })
+    .setFooter({ text: 'Avelora Ticket System' })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
@@ -418,18 +418,18 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
   const member = interaction.member as GuildMember;
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can reassign tickets, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can reassign tickets! \uD83C\uDF32", flags: 64 });
     return;
   }
 
   const targetUser = interaction.options.getUser('staff', true);
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.reply({ content: "Something went wrong, sugar. \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Something went wrong. \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -437,19 +437,19 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
   try {
     targetMember = await guild.members.fetch(targetUser.id);
   } catch {
-    await interaction.reply({ content: "Couldn't find that member in the server, sugar. \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Couldn't find that member in the server. \uD83C\uDF32", flags: 64 });
     return;
   }
 
   if (!isStaffForTicket(targetMember, ticket.department)) {
-    await interaction.reply({ content: `${targetMember.displayName} doesn't have the right roles for this department, sugar. \uD83C\uDF51`, flags: 64 });
+    await interaction.reply({ content: `${targetMember.displayName} doesn't have the right roles for this department. \uD83C\uDF32`, flags: 64 });
     return;
   }
 
   const previousClaimer = ticket.claimedBy;
   const assigned = await storage.updateTicketClaim(interaction.channelId, targetMember.id);
   if (!assigned) {
-    await interaction.reply({ content: "Couldn't assign this ticket — it may have been closed or modified, sugar. 🍑", flags: 64 });
+    await interaction.reply({ content: "Couldn't assign this ticket — it may have been closed or modified. 🌲", flags: 64 });
     return;
   }
   updateTicketLastActivity(interaction.channelId).catch(() => {});
@@ -458,9 +458,9 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
 
   const embed = new EmbedBuilder()
     .setColor(0xCC8844)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setDescription(
-      `Ticket reassigned to ${targetMember} by ${member}. \uD83C\uDF51\n` +
+      `Ticket reassigned to ${targetMember} by ${member}. \uD83C\uDF32\n` +
       (previousClaimer ? `Previously claimed by <@${previousClaimer}>.` : 'This ticket was previously unclaimed.')
     )
     .setFooter({ text: `Ticket #${ticketId}` })
@@ -472,7 +472,7 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
   if (previousClaimer && previousClaimer !== targetMember.id) {
     try {
       const oldMember = await guild.members.fetch(previousClaimer);
-      await oldMember.send(`\uD83D\uDD00 Ticket #${ticketId} has been reassigned from you to ${targetMember.displayName}. \uD83C\uDF51`).catch(() => {});
+      await oldMember.send(`\uD83D\uDD00 Ticket #${ticketId} has been reassigned from you to ${targetMember.displayName}. \uD83C\uDF32`).catch(() => {});
     } catch { /* graceful */ }
   }
 
@@ -480,7 +480,7 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
   try {
     await targetMember.send(
       `\uD83D\uDD00 You've been assigned to Ticket #${ticketId} (${ticket.subject}) by ${member.displayName}.\n` +
-      `Channel: <#${interaction.channelId}> \uD83C\uDF51`
+      `Channel: <#${interaction.channelId}> \uD83C\uDF32`
     ).catch(() => {});
   } catch { /* graceful */ }
 
@@ -502,7 +502,7 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
 async function handleReopen(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
   if (!isStaff(member)) {
-    await interaction.reply({ content: "Only staff can reopen tickets, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can reopen tickets! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -510,22 +510,22 @@ async function handleReopen(interaction: ChatInputCommandInteraction, client: Cl
   const ticket = await storage.getClosedTicketByNumber(ticketNumber);
 
   if (!ticket) {
-    await interaction.reply({ content: `Couldn't find a closed ticket #${ticketNumber}, sugar. \uD83C\uDF51`, flags: 64 });
+    await interaction.reply({ content: `Couldn't find a closed ticket #${ticketNumber}. \uD83C\uDF32`, flags: 64 });
     return;
   }
 
-  // Check 48h window — Owner/First Lady bypass this limit
+  // Check 48h window — Owner bypasses this limit
   const closedAt = ticket.closedAt ? new Date(ticket.closedAt).getTime() : 0;
   const hoursSinceClosed = (Date.now() - closedAt) / 3_600_000;
-  const ownerRoles = ['Ridgeline Owner', 'First Lady'];
+  const ownerRoles = ['Owner'];
   const hasOwnerOverride = ownerRoles.some(name => member.roles.cache.some(r => r.name === name));
   if (hoursSinceClosed > 48 && !hasOwnerOverride) {
-    await interaction.reply({ content: `Ticket #${ticketNumber} was closed more than 48 hours ago and can't be reopened, sugar. \uD83C\uDF51`, flags: 64 });
+    await interaction.reply({ content: `Ticket #${ticketNumber} was closed more than 48 hours ago and can't be reopened. \uD83C\uDF32`, flags: 64 });
     return;
   }
 
   if (!isValidDepartment(ticket.department)) {
-    await interaction.reply({ content: "Invalid department on this ticket, sugar. \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Invalid department on this ticket. \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -533,14 +533,14 @@ async function handleReopen(interaction: ChatInputCommandInteraction, client: Cl
 
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.editReply({ content: "Something went wrong, sugar. \uD83C\uDF51" });
+    await interaction.editReply({ content: "Something went wrong. \uD83C\uDF32" });
     return;
   }
 
   // Recreate the channel
   const result = await recreateTicketChannel(client, guild, ticket);
   if (!result) {
-    await interaction.editReply({ content: "Failed to recreate the ticket channel, sugar. Check bot permissions! \uD83C\uDF51" });
+    await interaction.editReply({ content: "Failed to recreate the ticket channel. Check bot permissions! \uD83C\uDF32" });
     return;
   }
 
@@ -548,12 +548,12 @@ async function handleReopen(interaction: ChatInputCommandInteraction, client: Cl
   await storage.reopenTicket(ticket.id, result.channel.id, member.id);
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
-  await interaction.editReply({ content: `\uD83D\uDD13 Ticket #${ticketId} has been reopened! Channel: <#${result.channel.id}> \uD83C\uDF51` });
+  await interaction.editReply({ content: `\uD83D\uDD13 Ticket #${ticketId} has been reopened! Channel: <#${result.channel.id}> \uD83C\uDF32` });
 
   // Post opening message in the new channel with action buttons
   const reopenEmbed = new EmbedBuilder()
     .setColor(0x57F287)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Reopened', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Ticket Reopened', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setDescription(
       `This ticket was reopened by ${member}.\n\n` +
       `\uD83D\uDC64 **Original opener:** <@${ticket.discordUserId}> (${ticket.userName})\n` +
@@ -595,7 +595,7 @@ async function handleMine(interaction: ChatInputCommandInteraction, _client: Cli
   const claimedTickets = isStaff(member) ? await storage.getOpenTicketsClaimedBy(member.id) : [];
 
   if (myTickets.length === 0 && claimedTickets.length === 0) {
-    await interaction.editReply({ content: "You don't have any open tickets right now, sugar. \uD83C\uDF51" });
+    await interaction.editReply({ content: "You don't have any open tickets right now. \uD83C\uDF32" });
     return;
   }
 
@@ -641,29 +641,29 @@ async function handleTransfer(interaction: ChatInputCommandInteraction, client: 
   const member = interaction.member as GuildMember;
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
     return;
   }
 
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can transfer tickets, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can transfer tickets! \uD83C\uDF32", flags: 64 });
     return;
   }
 
   const newDept = interaction.options.getString('department', true);
   if (!isValidDepartment(newDept)) {
-    await interaction.reply({ content: "That's not a valid department, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "That's not a valid department! \uD83C\uDF32", flags: 64 });
     return;
   }
 
   if (newDept === ticket.department) {
-    await interaction.reply({ content: "This ticket is already in that department, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "This ticket is already in that department! \uD83C\uDF32", flags: 64 });
     return;
   }
 
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.reply({ content: "Something went wrong, sugar. \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Something went wrong. \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -674,7 +674,7 @@ async function handleTransfer(interaction: ChatInputCommandInteraction, client: 
 
   const updated = await storage.updateTicketDepartment(interaction.channelId, newDept);
   if (!updated) {
-    await interaction.editReply({ content: "Couldn't transfer this ticket \u2014 it may have been closed, sugar. \uD83C\uDF51" });
+    await interaction.editReply({ content: "Couldn't transfer this ticket \u2014 it may have been closed. \uD83C\uDF32" });
     return;
   }
 
@@ -686,7 +686,7 @@ async function handleTransfer(interaction: ChatInputCommandInteraction, client: 
   try {
     await channel.setParent(newConfig.categoryId, { lockPermissions: false });
   } catch (err) {
-    console.error('[Peaches] Failed to move ticket channel to new category:', err);
+    console.error('[Avery] Failed to move ticket channel to new category:', err);
   }
 
   const allNewStaffRoles = Array.from(new Set([...newConfig.staffRoles, ...GLOBAL_STAFF_ROLES]));
@@ -738,7 +738,7 @@ async function handleTransfer(interaction: ChatInputCommandInteraction, client: 
   try {
     await channel.permissionOverwrites.set(overwrites);
   } catch (err) {
-    console.error('[Peaches] Failed to update ticket channel permissions after transfer:', err);
+    console.error('[Avery] Failed to update ticket channel permissions after transfer:', err);
   }
 
   try {
@@ -751,7 +751,7 @@ async function handleTransfer(interaction: ChatInputCommandInteraction, client: 
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Transfer', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Ticket Transfer', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setDescription(
       `This ticket has been transferred to **${newConfig.label}** by ${member}.\n\n` +
       `Previously: ${oldConfig.emoji} ${oldConfig.label}`
@@ -780,7 +780,7 @@ async function handleTransfer(interaction: ChatInputCommandInteraction, client: 
 async function handleFeedback(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
   if (!isStaff(member)) {
-    await interaction.reply({ content: "Only staff can view feedback reports, sugar! \uD83C\uDF51", flags: 64 });
+    await interaction.reply({ content: "Only staff can view feedback reports! \uD83C\uDF32", flags: 64 });
     return;
   }
 
@@ -828,7 +828,7 @@ async function handleFeedback(interaction: ChatInputCommandInteraction, client: 
 
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Ticket Feedback', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Ticket Feedback', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setTitle(`\u2B50 Satisfaction Report \u2014 ${deptLabel}`)
     .addFields(
       { name: '\uD83D\uDCCA Overall Rating', value: overallLine, inline: false },
@@ -842,10 +842,10 @@ async function handleFeedback(interaction: ChatInputCommandInteraction, client: 
     }
     embed.addFields({ name: '\uD83D\uDCAC Recent Feedback', value: commentsText, inline: false });
   } else {
-    embed.addFields({ name: '\uD83D\uDCAC Recent Feedback', value: 'No feedback with comments yet, sugar.', inline: false });
+    embed.addFields({ name: '\uD83D\uDCAC Recent Feedback', value: 'No feedback with comments yet.', inline: false });
   }
 
-  embed.setFooter({ text: 'Ridgeline Ticket Feedback' }).setTimestamp();
+  embed.setFooter({ text: 'Avelora Ticket Feedback' }).setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
 }

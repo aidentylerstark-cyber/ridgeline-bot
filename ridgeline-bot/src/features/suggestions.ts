@@ -33,19 +33,19 @@ export async function handleSuggestCommand(interaction: ChatInputCommandInteract
     const remainingMs = suggestCooldowns.getRemainingMs(interaction.user.id);
     const remainingMin = Math.ceil(remainingMs / 60_000);
     await interaction.reply({
-      content: `Hold your horses, sugar! You can submit another suggestion in about ${remainingMin} minute${remainingMin !== 1 ? 's' : ''}. \uD83C\uDF51`,
+      content: `Hold on a moment! You can submit another suggestion in about ${remainingMin} minute${remainingMin !== 1 ? 's' : ''}. \uD83C\uDF32`,
       flags: 64,
     });
     return;
   }
 
   if (idea.length < 10) {
-    await interaction.reply({ content: "That suggestion's a little short, sugar! Give us some details. 🍑", flags: 64 });
+    await interaction.reply({ content: "That suggestion's a little short! Give us some details. 🌲", flags: 64 });
     return;
   }
 
   if (idea.length > 1000) {
-    await interaction.reply({ content: "Whoa there, darlin'! That suggestion's too long. Keep it under 1,000 characters. 🍑", flags: 64 });
+    await interaction.reply({ content: "Whoa there! That suggestion's too long. Keep it under 1,000 characters. 🌲", flags: 64 });
     return;
   }
 
@@ -56,7 +56,7 @@ export async function handleSuggestCommand(interaction: ChatInputCommandInteract
 
   const suggestChannel = interaction.guild?.channels.cache.get(CHANNELS.suggestions);
   if (!suggestChannel) {
-    await interaction.editReply({ content: "Can't find the suggestions channel right now, sugar. Try again later! 🍑" });
+    await interaction.editReply({ content: "Can't find the suggestions channel right now. Try again later! 🌲" });
     return;
   }
 
@@ -96,7 +96,7 @@ export async function handleSuggestCommand(interaction: ChatInputCommandInteract
     const msg = await (suggestChannel as TextChannel).send({ embeds: [embed], components: [actionRow] });
     postedId = msg.id;
   } else {
-    await interaction.editReply({ content: "The suggestions channel isn't set up correctly, sugar. Let a staff member know! 🍑" });
+    await interaction.editReply({ content: "The suggestions channel isn't set up correctly. Let a staff member know! 🌲" });
     return;
   }
 
@@ -108,14 +108,14 @@ export async function handleSuggestCommand(interaction: ChatInputCommandInteract
     details: `Submitted suggestion #${suggestion.id}: ${idea.slice(0, 150)}`,
   });
 
-  await interaction.editReply({ content: `✅ Your suggestion has been submitted to <#${CHANNELS.suggestions}>! Thanks for helping make Ridgeline better, sugar! 🍑` });
-  console.log(`[Peaches] Suggestion #${suggestion.id} submitted by ${interaction.user.username}`);
+  await interaction.editReply({ content: `✅ Your suggestion has been submitted to <#${CHANNELS.suggestions}>! Thanks for helping make Avelora better! 🌲` });
+  console.log(`[Avery] Suggestion #${suggestion.id} submitted by ${interaction.user.username}`);
 }
 
 export async function handleSuggestionReview(interaction: ButtonInteraction, status: 'approved' | 'denied' | 'reviewing' | 'implemented' | 'in-progress', _client: Client): Promise<void> {
   // Must be staff
   if (!interaction.member || !isStaff(interaction.member as GuildMember)) {
-    await interaction.reply({ content: "Only staff can review suggestions, sugar! 🍑", flags: 64 });
+    await interaction.reply({ content: "Only staff can review suggestions! 🌲", flags: 64 });
     return;
   }
 
@@ -123,13 +123,13 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   const idMatch = interaction.customId.match(/suggestion_(?:approve|deny|reviewing|inprogress|implemented)_(\d+)$/);
   const suggestionId = idMatch ? parseInt(idMatch[1], 10) : NaN;
   if (isNaN(suggestionId)) {
-    await interaction.reply({ content: "Couldn't find that suggestion, sugar. 🍑", flags: 64 });
+    await interaction.reply({ content: "Couldn't find that suggestion. 🌲", flags: 64 });
     return;
   }
 
   const suggestion = await getSuggestion(suggestionId);
   if (!suggestion) {
-    await interaction.reply({ content: "That suggestion doesn't exist anymore, darlin'. 🍑", flags: 64 });
+    await interaction.reply({ content: "That suggestion doesn't exist anymore. 🌲", flags: 64 });
     return;
   }
 
@@ -149,7 +149,7 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   // Check embed exists BEFORE updating DB to avoid inconsistent state
   const originalEmbed = interaction.message.embeds[0];
   if (!originalEmbed) {
-    await interaction.reply({ content: 'Could not update the suggestion embed. 🍑', flags: 64 });
+    await interaction.reply({ content: 'Could not update the suggestion embed. 🌲', flags: 64 });
     return;
   }
 
@@ -159,11 +159,11 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   try {
     const suggester = await interaction.client.users.fetch(suggestion.discordUserId);
     const dmMessages: Record<string, string> = {
-      approved: `✅ **Your suggestion was approved!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nThanks for helping make Ridgeline better, sugar! 🍑`,
-      denied: `❌ **Your suggestion was not approved this time.**\n\n> *${suggestion.content.slice(0, 500)}*\n\nDon't let that stop you — keep those ideas coming! 🍑`,
-      reviewing: `🔍 **Your suggestion is under review!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nStaff are looking into it — we'll keep you posted! 🍑`,
-      'in-progress': `🔧 **Your suggestion is being worked on!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nThe team is actively building it — how exciting! 🍑`,
-      'implemented': `🚀 **Your suggestion has been implemented!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nYour idea made it into Ridgeline! Thank you, sugar! 🍑`,
+      approved: `✅ **Your suggestion was approved!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nThanks for helping make Avelora better! 🌲`,
+      denied: `❌ **Your suggestion was not approved this time.**\n\n> *${suggestion.content.slice(0, 500)}*\n\nDon't let that stop you — keep those ideas coming! 🌲`,
+      reviewing: `🔍 **Your suggestion is under review!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nStaff are looking into it — we'll keep you posted! 🌲`,
+      'in-progress': `🔧 **Your suggestion is being worked on!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nThe team is actively building it — how exciting! 🌲`,
+      'implemented': `🚀 **Your suggestion has been implemented!**\n\n> *${suggestion.content.slice(0, 500)}*\n\nYour idea made it into Avelora! Thank you! 🌲`,
     };
     await suggester.send(dmMessages[status] ?? `Your suggestion #${suggestionId} status was updated to **${status}**.`).catch(() => {});
   } catch {
@@ -190,13 +190,13 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   try {
     await interaction.update({ embeds: [updatedEmbed.toJSON()], components });
   } catch (err) {
-    console.error(`[Peaches] Failed to update suggestion #${suggestionId} embed:`, err);
+    console.error(`[Avery] Failed to update suggestion #${suggestionId} embed:`, err);
     // Fall back to replying if update fails (e.g. interaction expired)
     if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: `Suggestion #${suggestionId} has been ${status}. 🍑`, flags: 64 }).catch(() => {});
+      await interaction.reply({ content: `Suggestion #${suggestionId} has been ${status}. 🌲`, flags: 64 }).catch(() => {});
     }
   }
-  console.log(`[Peaches] Suggestion #${suggestionId} ${status} by ${interaction.user.username}`);
+  console.log(`[Avery] Suggestion #${suggestionId} ${status} by ${interaction.user.username}`);
 
   const auditActionMap: Record<string, string> = { approved: 'suggestion_approve', denied: 'suggestion_deny', reviewing: 'suggestion_review', 'in-progress': 'suggestion_in_progress', implemented: 'suggestion_implement' };
   if (interaction.guild) {

@@ -34,9 +34,9 @@ export async function postTriggerReference(client: Client) {
 
   headerContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## :peach: Peaches — Command & Trigger Reference\n` +
-      `> *Everything you need to know about gettin' Peaches to talk back.*\n\n` +
-      `Peaches responds when a message **starts with** one of her trigger words, or when she's **@mentioned**.`
+      `## :evergreen_tree: Avery — Command & Trigger Reference\n` +
+      `> *Everything you need to know about getting Avery to talk back.*\n\n` +
+      `Avery responds when a message **starts with** one of her trigger words, or when she's **@mentioned**.`
     )
   );
 
@@ -51,13 +51,13 @@ export async function postTriggerReference(client: Client) {
 
   triggerContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `### :speech_balloon: How to Get Peaches' Attention\n` +
+      `### :speech_balloon: How to Get Avery' Attention\n` +
       `Start your message with any of these:\n` +
-      `- \`hey peaches\`\n` +
-      `- \`yo peaches\`\n` +
-      `- \`peaches\` (just her name works)\n\n` +
+      `- \`hey avery\`\n` +
+      `- \`yo avery\`\n` +
+      `- \`avery\` (just her name works)\n\n` +
       `Or just **@mention** her.\n\n` +
-      `> :warning: Peaches will **not** respond in ticket channels.`
+      `> :warning: Avery will **not** respond in ticket channels.`
     )
   );
 
@@ -73,7 +73,7 @@ export async function postTriggerReference(client: Client) {
   faqContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `### :book: FAQ Topics\n` +
-      `Mention any of these words after a trigger and Peaches gives a quick answer:\n\n` +
+      `Mention any of these words after a trigger and Avery gives a quick answer:\n\n` +
       `- **Rules** — \`rules\`, \`guidelines\`, \`community rules\`\n` +
       `- **Roles** — \`get roles\`, \`how do i get a role\`, \`pick roles\`, \`assign role\`\n` +
       `- **Events** — \`events\`, \`what's happening\`, \`schedule\`\n` +
@@ -100,13 +100,13 @@ export async function postTriggerReference(client: Client) {
   convContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `### :speech_left: Conversational Topics\n` +
-      `Peaches has personality responses for all of these:\n\n` +
-      `**About Peaches**\n` +
+      `Avery has personality responses for all of these:\n\n` +
+      `**About Avery**\n` +
       `\`your name\` · \`who are you\` · \`how old\` · \`are you a bot\` · \`where do you live\` · \`what's your job\`\n\n` +
       `**Favorites**\n` +
       `\`favorite food\` · \`favorite drink\` · \`favorite place\` · \`favorite song\` · \`favorite season\` · \`favorite movie\` · \`favorite color\`\n\n` +
-      `**About Ridgeline**\n` +
-      `\`tell me about ridgeline\` · \`when was ridgeline founded\`\n\n` +
+      `**About Avelora**\n` +
+      `\`tell me about avelora\` · \`when was avelora founded\`\n\n` +
       `**Mood Check-ins**\n` +
       `\`i'm sad\` · \`i'm happy\` · \`i'm bored\` · \`i'm tired\` · \`i'm new\`\n\n` +
       `**General Chat**\n` +
@@ -133,8 +133,8 @@ export async function postTriggerReference(client: Client) {
   aiContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `### :sparkles: AI Conversations\n` +
-      `If none of the above triggers match, Peaches uses **AI** to have a natural conversation.\n\n` +
-      `Just talk to her about anything — she'll stay in character as the sassy town secretary.\n` +
+      `If none of the above triggers match, Avery uses **AI** to have a natural conversation.\n\n` +
+      `Just talk to her about anything — she'll stay in character as Avelora's warm community concierge.\n` +
       `She remembers context within each channel (last 20 messages).`
     )
   );
@@ -172,7 +172,7 @@ export async function postTriggerReference(client: Client) {
 
   footerContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `-# :peach: Peaches Bot — Ridgeline, Georgia — Last updated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+      `-# :evergreen_tree: Avery Bot — Avelora, California — Last updated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
     )
   );
 

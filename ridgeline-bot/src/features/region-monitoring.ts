@@ -8,9 +8,23 @@ import {
   getLatestRegionSnapshot,
   getLatestSnapshotAllRegions,
   getRegionSnapshotsSince,
+  getRegionStatsSince,
   type RegionSnapshotRow,
+  type RegionStatsRow,
   type RegionAgent,
 } from '../storage.js';
+import { TtlCache } from '../utilities/ttl-cache.js';
+
+// ── Last snapshot per region (in-memory) ──
+// Lets the webhook hot path skip a DB read on every post. Safe because this is
+// a single-instance bot (instance locking) — every insert flows through here,
+// so the cache always reflects the latest row. Empty after restart → DB fallback.
+const lastSnapshotCache = new Map<string, RegionSnapshotRow>();
+
+// ── /region output cache ──
+// Read-heavy command that staff tend to spam; 60s of staleness is fine for a
+// status readout and saves two DB round-trips + aggregation per repeat call.
+const regionOutputCache = new TtlCache<string[]>(60_000);
 
 // ── Alert cooldowns (in-memory) ──
 
@@ -165,17 +179,31 @@ export async function processRegionUpdate(client: Client, payload: Record<string
   const rawDilation = typeof payload.dilation === 'number' ? String(payload.dilation) : null;
   const eventType = typeof payload.eventType === 'string' ? payload.eventType : 'status';
 
-  // Get previous snapshot for comparison
-  const previous = await getLatestRegionSnapshot(region);
+  // Get previous snapshot for comparison (in-memory first, DB on cold cache)
+  const previous = lastSnapshotCache.get(region) ?? await getLatestRegionSnapshot(region);
 
   // Store new snapshot
+  const storedFps = rawFps !== null ? Math.round(rawFps) : null;
   await insertRegionSnapshot({
     regionName: region,
     agentCount,
     agents,
-    fps: rawFps !== null ? Math.round(rawFps) : null,
+    fps: storedFps,
     dilation: rawDilation,
     eventType,
+  });
+
+  // Update the in-memory cache to mirror what we just persisted, so the next
+  // webhook for this region can diff without re-reading the DB.
+  lastSnapshotCache.set(region, {
+    id: 0, // synthetic — id is never read off `previous` downstream
+    region_name: region,
+    agent_count: agentCount,
+    agents,
+    fps: storedFps,
+    dilation: rawDilation,
+    event_type: eventType,
+    created_at: new Date(),
   });
 
   // Get the monitoring channel
@@ -231,7 +259,7 @@ export async function processRegionUpdate(client: Client, payload: Record<string
     const cooldownKey = `${region}:fps_critical`;
     if (!isOnCooldown(cooldownKey)) {
       setCooldown(cooldownKey);
-      const mgmtRole = guild.roles.cache.find(r => r.name === 'Ridgeline Management');
+      const mgmtRole = guild.roles.cache.find(r => r.name === 'Community Manager');
       const ping = mgmtRole ? `<@&${mgmtRole.id}> ` : '';
       const dilationStr = dilation !== null ? ` | Dilation: ${rawDilation}` : '';
       await channel.send(
@@ -265,11 +293,18 @@ export async function processRegionUpdate(client: Client, payload: Record<string
 export async function handleRegionCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember | null;
   if (!member || !GLOBAL_STAFF_ROLES.some(r => member.roles.cache.some(role => role.name === r))) {
-    await interaction.reply({ content: 'This command is for staff only, sugar.', flags: 64 });
+    await interaction.reply({ content: 'This command is for staff only.', flags: 64 });
     return;
   }
 
   await interaction.deferReply({ flags: 64 });
+
+  // Serve a fresh-enough cached render if we have one (60s TTL)
+  const cachedLines = regionOutputCache.get('region');
+  if (cachedLines) {
+    await replyRegionLines(interaction, cachedLines);
+    return;
+  }
 
   const snapshots = await getLatestSnapshotAllRegions();
   const snapshotMap = new Map<string, RegionSnapshotRow>();
@@ -277,13 +312,12 @@ export async function handleRegionCommand(interaction: ChatInputCommandInteracti
     snapshotMap.set(s.region_name, s);
   }
 
-  // Get last 24h data for averages
-  const historicalSnapshots = await getRegionSnapshotsSince(24);
-  const histByRegion = new Map<string, RegionSnapshotRow[]>();
-  for (const s of historicalSnapshots) {
-    const arr = histByRegion.get(s.region_name) ?? [];
-    arr.push(s);
-    histByRegion.set(s.region_name, arr);
+  // Get last 24h aggregated stats — computed in SQL so the agents JSONB blobs
+  // never cross the wire (the old getRegionSnapshotsSince pulled every blob).
+  const stats = await getRegionStatsSince(24);
+  const statsByRegion = new Map<string, RegionStatsRow>();
+  for (const s of stats) {
+    statsByRegion.set(s.region_name, s);
   }
 
   const now = Date.now();
@@ -301,48 +335,26 @@ export async function handleRegionCommand(interaction: ChatInputCommandInteracti
     const isOffline = ageMs > REGION_OFFLINE_THRESHOLD_MS;
     const status = isOffline ? 'Offline' : 'Online';
 
-    // Compute daily stats
-    const hist = histByRegion.get(name) ?? [];
-    const restarts = hist.filter(s => s.event_type === 'restart').length;
+    // Daily stats (aggregated in SQL). Fall back to the current snapshot when
+    // there's no history in the 24h window (e.g. region offline > 24h).
+    const stat = statsByRegion.get(name);
+    const restarts = stat?.restarts ?? 0;
+    const peakAgents = stat?.peak_agents ?? snap.agent_count;
+    const uniqueVisitors = stat?.unique_agents ?? 0;
+    const avgFps = stat?.avg_fps != null ? stat.avg_fps.toFixed(1) : 'N/A';
+    const fpsMin = stat?.fps_min ?? 0;
+    const fpsMax = stat?.fps_max ?? 0;
 
-    let peakAgents = 0;
-    let fpsSum = 0;
-    let fpsCount = 0;
-    let fpsMin = Infinity;
-    let fpsMax = -Infinity;
-    const uniqueAgents = new Set<string>();
-
-    for (const h of hist) {
-      if (h.agent_count > peakAgents) peakAgents = h.agent_count;
-      if (h.fps !== null) {
-        fpsSum += h.fps;
-        fpsCount++;
-        if (h.fps < fpsMin) fpsMin = h.fps;
-        if (h.fps > fpsMax) fpsMax = h.fps;
-      }
-      if (Array.isArray(h.agents)) {
-        for (const a of h.agents) {
-          const n = normalizeAgent(a);
-          if (n.key !== 'unknown') uniqueAgents.add(n.key);
-        }
-      }
-    }
-
-    const avgFps = fpsCount > 0 ? (fpsSum / fpsCount).toFixed(1) : 'N/A';
-    if (!isFinite(fpsMin)) fpsMin = 0;
-    if (!isFinite(fpsMax)) fpsMax = 0;
-
-    // Find last restart for uptime
-    const lastRestart = hist.filter(s => s.event_type === 'restart').pop();
-    const uptimeMs = lastRestart
-      ? now - new Date(lastRestart.created_at).getTime()
-      : now - new Date(hist[0]?.created_at ?? snap.created_at).getTime();
+    // Uptime: time since last restart, else since earliest snapshot in window
+    const uptimeMs = stat?.last_restart
+      ? now - new Date(stat.last_restart).getTime()
+      : now - new Date(stat?.earliest ?? snap.created_at).getTime();
 
     lines.push(`\uD83D\uDDFA\uFE0F **${name}** — ${status}`);
     lines.push(`Uptime: ${formatUptime(uptimeMs)}`);
     if (restarts > 0) lines.push(`Restarts (24h): ${restarts}`);
     lines.push(`Current agents: ${snap.agent_count} / ${peakAgents} peak`);
-    lines.push(`Unique visitors (24h): ${uniqueAgents.size}`);
+    lines.push(`Unique visitors (24h): ${uniqueVisitors}`);
     lines.push(`FPS: ${snap.fps ?? 'N/A'} current | ${avgFps} avg | ${fpsMin}-${fpsMax} range`);
     lines.push(`Dilation: ${snap.dilation ?? 'N/A'}`);
 
@@ -362,6 +374,12 @@ export async function handleRegionCommand(interaction: ChatInputCommandInteracti
     lines.push('');
   }
 
+  regionOutputCache.set('region', lines);
+  await replyRegionLines(interaction, lines);
+}
+
+/** Render the region status lines to the interaction, splitting on Discord's 2000-char limit. */
+async function replyRegionLines(interaction: ChatInputCommandInteraction, lines: string[]): Promise<void> {
   const output = lines.join('\n');
 
   // Guard against exceeding Discord's 2000-char message limit

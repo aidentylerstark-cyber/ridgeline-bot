@@ -398,7 +398,7 @@ export async function incrementTicketNumber(): Promise<number> {
     RETURNING (value->>'nextTicketNumber')::int - 1 AS ticket_number
   `);
   if (!rows[0]) {
-    console.error('[Peaches] incrementTicketNumber: discord_bot_state key missing after INSERT — returning fallback 1');
+    console.error('[Avery] incrementTicketNumber: discord_bot_state key missing after INSERT — returning fallback 1');
   }
   return rows[0]?.ticket_number ?? 1;
 }
@@ -706,6 +706,74 @@ export async function getLatestSnapshotAllRegions(): Promise<RegionSnapshotRow[]
 export async function getRegionSnapshotsSince(hours: number): Promise<RegionSnapshotRow[]> {
   const { rows } = await pool.query<RegionSnapshotRow>(
     `SELECT * FROM region_snapshots WHERE created_at > NOW() - INTERVAL '1 hour' * $1 ORDER BY created_at ASC`,
+    [hours]
+  );
+  return rows;
+}
+
+export interface RegionStatsRow {
+  region_name: string;
+  peak_agents: number;
+  restarts: number;
+  avg_fps: number | null;
+  fps_min: number | null;
+  fps_max: number | null;
+  earliest: Date | null;
+  last_restart: Date | null;
+  unique_agents: number;
+}
+
+/**
+ * Aggregate per-region stats over the last N hours entirely in SQL.
+ * Avoids transferring the full `agents` JSONB for every snapshot to the bot
+ * (which `getRegionSnapshotsSince` does). Unique-visitor counting unnests the
+ * agents array in Postgres and mirrors normalizeAgent()'s key extraction:
+ * object elements use a trimmed non-empty `key` (with a non-empty `name`),
+ * string elements use the trimmed string; junk values map to NULL (excluded).
+ */
+export async function getRegionStatsSince(hours: number): Promise<RegionStatsRow[]> {
+  const { rows } = await pool.query<RegionStatsRow>(
+    `WITH base AS (
+       SELECT region_name, agent_count, fps, event_type, created_at, agents
+       FROM region_snapshots
+       WHERE created_at > NOW() - INTERVAL '1 hour' * $1
+     ),
+     scalar AS (
+       SELECT region_name,
+         MAX(agent_count)::int AS peak_agents,
+         COUNT(*) FILTER (WHERE event_type = 'restart')::int AS restarts,
+         AVG(fps)::float AS avg_fps,
+         MIN(fps)::int AS fps_min,
+         MAX(fps)::int AS fps_max,
+         MIN(created_at) AS earliest,
+         MAX(created_at) FILTER (WHERE event_type = 'restart') AS last_restart
+       FROM base
+       GROUP BY region_name
+     ),
+     uniq AS (
+       SELECT region_name, COUNT(DISTINCT agent_key)::int AS unique_agents
+       FROM (
+         SELECT region_name,
+           CASE
+             WHEN jsonb_typeof(elem) = 'object'
+                  AND btrim(COALESCE(elem->>'key', '')) <> ''
+                  AND btrim(elem->>'key') <> '[object Object]'
+                  AND btrim(COALESCE(elem->>'name', '')) <> ''
+               THEN btrim(elem->>'key')
+             WHEN jsonb_typeof(elem) = 'string'
+                  AND btrim(elem #>> '{}') NOT IN ('', '[object Object]', 'undefined', 'null')
+               THEN btrim(elem #>> '{}')
+             ELSE NULL
+           END AS agent_key
+         FROM base, LATERAL jsonb_array_elements(agents) AS elem
+         WHERE jsonb_typeof(agents) = 'array'
+       ) x
+       WHERE agent_key IS NOT NULL
+       GROUP BY region_name
+     )
+     SELECT s.region_name, s.peak_agents, s.restarts, s.avg_fps, s.fps_min, s.fps_max,
+            s.earliest, s.last_restart, COALESCE(u.unique_agents, 0) AS unique_agents
+     FROM scalar s LEFT JOIN uniq u USING (region_name)`,
     [hours]
   );
   return rows;

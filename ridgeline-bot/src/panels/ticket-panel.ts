@@ -20,7 +20,7 @@ export async function postTicketPanel(client: Client) {
 
   const panelChannel = guild.channels.cache.get(CHANNELS.ticketPanel) as TextChannel | undefined;
   if (!panelChannel) {
-    console.log('[Peaches] Ticket panel channel not found');
+    console.log('[Avery] Ticket panel channel not found');
     return;
   }
 
@@ -40,15 +40,13 @@ export async function postTicketPanel(client: Client) {
 
   // Components V2 ticket panel
   const panelContainer = new ContainerBuilder()
-    .setAccentColor(0xD4A574);
+    .setAccentColor(0x2E8B57);
 
   panelContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## \uD83C\uDFAB  Need Help? Open a Ticket!\n` +
-      `> *Peaches leans over the counter with a smile*\n\n` +
-      `Hey there, sugar! If you need help from our staff team, ` +
-      `you're in the right place. Click the button below and I'll get you set up ` +
-      `with a private ticket channel.`
+      `## \uD83C\uDFAB Support Tickets\n` +
+      `Need a hand from the staff team? Open a ticket and we'll help you out in a **private channel**. ` +
+      `Pick the department that best fits your request.`
     )
   );
 
@@ -56,11 +54,12 @@ export async function postTicketPanel(client: Client) {
 
   panelContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `\u26A0\uFE0F **General Support** \u2014 Account issues, questions, anything else\n` +
-      `\uD83C\uDFE0 **Rental / Landscaping** \u2014 Housing, property, landscaping help\n` +
-      `\uD83D\uDCC6 **Events** \u2014 Event planning, scheduling, event issues\n` +
-      `\uD83D\uDCC1 **Marketing** \u2014 Promotions, media, marketing requests\n` +
-      `\uD83D\uDCCD **Roleplay Support** \u2014 RP questions, storyline help, disputes`
+      `### Departments\n` +
+      `\u26A0\uFE0F **General Support** \u2014 account issues, questions, anything else\n` +
+      `\uD83C\uDFE0 **Rental / Landscaping** \u2014 housing, property, landscaping\n` +
+      `\uD83D\uDCC6 **Events** \u2014 event planning & scheduling\n` +
+      `\uD83D\uDCC1 **Marketing** \u2014 promotions, media, marketing requests\n` +
+      `\uD83D\uDCCD **Roleplay Support** \u2014 storylines, RP questions, disputes`
     )
   );
 
@@ -78,7 +77,7 @@ export async function postTicketPanel(client: Client) {
 
   panelContainer.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `-# Please don't open tickets for things that can be handled in general chat. Peaches will know. Peaches always knows. \uD83D\uDC40`
+      `-# One open ticket at a time per department. For quick questions, try general chat first.`
     )
   );
 
@@ -86,5 +85,5 @@ export async function postTicketPanel(client: Client) {
     components: [panelContainer],
     flags: MessageFlags.IsComponentsV2,
   });
-  console.log('[Peaches] Ticket panel posted');
+  console.log('[Avery] Ticket panel posted');
 }

@@ -66,7 +66,7 @@ export function getStaffMentions(guild: Guild, department: TicketDepartment): st
     .map(r => `<@&${r?.id}>`)
     .join(' ');
   if (!mentions) {
-    console.warn(`[Peaches] No staff roles found in guild cache for department "${department}" — staff will not be pinged`);
+    console.warn(`[Avery] No staff roles found in guild cache for department "${department}" — staff will not be pinged`);
   }
   return mentions;
 }
@@ -162,7 +162,7 @@ export async function createTicketChannel(
 
     return { channel: channel as TextChannel, ticketNumber };
   } catch (err) {
-    console.error('[Peaches] Failed to create ticket channel:', err);
+    console.error('[Avery] Failed to create ticket channel:', err);
     return null;
   }
 }
@@ -192,13 +192,12 @@ export async function sendTicketOpeningEmbed(
   const embed = new EmbedBuilder()
     .setColor(embedColor)
     .setAuthor({
-      name: 'Peaches \uD83C\uDF51 \u2014 Ticket System',
+      name: 'Avery \uD83C\uDF32 \u2014 Ticket System',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
     .setTitle(`${config.emoji}  ${config.label} \u2014 Ticket #${String(ticketNumber).padStart(4, '0')}`)
     .setDescription(
-      `> *Peaches pulls out a fresh form and clicks her pen*\n\n` +
-      `Alright sugar, I've got your ticket right here. A staff member will be with you shortly!\n\n` +
+      `Your ticket is open — a staff member will be with you shortly. Please share as much detail as you can below.\n\n` +
       `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n` +
       `\uD83D\uDC64 **Opened by:** ${user}\n` +
       `\uD83C\uDF10 **SL Name:** ${slName ?? 'Not provided'}\n` +
@@ -208,7 +207,7 @@ export async function sendTicketOpeningEmbed(
       `\uD83D\uDD50 **Opened:** <t:${Math.floor(Date.now() / 1000)}:F>\n` +
       `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`
     )
-    .setFooter({ text: 'Ridgeline Ticket System \u2014 Powered by Peaches \uD83C\uDF51' })
+    .setFooter({ text: 'Avelora Ticket System \u2014 Powered by Avery \uD83C\uDF32' })
     .setTimestamp();
 
   const ticketId = String(ticketNumber).padStart(4, '0');
@@ -238,9 +237,9 @@ export async function closeTicket(
     // Check for zombie channel — ticket closed in DB but channel still exists
     const closedTicket = await storage.getTicketByChannelId(channel.id);
     if (closedTicket && closedTicket.isClosed) {
-      console.log(`[Peaches] Zombie ticket channel detected: #${closedTicket.ticketNumber} is closed in DB — deleting orphaned channel`);
+      console.log(`[Avery] Zombie ticket channel detected: #${closedTicket.ticketNumber} is closed in DB — deleting orphaned channel`);
       await channel.delete('Cleaning up zombie ticket channel (already closed in DB)').catch(err =>
-        console.error('[Peaches] Failed to delete zombie ticket channel:', err)
+        console.error('[Avery] Failed to delete zombie ticket channel:', err)
       );
     }
     return;
@@ -249,15 +248,15 @@ export async function closeTicket(
   const closingEmbed = new EmbedBuilder()
     .setColor(0xCC4444)
     .setAuthor({
-      name: 'Peaches \uD83C\uDF51 \u2014 Ticket Closed',
+      name: 'Avery \uD83C\uDF32 \u2014 Ticket Closed',
       iconURL: client.user?.displayAvatarURL({ size: 64 }),
     })
     .setDescription(
       `This ticket has been closed by ${closedBy}.\n` +
-      `*Saving transcript and closing up shop...* \uD83C\uDF51`
+      `*Saving transcript and closing up shop...* \uD83C\uDF32`
     );
   await channel.send({ embeds: [closingEmbed] }).catch(err =>
-    console.error('[Peaches] Failed to send closing embed:', err)
+    console.error('[Avery] Failed to send closing embed:', err)
   );
 
   // Generate transcript — if this fails, still proceed with closing (transcript is best-effort)
@@ -304,7 +303,7 @@ export async function closeTicket(
       const logEmbed = new EmbedBuilder()
         .setColor(0x8B6F47)
         .setAuthor({
-          name: 'Peaches \uD83C\uDF51 \u2014 Ticket Log',
+          name: 'Avery \uD83C\uDF32 \u2014 Ticket Log',
           iconURL: client.user?.displayAvatarURL({ size: 64 }),
         })
         .setTitle(`${config.emoji}  Ticket #${String(ticket.ticketNumber).padStart(4, '0')} \u2014 Closed`)
@@ -326,14 +325,14 @@ export async function closeTicket(
           { name: '\uD83D\uDCDD Resolution', value: resolutionField.slice(0, 1024), inline: false },
           { name: `\uD83D\uDCDD Staff Notes (${notes.length})`, value: notesSummary, inline: false },
         )
-        .setFooter({ text: 'Ridgeline Ticket System \u2014 Powered by Peaches \uD83C\uDF51' })
+        .setFooter({ text: 'Avelora Ticket System \u2014 Powered by Avery \uD83C\uDF32' })
         .setTimestamp();
 
       await logChannel.send({ embeds: [logEmbed], files: [transcript] });
     }
   } catch (err) {
     transcriptFailed = true;
-    console.error('[Peaches] Transcript generation failed (ticket will still close):', err);
+    console.error('[Avery] Transcript generation failed (ticket will still close):', err);
     await channel.send('⚠️ Transcript generation failed — the ticket will still be closed but the transcript may be incomplete.').catch(() => {});
   }
 
@@ -341,11 +340,11 @@ export async function closeTicket(
   try {
     const wasClosed = await storage.closeDiscordTicket(channel.id, closedBy.id);
     if (!wasClosed) {
-      console.log(`[Peaches] Ticket #${ticket.ticketNumber} close race detected — another close already succeeded`);
+      console.log(`[Avery] Ticket #${ticket.ticketNumber} close race detected — another close already succeeded`);
       return; // Other close handler will delete the channel
     }
   } catch (err) {
-    console.error('[Peaches] Failed to mark ticket as closed in DB — channel will NOT be deleted:', err);
+    console.error('[Avery] Failed to mark ticket as closed in DB — channel will NOT be deleted:', err);
     await channel.send('\u26A0\uFE0F There was a database error closing this ticket. Please try again or contact a developer.').catch(() => {});
     return;
   }
@@ -363,26 +362,26 @@ export async function closeTicket(
   // Re-fetch ticket to get resolution fields that may have been set just before close
   const updatedTicket = await storage.getTicketByChannelId(channel.id);
   sendTicketSurveyDM(client, updatedTicket ?? ticket).catch(err =>
-    console.error('[Peaches] Failed to send survey DM:', err)
+    console.error('[Avery] Failed to send survey DM:', err)
   );
 
   // Delete channel immediately after transcript send resolves (no artificial delay)
   try {
     await channel.delete('Ticket closed');
-    console.log(`[Peaches] Ticket #${ticket.ticketNumber} closed by ${closedBy.displayName}`);
+    console.log(`[Avery] Ticket #${ticket.ticketNumber} closed by ${closedBy.displayName}`);
   } catch (err) {
-    console.error('[Peaches] Failed to delete ticket channel:', err);
+    console.error('[Avery] Failed to delete ticket channel:', err);
     // Alert staff about orphaned channel — ticket is closed in DB but channel remains
     try {
       const rawModLog = channel.guild.channels.cache.get(CHANNELS.modLog);
       const modLogChannel = rawModLog?.isTextBased() && !rawModLog.isDMBased() ? rawModLog as TextChannel : undefined;
       if (modLogChannel) {
         await modLogChannel.send(
-          `\u26A0\uFE0F **Orphaned Ticket Channel** — Ticket #${String(ticket.ticketNumber).padStart(4, '0')} was closed in the database but the channel <#${channel.id}> (\`${channel.name}\`, ID: \`${channel.id}\`) could not be deleted. Please remove it manually. \uD83C\uDF51`
+          `\u26A0\uFE0F **Orphaned Ticket Channel** — Ticket #${String(ticket.ticketNumber).padStart(4, '0')} was closed in the database but the channel <#${channel.id}> (\`${channel.name}\`, ID: \`${channel.id}\`) could not be deleted. Please remove it manually. \uD83C\uDF32`
         );
       }
     } catch (modLogErr) {
-      console.error('[Peaches] Failed to notify mod-log about orphaned channel:', modLogErr);
+      console.error('[Avery] Failed to notify mod-log about orphaned channel:', modLogErr);
     }
   }
 }
@@ -465,7 +464,7 @@ export async function recreateTicketChannel(
 
     return { channel: channel as TextChannel };
   } catch (err) {
-    console.error('[Peaches] Failed to recreate ticket channel:', err);
+    console.error('[Avery] Failed to recreate ticket channel:', err);
     return null;
   }
 }

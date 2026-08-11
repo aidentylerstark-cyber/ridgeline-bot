@@ -37,7 +37,7 @@ export function scheduleStaffReport(client: Client): cron.ScheduledTask {
       if (rows.length === 0) {
         const embed = new EmbedBuilder()
           .setColor(0xD4A574)
-          .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Weekly Staff Report', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+          .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Weekly Staff Report', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
           .setTitle('\uD83D\uDCCA Weekly Staff Activity Report')
           .setDescription('No staff activity recorded in the last 7 days.')
           .setTimestamp();
@@ -131,7 +131,7 @@ export function scheduleStaffReport(client: Client): cron.ScheduledTask {
 
       const embed = new EmbedBuilder()
         .setColor(0xD4A574)
-        .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Weekly Staff Report', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+        .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Weekly Staff Report', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
         .setTitle('\uD83D\uDCCA Weekly Staff Activity Report')
         .setDescription(description)
         .addFields(
@@ -147,10 +147,10 @@ export function scheduleStaffReport(client: Client): cron.ScheduledTask {
         .setTimestamp();
 
       await modLogChannel.send({ embeds: [embed] }).catch(() => {});
-      console.log('[Peaches] Weekly staff activity report posted');
+      console.log('[Avery] Weekly staff activity report posted');
       }, { label: 'Staff report' });
     } catch (err) {
-      console.error('[Peaches] Staff report failed after retries:', err);
+      console.error('[Avery] Staff report failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 }

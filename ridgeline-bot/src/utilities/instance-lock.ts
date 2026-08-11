@@ -32,7 +32,7 @@ export async function claimInstanceLock(): Promise<void> {
       SET instance_id = $1, claimed_at = now()
   `, [INSTANCE_ID]);
 
-  console.log(`[Peaches] Claimed instance lock: ${INSTANCE_ID.slice(0, 8)}`);
+  console.log(`[Avery] Claimed instance lock: ${INSTANCE_ID.slice(0, 8)}`);
 }
 
 /**
@@ -52,7 +52,7 @@ export function startInstanceHeartbeat(client: Client): void {
       );
       consecutiveFailures = 0; // Reset on success
       if (rows[0]?.instance_id !== INSTANCE_ID) {
-        console.log('[Peaches] Another instance took over — shutting down old bot');
+        console.log('[Avery] Another instance took over — shutting down old bot');
         active = false;
         stopInstanceHeartbeat();
         client.destroy();
@@ -61,9 +61,9 @@ export function startInstanceHeartbeat(client: Client): void {
       }
     } catch (err) {
       consecutiveFailures++;
-      console.error(`[Peaches] Instance heartbeat check failed (${consecutiveFailures}/${MAX_HEARTBEAT_FAILURES}):`, err);
+      console.error(`[Avery] Instance heartbeat check failed (${consecutiveFailures}/${MAX_HEARTBEAT_FAILURES}):`, err);
       if (consecutiveFailures >= MAX_HEARTBEAT_FAILURES) {
-        console.error('[Peaches] Too many consecutive heartbeat failures — DB may be down. Exiting to allow restart.');
+        console.error('[Avery] Too many consecutive heartbeat failures — DB may be down. Exiting to allow restart.');
         active = false;
         stopInstanceHeartbeat();
         client.destroy();

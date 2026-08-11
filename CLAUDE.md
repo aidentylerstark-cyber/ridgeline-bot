@@ -1,10 +1,10 @@
-# Claude Code — Ridgeline Bot Super Agent
+# Claude Code — Avelora Bot Super Agent
 
 ## Essentials
 
 - **Local path:** `/home/runner/workspace/ridgeline-bot` — all work happens here
-- **Bot name:** Peaches (Discord bot for Ridgeline, Georgia — a Second Life RP community)
-- **Guild ID:** `1096864059946709033`
+- **Bot name:** Avery (Discord bot for the City of Avelora — a Southern California metropolitan city ringed by hills & mountains, a Second Life RP community)
+- **Guild ID:** `1536851087078858852`
 - **Stack:** TypeScript ESM, discord.js v14, PostgreSQL/Drizzle, Claude Haiku, Railway
 - **Build check:** `npx tsc --noEmit` — always run after edits
 
@@ -18,11 +18,11 @@
 
 - ESM only (`import`/`export`) — never `require()`
 - Imports use `.js` extensions (required for ESM even for `.ts` files)
-- Logs: `[Peaches]` for bot-personality, `[Discord Bot]` for infrastructure
+- Logs: `[Avery]` for bot-personality, `[Discord Bot]` for infrastructure
 - Use `.cache.get()` / `.cache.find()` for channel/role lookups — no unnecessary API fetches
 - Catch and log errors, never crash; use graceful fallbacks
 - `isBotActive()` check at top of every event handler (instance locking)
-- Peaches personality: Southern, sassy, warm — "sugar", "darlin'", "hon" — see `PEACHES_SYSTEM_PROMPT` in `src/events/message.ts`
+- Avery personality: warm, professional-and-friendly community concierge for a SoCal metropolitan city (ringed by hills/mountains, cool winters w/ rare snow) — welcoming, helpful, light easygoing humor (no Southern dialect) — see `AVERY_SYSTEM_PROMPT` in `src/chatbot/pipeline.ts`
 - Wrap all `interaction.update()` calls in try/catch (tokens expire after 15 min)
 - Button/interaction handlers must NEVER silently return — always give user feedback
 - Atomic DB operations (claim, close) must use raw `pool.query` with rowCount check
@@ -92,7 +92,11 @@
 | marketing | Marketing | `1437260751537705122` |
 | roleplay | Roleplay Support | `1437263205402415265` |
 
-Global staff roles (all depts): Ridgeline Owner, First Lady, Ridgeline Management, Ridgeline Manager
+Global staff roles (all depts): Avelora Owner, First Lady, Avelora Management, Avelora Manager
+
+> ⚠️ Rebrand in progress: category IDs above and the role names are still old
+> Ridgeline values until the Avelora server IDs/roles are wired in — see
+> `TODO(avelora)` markers in `src/config.ts`.
 
 ### Scheduled Tasks
 

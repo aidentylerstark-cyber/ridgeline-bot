@@ -41,16 +41,16 @@ export async function handleTicketOpen(
 ) {
   const member = interaction.member as GuildMember;
   if (!member) {
-    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    await interaction.reply({ content: 'Something went wrong. Try again! \uD83C\uDF32', flags: 64 });
     return;
   }
 
   // Rate limit check — reply immediately (no defer needed for a rejection)
   if (ticketCooldowns.isOnCooldown(member.id)) {
     const remainingSeconds = Math.ceil(ticketCooldowns.getRemainingMs(member.id) / 1000);
-    console.log(`[Peaches] Ticket cooldown: ${member.displayName} (${remainingSeconds}s remaining)`);
+    console.log(`[Avery] Ticket cooldown: ${member.displayName} (${remainingSeconds}s remaining)`);
     await interaction.reply({
-      content: `Hold your horses, sugar! You gotta wait **${remainingSeconds} more seconds** before openin' another ticket. \uD83C\uDF51`,
+      content: `Hold on a moment! You need to wait **${remainingSeconds} more seconds** before opening another ticket. \uD83C\uDF32`,
       flags: 64,
     });
     return;
@@ -83,9 +83,9 @@ export async function handleTicketOpen(
   }
 
   if (optionEntries.length === 0) {
-    console.log(`[Peaches] Ticket limit reached: ${member.displayName} has max tickets in all departments`);
+    console.log(`[Avery] Ticket limit reached: ${member.displayName} has max tickets in all departments`);
     await interaction.editReply({
-      content: `Honey, you've already got an open ticket in every department! Close some first before openin' new ones. \uD83C\uDF51`,
+      content: `You've already got an open ticket in every department! Close some first before opening new ones. \uD83C\uDF32`,
     });
     return;
   }
@@ -100,13 +100,13 @@ export async function handleTicketOpen(
 
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId('ticket_department')
-    .setPlaceholder('Pick a department, sugar...')
+    .setPlaceholder('Pick a department...')
     .addOptions(options);
 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
 
   await interaction.editReply({
-    content: `**Which department can help you today?** Pick one below and we'll get you sorted out, sugar! \uD83C\uDF51`,
+    content: `**Which department can help you today?** Pick one below and we'll get you sorted out! \uD83C\uDF32`,
     components: [row],
   });
 }
@@ -119,12 +119,12 @@ export async function handleTicketClaim(interaction: ButtonInteraction, client: 
   if (!interaction.channelId) { console.warn('[Discord Bot] Button interaction missing channelId (ticket_claim)'); return; }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: `This doesn't seem to be an active ticket, sugar.`, flags: 64 });
+    await interaction.reply({ content: `This doesn't seem to be an active ticket.`, flags: 64 });
     return;
   }
 
   if (!isValidDepartment(ticket.department)) {
-    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    await interaction.reply({ content: 'Invalid ticket department data. Contact a moderator! \uD83C\uDF32', flags: 64 });
     return;
   }
   const member = interaction.member as GuildMember;
@@ -132,7 +132,7 @@ export async function handleTicketClaim(interaction: ButtonInteraction, client: 
   // Only staff roles (department-specific or global) can claim
   if (!isStaffForTicket(member, ticket.department)) {
     await interaction.reply({
-      content: `Sorry sugar, only staff can claim tickets! Sit tight and someone'll be with you shortly. \uD83C\uDF51`,
+      content: `Sorry, only staff can claim tickets! Sit tight and someone will be with you shortly. \uD83C\uDF32`,
       flags: 64,
     });
     return;
@@ -144,12 +144,12 @@ export async function handleTicketClaim(interaction: ButtonInteraction, client: 
     // Re-fetch to show who claimed it
     const refreshed = await storage.getOpenTicketByChannelId(interaction.channelId);
     await interaction.reply({
-      content: `This ticket's already been claimed by <@${refreshed?.claimedBy ?? 'someone'}>, hon! \uD83C\uDF51`,
+      content: `This ticket's already been claimed by <@${refreshed?.claimedBy ?? 'someone'}>! \uD83C\uDF32`,
       flags: 64,
     });
     return;
   }
-  console.log(`[Peaches] Ticket #${ticket.ticketNumber} claimed by ${member.displayName}`);
+  console.log(`[Avery] Ticket #${ticket.ticketNumber} claimed by ${member.displayName}`);
   updateTicketLastActivity(interaction.channelId).catch(() => {});
 
   if (interaction.guild) {
@@ -165,10 +165,10 @@ export async function handleTicketClaim(interaction: ButtonInteraction, client: 
 
   const claimEmbed = new EmbedBuilder()
     .setColor(0x4A7C59)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setDescription(
-      `**${member.displayName}** has claimed this ticket! They'll be helpin' you out, sugar. \uD83C\uDF51\n\n` +
-      `*Y'all play nice now!*`
+      `**${member.displayName}** has claimed this ticket! They'll be helping you out. \uD83C\uDF32\n\n` +
+      `*Play nice, everyone!*`
     );
 
   await interaction.reply({ embeds: [claimEmbed] });
@@ -182,7 +182,7 @@ export async function handleTicketClaim(interaction: ButtonInteraction, client: 
       if (owner && owner.id !== member.id) {
         await owner.send(
           `\uD83C\uDFAB **Ticket #${ticketId}** has been claimed by **${member.displayName}**!\n` +
-          `They'll be helping you out. Head over to <#${interaction.channelId}> to chat. \uD83C\uDF51`
+          `They'll be helping you out. Head over to <#${interaction.channelId}> to chat. \uD83C\uDF32`
         ).catch(() => {});
       }
     }
@@ -197,17 +197,17 @@ export async function handleTicketUnclaim(interaction: ButtonInteraction, client
   if (!interaction.channelId) { console.warn('[Discord Bot] Button interaction missing channelId (ticket_unclaim)'); return; }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: `This doesn't seem to be an active ticket, sugar.`, flags: 64 });
+    await interaction.reply({ content: `This doesn't seem to be an active ticket.`, flags: 64 });
     return;
   }
 
   if (!ticket.claimedBy) {
-    await interaction.reply({ content: `This ticket ain't claimed by anyone yet, hon! \uD83C\uDF51`, flags: 64 });
+    await interaction.reply({ content: `This ticket isn't claimed by anyone yet! \uD83C\uDF32`, flags: 64 });
     return;
   }
 
   if (!isValidDepartment(ticket.department)) {
-    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    await interaction.reply({ content: 'Invalid ticket department data. Contact a moderator! \uD83C\uDF32', flags: 64 });
     return;
   }
   const member = interaction.member as GuildMember;
@@ -215,7 +215,7 @@ export async function handleTicketUnclaim(interaction: ButtonInteraction, client
   // Only the claimer or staff can unclaim
   if (!isStaffForTicket(member, ticket.department) && member.id !== ticket.claimedBy) {
     await interaction.reply({
-      content: `Only the staff member who claimed this ticket (or another staff member) can unclaim it, sugar. \uD83C\uDF51`,
+      content: `Only the staff member who claimed this ticket (or another staff member) can unclaim it. \uD83C\uDF32`,
       flags: 64,
     });
     return;
@@ -224,10 +224,10 @@ export async function handleTicketUnclaim(interaction: ButtonInteraction, client
   const previousClaimer = ticket.claimedBy;
   const unclaimed = await storage.updateTicketClaim(interaction.channelId, null);
   if (!unclaimed) {
-    await interaction.reply({ content: "Couldn't unclaim this ticket — it may have already been modified, sugar. 🍑", flags: 64 });
+    await interaction.reply({ content: "Couldn't unclaim this ticket — it may have already been modified. 🌲", flags: 64 });
     return;
   }
-  console.log(`[Peaches] Ticket #${ticket.ticketNumber} unclaimed by <@${previousClaimer}>`);
+  console.log(`[Avery] Ticket #${ticket.ticketNumber} unclaimed by <@${previousClaimer}>`);
   updateTicketLastActivity(interaction.channelId).catch(() => {});
 
   if (interaction.guild) {
@@ -243,9 +243,9 @@ export async function handleTicketUnclaim(interaction: ButtonInteraction, client
 
   const unclaimEmbed = new EmbedBuilder()
     .setColor(0xCC8844)
-    .setAuthor({ name: 'Peaches \uD83C\uDF51', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+    .setAuthor({ name: 'Avery \uD83C\uDF32', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
     .setDescription(
-      `<@${previousClaimer}> has released this ticket. It's up for grabs again! \uD83C\uDF51\n\n` +
+      `<@${previousClaimer}> has released this ticket. It's up for grabs again! \uD83C\uDF32\n\n` +
       `*Any available staff member can claim it.*`
     );
 
@@ -266,29 +266,29 @@ export async function handleTicketClose(interaction: ButtonInteraction, client: 
       const member = interaction.member as GuildMember;
       const channel = interaction.channel as TextChannel;
       if (channel && member) {
-        console.log(`[Peaches] Zombie ticket channel detected via close button: #${closedTicket.ticketNumber} — deleting orphaned channel`);
-        await interaction.reply({ content: `This ticket is already closed in the system. Cleaning up the channel now... \uD83C\uDF51` });
+        console.log(`[Avery] Zombie ticket channel detected via close button: #${closedTicket.ticketNumber} — deleting orphaned channel`);
+        await interaction.reply({ content: `This ticket is already closed in the system. Cleaning up the channel now... \uD83C\uDF32` });
         // Brief delay so the user sees the message before the channel is deleted
         await new Promise(resolve => setTimeout(resolve, 2000));
         await channel.delete('Cleaning up zombie ticket channel (already closed in DB)').catch(err =>
-          console.error('[Peaches] Failed to delete zombie ticket channel:', err)
+          console.error('[Avery] Failed to delete zombie ticket channel:', err)
         );
         return;
       }
     }
-    await interaction.reply({ content: `This doesn't seem to be an active ticket, sugar.`, flags: 64 });
+    await interaction.reply({ content: `This doesn't seem to be an active ticket.`, flags: 64 });
     return;
   }
 
   const member = interaction.member as GuildMember;
   const guild = interaction.guild;
   if (!guild || !member) {
-    await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+    await interaction.reply({ content: 'Something went wrong. Try again! \uD83C\uDF32', flags: 64 });
     return;
   }
 
   if (!isValidDepartment(ticket.department)) {
-    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    await interaction.reply({ content: 'Invalid ticket department data. Contact a moderator! \uD83C\uDF32', flags: 64 });
     return;
   }
   const isStaff = isStaffForTicket(member, ticket.department);
@@ -309,7 +309,7 @@ export async function handleTicketClose(interaction: ButtonInteraction, client: 
     );
 
     await interaction.reply({
-      content: `**Staff close** \u2014 Are you sure you want to close this ticket? A transcript will be saved to the logs. \uD83C\uDF51`,
+      content: `**Staff close** \u2014 Are you sure you want to close this ticket? A transcript will be saved to the logs. \uD83C\uDF32`,
       components: [staffRow],
     });
   } else if (member.id === ticket.discordUserId) {
@@ -326,12 +326,12 @@ export async function handleTicketClose(interaction: ButtonInteraction, client: 
     );
 
     await interaction.reply({
-      content: `You're requesting to close this ticket. A staff member will need to confirm. \uD83C\uDF51`,
+      content: `You're requesting to close this ticket. A staff member will need to confirm. \uD83C\uDF32`,
       components: [ownerRow],
     });
   } else {
     await interaction.reply({
-      content: `Only the ticket owner or staff can close this ticket, sugar. \uD83C\uDF51`,
+      content: `Only the ticket owner or staff can close this ticket. \uD83C\uDF32`,
       flags: 64,
     });
   }
@@ -345,7 +345,7 @@ export async function handleTicketOwnerRequestClose(interaction: ButtonInteracti
   if (!interaction.channelId) { console.warn('[Discord Bot] Button interaction missing channelId (ticket_owner_request_close)'); return; }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: `This ticket doesn't seem to be active anymore, sugar. It may have already been closed. 🍑`, flags: 64 });
+    await interaction.reply({ content: `This ticket doesn't seem to be active anymore. It may have already been closed. 🌲`, flags: 64 });
     return;
   }
 
@@ -353,7 +353,7 @@ export async function handleTicketOwnerRequestClose(interaction: ButtonInteracti
   const member = interaction.member as GuildMember;
   if (member.id !== ticket.discordUserId) {
     await interaction.reply({
-      content: `Only the ticket owner can request a close, sugar. \uD83C\uDF51`,
+      content: `Only the ticket owner can request a close. \uD83C\uDF32`,
       flags: 64,
     });
     return;
@@ -364,7 +364,7 @@ export async function handleTicketOwnerRequestClose(interaction: ButtonInteracti
   const guild = interaction.guild;
   if (!guild || !isValidDepartment(ticket.department)) {
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+      await interaction.reply({ content: 'Something went wrong. Try again! \uD83C\uDF32', flags: 64 });
     }
     return;
   }
@@ -390,7 +390,7 @@ export async function handleTicketOwnerRequestClose(interaction: ButtonInteracti
       components: [],
     });
   } catch (err) {
-    console.warn('[Peaches] Owner close-request interaction.update() failed (token may have expired):', err);
+    console.warn('[Avery] Owner close-request interaction.update() failed (token may have expired):', err);
   }
 
   try {
@@ -399,9 +399,9 @@ export async function handleTicketOwnerRequestClose(interaction: ButtonInteracti
       components: [staffConfirmRow],
     });
   } catch (err) {
-    console.error('[Peaches] Failed to send close request message:', err);
+    console.error('[Avery] Failed to send close request message:', err);
   }
-  console.log(`[Peaches] Ticket #${ticket.ticketNumber} close requested by owner (${ticket.userName})`);
+  console.log(`[Avery] Ticket #${ticket.ticketNumber} close requested by owner (${ticket.userName})`);
 }
 
 // ─────────────────────────────────────────
@@ -416,22 +416,22 @@ export async function handleTicketConfirmClose(interaction: ButtonInteraction, c
     const closedTicket = await storage.getTicketByChannelId(interaction.channelId);
     if (closedTicket && closedTicket.isClosed) {
       const channel = interaction.channel as TextChannel;
-      console.log(`[Peaches] Zombie ticket detected on confirm close: #${closedTicket.ticketNumber} — deleting orphaned channel`);
+      console.log(`[Avery] Zombie ticket detected on confirm close: #${closedTicket.ticketNumber} — deleting orphaned channel`);
       try {
         await interaction.update({
-          content: `This ticket was already closed. Cleaning up the channel now... \uD83C\uDF51`,
+          content: `This ticket was already closed. Cleaning up the channel now... \uD83C\uDF32`,
           components: [],
         });
       } catch {
-        console.warn('[Peaches] Zombie ticket interaction.update() failed (token may have expired)');
+        console.warn('[Avery] Zombie ticket interaction.update() failed (token may have expired)');
       }
       await channel?.delete('Cleaning up zombie ticket channel (already closed in DB)').catch(err =>
-        console.error('[Peaches] Failed to delete zombie ticket channel:', err)
+        console.error('[Avery] Failed to delete zombie ticket channel:', err)
       );
       return;
     }
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: `This ticket doesn't seem to be active anymore, sugar. It may have already been closed. \uD83C\uDF51`, flags: 64 });
+      await interaction.reply({ content: `This ticket doesn't seem to be active anymore. It may have already been closed. \uD83C\uDF32`, flags: 64 });
     }
     return;
   }
@@ -440,14 +440,14 @@ export async function handleTicketConfirmClose(interaction: ButtonInteraction, c
   const guild = interaction.guild;
   if (!guild || !isValidDepartment(ticket.department)) {
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+      await interaction.reply({ content: 'Something went wrong. Try again! \uD83C\uDF32', flags: 64 });
     }
     return;
   }
 
   if (!isStaffForTicket(member, ticket.department)) {
     await interaction.reply({
-      content: `Only staff can approve closing a ticket, sugar. \uD83C\uDF51`,
+      content: `Only staff can approve closing a ticket. \uD83C\uDF32`,
       flags: 64,
     });
     return;
@@ -483,9 +483,9 @@ export async function handleTicketConfirmClose(interaction: ButtonInteraction, c
   try {
     await interaction.showModal(modal);
   } catch (err) {
-    console.error('[Peaches] Failed to show resolution modal:', err);
+    console.error('[Avery] Failed to show resolution modal:', err);
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: 'Something went wrong showing the close form, sugar. Try again! 🍑', flags: 64 }).catch(() => {});
+      await interaction.reply({ content: 'Something went wrong showing the close form. Try again! 🌲', flags: 64 }).catch(() => {});
     }
   }
 }
@@ -500,7 +500,7 @@ export async function handleTicketResolutionModal(interaction: ModalSubmitIntera
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: `This ticket doesn't seem to be active anymore, sugar. \uD83C\uDF51`, flags: 64 });
+      await interaction.reply({ content: `This ticket doesn't seem to be active anymore. \uD83C\uDF32`, flags: 64 });
     }
     return;
   }
@@ -509,13 +509,13 @@ export async function handleTicketResolutionModal(interaction: ModalSubmitIntera
   const guild = interaction.guild;
   if (!guild || !isValidDepartment(ticket.department)) {
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51', flags: 64 });
+      await interaction.reply({ content: 'Something went wrong. Try again! \uD83C\uDF32', flags: 64 });
     }
     return;
   }
 
   if (!isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: `Only staff can close tickets, sugar. \uD83C\uDF51`, flags: 64 });
+    await interaction.reply({ content: `Only staff can close tickets. \uD83C\uDF32`, flags: 64 });
     return;
   }
 
@@ -533,16 +533,16 @@ export async function handleTicketResolutionModal(interaction: ModalSubmitIntera
       await updateTicketResolution(ticket.id, resolution ?? '', finalType);
     }
   } catch (err) {
-    console.error('[Peaches] Failed to save ticket resolution:', err);
+    console.error('[Avery] Failed to save ticket resolution:', err);
     await interaction.reply({
-      content: "Couldn't save the resolution info, sugar. Please try closing again! 🍑",
+      content: "Couldn't save the resolution info. Please try closing again! 🌲",
       flags: 64,
     });
     return;
   }
 
   await interaction.reply({
-    content: `Ticket is being closed by ${member.displayName}... saving transcript... \uD83C\uDF51`,
+    content: `Ticket is being closed by ${member.displayName}... saving transcript... \uD83C\uDF32`,
   });
 
   const channel = interaction.channel as TextChannel;
@@ -557,20 +557,20 @@ export async function handleTicketDenyClose(interaction: ButtonInteraction, _cli
   if (!interaction.channelId) { console.warn('[Discord Bot] Button interaction missing channelId (ticket_deny_close)'); return; }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: `This ticket doesn't seem to be active anymore, sugar. It may have already been closed. \uD83C\uDF51`, flags: 64 });
+    await interaction.reply({ content: `This ticket doesn't seem to be active anymore. It may have already been closed. \uD83C\uDF32`, flags: 64 });
     return;
   }
 
   const member = interaction.member as GuildMember;
 
   if (!isValidDepartment(ticket.department)) {
-    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    await interaction.reply({ content: 'Invalid ticket department data. Contact a moderator! \uD83C\uDF32', flags: 64 });
     return;
   }
   // Only staff can deny a close request
   if (!isStaffForTicket(member, ticket.department)) {
     await interaction.reply({
-      content: `Only staff can deny a close request, sugar. \uD83C\uDF51`,
+      content: `Only staff can deny a close request. \uD83C\uDF32`,
       flags: 64,
     });
     return;
@@ -578,11 +578,11 @@ export async function handleTicketDenyClose(interaction: ButtonInteraction, _cli
 
   try {
     await interaction.update({
-      content: `Close request denied by **${member.displayName}** \u2014 this ticket stays open. \uD83C\uDF51`,
+      content: `Close request denied by **${member.displayName}** \u2014 this ticket stays open. \uD83C\uDF32`,
       components: [],
     });
   } catch (err) {
-    console.warn('[Peaches] Ticket deny-close interaction.update() failed (token may have expired):', err);
+    console.warn('[Avery] Ticket deny-close interaction.update() failed (token may have expired):', err);
   }
 
   const guild = interaction.guild;
@@ -597,7 +597,7 @@ export async function handleTicketDenyClose(interaction: ButtonInteraction, _cli
     });
   }
 
-  console.log(`[Peaches] Ticket #${ticket.ticketNumber} close denied by ${member.displayName}`);
+  console.log(`[Avery] Ticket #${ticket.ticketNumber} close denied by ${member.displayName}`);
 }
 
 // ─────────────────────────────────────────
@@ -614,7 +614,7 @@ export async function handleTicketCancelClose(interaction: ButtonInteraction) {
     const isOwner = member.id === ticket.discordUserId;
     if (!isStaff && !isOwner) {
       await interaction.reply({
-        content: `Only the ticket owner or staff can cancel a close request, sugar. \uD83C\uDF51`,
+        content: `Only the ticket owner or staff can cancel a close request. \uD83C\uDF32`,
         flags: 64,
       });
       return;
@@ -623,11 +623,11 @@ export async function handleTicketCancelClose(interaction: ButtonInteraction) {
 
   try {
     await interaction.update({
-      content: 'Ticket close cancelled. \uD83C\uDF51',
+      content: 'Ticket close cancelled. \uD83C\uDF32',
       components: [],
     });
   } catch (err) {
-    console.warn('[Peaches] Ticket cancel-close interaction.update() failed (token may have expired):', err);
+    console.warn('[Avery] Ticket cancel-close interaction.update() failed (token may have expired):', err);
   }
 }
 
@@ -639,19 +639,19 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
   if (!interaction.channelId) { console.warn('[Discord Bot] Button interaction missing channelId (ticket_adduser)'); return; }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: `This doesn't seem to be an active ticket, sugar.`, flags: 64 });
+    await interaction.reply({ content: `This doesn't seem to be an active ticket.`, flags: 64 });
     return;
   }
 
   const member = interaction.member as GuildMember;
   if (!isValidDepartment(ticket.department)) {
-    await interaction.reply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51', flags: 64 });
+    await interaction.reply({ content: 'Invalid ticket department data. Contact a moderator! \uD83C\uDF32', flags: 64 });
     return;
   }
 
   if (!isStaffForTicket(member, ticket.department)) {
     await interaction.reply({
-      content: `Only staff can add users to a ticket, sugar. \uD83C\uDF51`,
+      content: `Only staff can add users to a ticket. \uD83C\uDF32`,
       flags: 64,
     });
     return;
@@ -660,7 +660,7 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
   // Present a native member picker — no copying user IDs.
   const selectMenu = new UserSelectMenuBuilder()
     .setCustomId('ticket_adduser_select')
-    .setPlaceholder('Pick a member to add to this ticket, sugar...')
+    .setPlaceholder('Pick a member to add to this ticket...')
     .setMinValues(1)
     .setMaxValues(1);
 
@@ -673,9 +673,9 @@ export async function handleTicketAddUser(interaction: ButtonInteraction, _clien
       flags: 64,
     });
   } catch (err) {
-    console.error('[Peaches] Failed to show add-user picker:', err);
+    console.error('[Avery] Failed to show add-user picker:', err);
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: 'Something went wrong showing the picker, sugar. Try again! 🍑', flags: 64 }).catch(() => {});
+      await interaction.reply({ content: 'Something went wrong showing the picker. Try again! 🌲', flags: 64 }).catch(() => {});
     }
   }
 }
@@ -691,24 +691,24 @@ export async function handleTicketAddUserSelect(interaction: UserSelectMenuInter
 
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.editReply({ content: `This doesn't seem to be an active ticket, sugar.`, components: [] });
+    await interaction.editReply({ content: `This doesn't seem to be an active ticket.`, components: [] });
     return;
   }
 
   const member = interaction.member as GuildMember;
   if (!isValidDepartment(ticket.department)) {
-    await interaction.editReply({ content: 'Invalid ticket department data, sugar. Contact a moderator! \uD83C\uDF51' });
+    await interaction.editReply({ content: 'Invalid ticket department data. Contact a moderator! \uD83C\uDF32' });
     return;
   }
 
   if (!isStaffForTicket(member, ticket.department)) {
-    await interaction.editReply({ content: `Only staff can add users to a ticket, sugar. \uD83C\uDF51` });
+    await interaction.editReply({ content: `Only staff can add users to a ticket. \uD83C\uDF32` });
     return;
   }
 
   const userId = interaction.values[0];
   if (!userId) {
-    await interaction.editReply({ content: `No member selected, sugar! Try again. \uD83C\uDF51`, components: [] });
+    await interaction.editReply({ content: `No member selected! Try again. \uD83C\uDF32`, components: [] });
     return;
   }
 
@@ -717,7 +717,7 @@ export async function handleTicketAddUserSelect(interaction: UserSelectMenuInter
 
   // Verify the user actually exists in the guild before modifying permissions
   if (!guild) {
-    await interaction.editReply({ content: 'Something went wrong, sugar. Try again! \uD83C\uDF51' });
+    await interaction.editReply({ content: 'Something went wrong. Try again! \uD83C\uDF32' });
     return;
   }
 
@@ -726,7 +726,7 @@ export async function handleTicketAddUserSelect(interaction: UserSelectMenuInter
     targetMember = await guild.members.fetch(userId);
   } catch {
     await interaction.editReply({
-      content: `Couldn't find a member with that ID in this server, sugar. Double-check the ID and try again! \uD83C\uDF51`,
+      content: `Couldn't find a member with that ID in this server. Double-check the ID and try again! \uD83C\uDF32`,
     });
     return;
   }
@@ -736,7 +736,7 @@ export async function handleTicketAddUserSelect(interaction: UserSelectMenuInter
     const existingPerms = channel.permissionOverwrites.cache.get(targetMember.id);
     if (existingPerms?.allow.has('ViewChannel')) {
       await interaction.editReply({
-        content: `${targetMember.displayName} already has access to this ticket, sugar! 🍑`,
+        content: `${targetMember.displayName} already has access to this ticket! 🌲`,
       });
       return;
     }
@@ -749,9 +749,9 @@ export async function handleTicketAddUserSelect(interaction: UserSelectMenuInter
       EmbedLinks: true,
     });
 
-    await interaction.editReply({ content: `\uD83C\uDF51 ${targetMember} has been added to this ticket!`, components: [] });
-    await channel.send(`\uD83C\uDF51 ${targetMember} was added to this ticket by ${interaction.user}.`);
-    console.log(`[Peaches] Ticket #${ticket.ticketNumber}: ${targetMember.displayName} added by ${interaction.user.displayName}`);
+    await interaction.editReply({ content: `\uD83C\uDF32 ${targetMember} has been added to this ticket!`, components: [] });
+    await channel.send(`\uD83C\uDF32 ${targetMember} was added to this ticket by ${interaction.user}.`);
+    console.log(`[Avery] Ticket #${ticket.ticketNumber}: ${targetMember.displayName} added by ${interaction.user.displayName}`);
     updateTicketLastActivity(channel.id).catch(() => {});
 
     if (guild) {
@@ -765,9 +765,9 @@ export async function handleTicketAddUserSelect(interaction: UserSelectMenuInter
       });
     }
   } catch (err) {
-    console.error('[Peaches] Failed to add user to ticket:', err);
+    console.error('[Avery] Failed to add user to ticket:', err);
     await interaction.editReply({
-      content: `Something went wrong adding that user, sugar. Try again or check bot permissions! \uD83C\uDF51`,
+      content: `Something went wrong adding that user. Try again or check bot permissions! \uD83C\uDF32`,
     });
   }
 }

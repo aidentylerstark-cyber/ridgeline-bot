@@ -16,20 +16,20 @@ export async function handleWelcomeCommand(interaction: ChatInputCommandInteract
     const success = await resendOnboardingDM(client, member);
     if (success) {
       await interaction.reply({
-        content: "Check your DMs, sugar! I just sent you the welcome packet again. \uD83C\uDF51",
+        content: "Check your DMs! I just sent you the welcome packet again. \uD83C\uDF32",
         flags: 64,
       });
-      console.log(`[Peaches] Resent welcome DM to ${member.displayName}`);
+      console.log(`[Avery] Resent welcome DM to ${member.displayName}`);
     } else {
       await interaction.reply({
-        content: "I tried to send you the welcome info but your DMs are closed, hon! Enable DMs from server members and try again. \uD83C\uDF51",
+        content: "I tried to send you the welcome info but your DMs are closed! Enable DMs from server members and try again. \uD83C\uDF32",
         flags: 64,
       });
-      console.log(`[Peaches] Could not resend welcome DM to ${member.displayName} (DMs likely disabled)`);
+      console.log(`[Avery] Could not resend welcome DM to ${member.displayName} (DMs likely disabled)`);
     }
   } catch {
     await interaction.reply({
-      content: "Something went sideways, sugar. Try again in a sec! \uD83C\uDF51",
+      content: "Something went sideways. Try again in a sec! \uD83C\uDF32",
       flags: 64,
     });
   }

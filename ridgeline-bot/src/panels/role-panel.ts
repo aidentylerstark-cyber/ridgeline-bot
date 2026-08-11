@@ -38,72 +38,52 @@ export async function postRoleButtons(client: Client) {
     }
   }
 
-  // Header (Components V2)
-  const headerContainer = new ContainerBuilder()
-    .setAccentColor(0xD4A574);
+  // One clean Components V2 panel with every category
+  const container = new ContainerBuilder().setAccentColor(0x5865F2);
 
-  headerContainer.addTextDisplayComponents(
+  container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## \uD83C\uDFAD Ridgeline Role Selection Board\n` +
-      `> *Peaches slides a clipboard across the counter*\n\n` +
-      `Welcome to the role board, sugar! Click a button to **add** a role to your profile. ` +
-      `Click it again to **remove** it \u2014 no hard feelings.\n\n` +
-      `These roles help us get to know you and keep you in the loop on the things you care about.`
+      `## \uD83C\uDFF7\uFE0F Role Selection\n` +
+      `Pick your roles below \u2014 **click to add, click again to remove**. ` +
+      `Some tags unlock hidden channels (Gamer \u2192 \uD83C\uDFAE Gaming, Avelora Kids \u2192 \uD83E\uDDF8 Kids/Family).`
     )
   );
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
-  await getRolesChannel.send({
-    components: [headerContainer],
-    flags: MessageFlags.IsComponentsV2,
-  });
-
-  // Each category (Components V2)
-  for (const [category, roleNames] of Object.entries(SELF_ASSIGN_ROLES)) {
+  const entries = Object.entries(SELF_ASSIGN_ROLES);
+  entries.forEach(([category, roleNames], i) => {
     const style = ROLE_CATEGORY_STYLE[category];
-
-    const categoryContainer = new ContainerBuilder()
-      .setAccentColor(style?.color ?? 0x4A7C59);
-
-    categoryContainer.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `### ${category}\n${style?.description ?? 'Select your roles below.'}`
-      )
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`### ${category}\n${style?.description ?? 'Select your roles below.'}`)
     );
 
     const row = new ActionRowBuilder<ButtonBuilder>();
     for (const roleName of roleNames) {
-      const buttonId = `role_${roleName.replace(/ /g, '_')}`;
       row.addComponents(
         new ButtonBuilder()
-          .setCustomId(buttonId)
+          .setCustomId(`role_${roleName.replace(/ /g, '_')}`)
           .setLabel(roleName)
-          .setStyle(style?.buttonStyle ?? 2) // Secondary
+          .setStyle(style?.buttonStyle ?? 2)
       );
     }
+    container.addActionRowComponents(row);
 
-    categoryContainer.addActionRowComponents(row);
+    if (i < entries.length - 1) {
+      container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+    }
+  });
 
-    await getRolesChannel.send({
-      components: [categoryContainer],
-      flags: MessageFlags.IsComponentsV2,
-    });
-  }
-
-  // Footer (Components V2)
-  const footerContainer = new ContainerBuilder()
-    .setAccentColor(0xD4A574);
-
-  footerContainer.addTextDisplayComponents(
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `\uD83C\uDF51 *If you need a role that ain't listed here, just holler at Peaches or click "Open a Ticket" in <#${CHANNELS.ticketPanel}>!*\n\n` +
-      `-# \uD83C\uDFE1 Ridgeline, Georgia \u2014 Where Every Story Matters`
+      `-# Need a role that isn't here? Open a ticket in <#${CHANNELS.ticketPanel}> \u00B7 \uD83C\uDFD9\uFE0F Avelora, California`
     )
   );
 
   await getRolesChannel.send({
-    components: [footerContainer],
+    components: [container],
     flags: MessageFlags.IsComponentsV2,
   });
 
-  console.log('[Discord Bot] Role selection buttons posted to #get-roles');
+  console.log('[Discord Bot] Role selection panel posted to #get-roles');
 }

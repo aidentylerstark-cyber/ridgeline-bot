@@ -92,7 +92,7 @@ export function scheduleCleanup(client: Client): { stop: () => void; start: () =
       const regionSnapshots = await purgeOldRegionSnapshots(REGION_SNAPSHOT_RETENTION_DAYS);
 
       console.log(
-        `[Peaches] Weekly cleanup complete — tickets: ${tickets}, suggestions: ${suggestions}, ` +
+        `[Avery] Weekly cleanup complete — tickets: ${tickets}, suggestions: ${suggestions}, ` +
         `birthday posts: ${birthdayPosts}, milestone posts: ${milestonePosts}, audit logs: ${auditLogs}, region snapshots: ${regionSnapshots}`
       );
 
@@ -113,7 +113,7 @@ export function scheduleCleanup(client: Client): { stop: () => void; start: () =
 
           const purgeEmbed = new EmbedBuilder()
             .setColor(0xD4A574)
-            .setAuthor({ name: 'Peaches \uD83C\uDF51 \u2014 Weekly Cleanup', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+            .setAuthor({ name: 'Avery \uD83C\uDF32 \u2014 Weekly Cleanup', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
             .setTitle('\uD83E\uDDF9 Weekly Data Purge Complete')
             .setDescription(lines.join('\n'))
             .setFooter({ text: `${totalPurged} total records purged` })
@@ -124,7 +124,7 @@ export function scheduleCleanup(client: Client): { stop: () => void; start: () =
       }
       }, { label: 'Weekly cleanup' });
     } catch (err) {
-      console.error('[Peaches] Weekly cleanup failed after retries:', err);
+      console.error('[Avery] Weekly cleanup failed after retries:', err);
     }
   }, { timezone: 'America/New_York' });
 

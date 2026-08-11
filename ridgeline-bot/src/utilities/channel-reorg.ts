@@ -87,7 +87,7 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
   },
   'breaking-news': {
     categoryId: '1378417767803523082',
-    categoryName: '\uD83D\uDCE2 RIDGELINE NEWS',
+    categoryName: '\uD83D\uDCE2 AVELORA NEWS',
     renames: [
       { id: '1378438241040203919', name: '\uD83D\uDCF0\u250Abreaking-news' },
       { id: '1436159073782595615', name: '\uD83D\uDEA8\u250Aridge-alerts' },
@@ -116,7 +116,7 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
       { id: '1410765263099396246', name: '\uD83D\uDCAC\u250Ageneral-chat' },
       { id: '1397573063997919272', name: '\uD83C\uDF89\u250Acelebration-corner' },
       { id: '1396633643446702240', name: '\uD83D\uDED2\u250Ashopping-corner' },
-      { id: '1383231594248015912', name: '\uD83D\uDCF8\u250Aridgeline-photos' },
+      { id: '1383231594248015912', name: '\uD83D\uDCF8\u250Aavelora-photos' },
       { id: '1392647522018918430', name: '\uD83C\uDF0E\u250Asl-photos' },
       { id: '1097067075060633671', name: '\uD83D\uDC3E\u250Apet-tax' },
       { id: '1380939549185675344', name: '\uD83C\uDF54\u250Afood-lovers' },
@@ -132,7 +132,7 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
     categoryName: '\uD83D\uDEDF GET SUPPORT',
     renames: [
       { id: '1097052132949119067', name: '\uD83C\uDFAB\u250Aopen-a-ticket' },
-      { id: '1420963602457825330', name: '\uD83D\uDCCA\u250Aridgeline-stats' },
+      { id: '1420963602457825330', name: '\uD83D\uDCCA\u250Aavelora-stats' },
       { id: '1378837861012475915', name: '\uD83D\uDCE6\u250Aobjects-returns' },
       { id: '1392115473792893030', name: '\uD83C\uDFF7\u250Arole-request' },
       { id: '1456373951721767005', name: '\uD83C\uDF10\u250Awebsite-notifications' },
@@ -226,7 +226,7 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
   },
   'court': {
     categoryId: '1378425880426057828',
-    categoryName: '\u2696\uFE0F WEST RIDGELINE SUPERIOR COURT',
+    categoryName: '\u2696\uFE0F WEST AVELORA SUPERIOR COURT',
     renames: [
       { id: '1378427782933123113', name: '\uD83C\uDFDB\u250Acourthouse-lobby' },
       { id: '1378428022478340157', name: '\uD83D\uDCAC\u250Aleadership-chat' },
@@ -246,7 +246,7 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
   },
   'sheriff': {
     categoryId: '1378423521641762977',
-    categoryName: '\uD83D\uDE94 RIDGELINE COUNTY SHERIFF',
+    categoryName: '\uD83D\uDE94 AVELORA COUNTY SHERIFF',
     renames: [
       { id: '1382371697390260356', name: '\uD83D\uDD0A\u250Arcsd-training' },
       { id: '1378424294476087317', name: '\uD83D\uDD10\u250Aevidence-locker' },
@@ -262,7 +262,7 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
   },
   'crime': {
     categoryId: '1382373329679421490',
-    categoryName: '\uD83D\uDD2A RIDGELINE CRIME',
+    categoryName: '\uD83D\uDD2A AVELORA CRIME',
     renames: [
       { id: '1382373394879746159', name: '\uD83D\uDC80\u250Acriminals-united' },
       { id: '1382373622286389380', name: '\uD83D\uDD0A\u250Acriminals-voice' },
@@ -270,7 +270,7 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
   },
   'fire-department': {
     categoryId: '1378433422032375848',
-    categoryName: '\uD83D\uDE92 RIDGELINE FIRE DEPARTMENT',
+    categoryName: '\uD83D\uDE92 AVELORA FIRE DEPARTMENT',
     renames: [
       { id: '1378433491590582282', name: '\uD83C\uDFE0\u250Afire-station-lobby' },
       { id: '1443037438451650723', name: '\uD83D\uDD0A\u250Atraining' },
@@ -286,7 +286,7 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
   },
   'medical-center': {
     categoryId: '1378429174825488524',
-    categoryName: '\uD83C\uDFE5 RIDGELINE MEDICAL CENTER',
+    categoryName: '\uD83C\uDFE5 AVELORA MEDICAL CENTER',
     renames: [
       { id: '1378430366859395122', name: '\uD83C\uDFE5\u250Ahospital-lobby' },
       { id: '1410425013928067214', name: '\uD83D\uDD0A\u250Amedical-voice' },
@@ -410,7 +410,7 @@ const CATEGORY_CONFIGS: Record<string, { categoryId: string | null; categoryName
   },
   'post-office': {
     categoryId: '1485397422791463072',
-    categoryName: '\uD83D\uDCEE RIDGELINE POST OFFICE',
+    categoryName: '\uD83D\uDCEE AVELORA POST OFFICE',
     renames: [
       { id: '1485396595196563526', name: '\uD83D\uDCAC\u250Apostal-staff-chat' },
       { id: '1485396602645381200', name: '\uD83D\uDCE2\u250Aannouncements' },
@@ -518,7 +518,7 @@ export async function setChannelPermissions(client: Client, categoryKey: string)
   }
 
   // Find staff roles for staff-post channels
-  const staffRoleNames = ['Community Manager', 'Community Moderator', 'Ridgeline Owner', 'First Lady', 'Ridgeline Management', 'Ridgeline Manager'];
+  const staffRoleNames = ['Community Manager', 'Moderator', 'Owner'];
   const staffRoles = staffRoleNames
     .map(name => guild.roles.cache.find(r => r.name === name))
     .filter(Boolean);

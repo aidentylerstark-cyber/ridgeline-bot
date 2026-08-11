@@ -1,40 +1,33 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { Message } from 'discord.js';
 import { FAQ_RESPONSES } from './faq.js';
-import { PEACHES_PATTERNS, PEACHES_GREETINGS, PEACHES_FALLBACK, pick } from './keywords.js';
+import { AVERY_PATTERNS, AVERY_GREETINGS, AVERY_FALLBACK, pick } from './keywords.js';
 import { addToMemory, getConversationHistory } from './memory.js';
 import { parseBirthdayDate, formatBirthdayDate, registerBirthday, lookupBirthday } from '../features/birthdays.js';
 import { setCharacterName } from '../storage.js';
 
-// Peaches' AI system prompt
+// Avery's AI system prompt
 import { CHANNELS } from '../config.js';
 
-const PEACHES_SYSTEM_PROMPT = `You are Peaches \uD83C\uDF51 \u2014 the sassy, warm-hearted town secretary of Ridgeline, Georgia.
+const AVERY_SYSTEM_PROMPT = `You are Avery \uD83C\uDF32 \u2014 the warm, friendly community concierge for Avelora, a Southern California metropolitan city ringed by elevated hills and mountain terrain.
 
 PERSONALITY:
-- You're a Southern woman with a big personality, a bigger heart, and the biggest sweet tea collection in three counties
-- You're sassy, witty, and sharp-tongued but ALWAYS kind underneath. Think: a warm grandma who roasts you lovingly
-- You use Southern expressions naturally: "sugar", "honey", "darlin'", "bless your heart", "well I'll be", "butter my biscuit"
-- You have strong opinions about sweet tea (MUST be sweet), peach cobbler (your mama's recipe), and Dolly Parton (national treasure)
-- You gossip harmlessly and love drama but you're never truly mean
-- You're proud of Ridgeline and treat everyone like family
-- You use emojis sparingly but effectively \u2014 mostly \uD83C\uDF51, \uD83D\uDC40, \uD83D\uDC85, \uD83D\uDE02, \uD83D\uDC95, \u2615
+- You're upbeat, welcoming, and genuinely helpful \u2014 the one who makes everyone feel at home the moment they arrive
+- You're professional and personable: friendly and conversational, with light, easygoing humor. Never sarcastic, snarky, or mean
+- You love Avelora \u2014 its lively streets, the hills and mountains that frame the skyline, the SoCal sunshine, and the tight-knit community
+- You know the town inside and out and are always happy to point people in the right direction
+- You use emojis sparingly but warmly \u2014 mostly \uD83C\uDF32, \uD83C\uDFD9\uFE0F, \uD83C\uDFD4\uFE0F, \u2615, \uD83D\uDE0A, \uD83D\uDC9A
 
 ABOUT YOU:
-- You work at Ridgeline Town Hall as the town secretary
-- You know everyone's name and everyone's business
-- Your favorite food is peach cobbler, favorite drink is sweet tea with mint
-- You love Dolly Parton, front porches, fall season, and gossip
-- You've been here since the town was founded
-- You have a cottage on Peachtree Lane but basically live at Town Hall
+- You're the community concierge for Avelora \u2014 you welcome new residents, celebrate milestones, and help folks find their way around
+- You love mornings at a downtown coffee shop, hikes in the hills above the city, and the rare winter days when snow dusts the peaks
+- You've been part of Avelora since the very beginning and know just about everyone
 
-ABOUT RIDGELINE:
-- Ridgeline, Georgia is a close-knit Southern roleplay community in Second Life
-- Founded: June 25, 2025
+ABOUT AVELORA:
+- Avelora is a Southern California metropolitan city surrounded by elevated hills and mountain terrain, with a strong sense of community
+- Its unusual geography brings cooler winters than the nearby coast \u2014 occasional winter flurries and the rare light snowfall dusting the city
+- It's a realistic city roleplay community in Second Life
 - Tagline: "Where Every Story Matters"
-- It's a realistic small-town roleplay community \u2014 think Friday Night Lights meets Gilmore Girls
-- The website is ridgeline-sl.com
-- The community has over 200 members
 
 DISCORD CHANNELS (use Discord mention format <#ID>):
 - Rules: <#${CHANNELS.rules}>
@@ -51,14 +44,14 @@ DISCORD CHANNELS (use Discord mention format <#ID>):
 
 RULES:
 - Keep responses SHORT \u2014 this is Discord chat, not an essay. 1-3 sentences usually. Max 4 sentences.
-- Stay in character as Peaches ALWAYS. You are never an AI assistant \u2014 you ARE Peaches.
-- If someone asks something you genuinely don't know, be honest but in character ("Sugar, that's above my pay grade")
+- Stay in character as Avery ALWAYS. You are never an AI assistant \u2014 you ARE Avery.
+- If someone asks something you genuinely don't know, be honest and friendly ("That's a great question \u2014 let me point you to someone who'd know")
 - Direct people to the right channels when relevant
-- NEVER break character. NEVER say you're an AI, Claude, or a language model. You're Peaches.
-- Don't use asterisks for actions too much \u2014 one per message MAX if it adds flavor
+- NEVER break character. NEVER say you're an AI, Claude, or a language model. You're Avery.
+- Don't overuse asterisks for actions \u2014 one per message MAX if it adds warmth
 - Be conversational and natural \u2014 match the energy of whoever you're talking to
 - Remember details people share with you in the conversation and reference them naturally
-- You can have opinions, tell stories, make jokes, give advice \u2014 be a REAL personality`;
+- You can have opinions, share little stories, make friendly jokes, and give advice \u2014 be a REAL, warm personality`;
 
 // Anthropic SDK client — initialized once at module load
 const anthropic = process.env.ANTHROPIC_API_KEY
@@ -99,7 +92,7 @@ export async function processChatbotMessage(
   for (const faq of FAQ_RESPONSES) {
     if (faq.compiledTriggers.some(re => re.test(query))) {
       const channelName = 'name' in message.channel ? message.channel.name : message.channelId;
-      console.log(`[Peaches] FAQ response to ${message.author.displayName} in #${channelName}: "${query}" \u2192 matched "${faq.triggers[0]}"`);
+      console.log(`[Avery] FAQ response to ${message.author.displayName} in #${channelName}: "${query}" \u2192 matched "${faq.triggers[0]}"`);
       await message.reply(faq.response);
       return;
     }
@@ -112,15 +105,15 @@ export async function processChatbotMessage(
     const parsed = parseBirthdayDate(dateStr);
     if (parsed) {
       await registerBirthday(message.author.id, parsed.month, parsed.day);
-      console.log(`[Peaches] Birthday registered: ${message.author.displayName} \u2192 ${formatBirthdayDate(parsed.month, parsed.day)}`);
+      console.log(`[Avery] Birthday registered: ${message.author.displayName} \u2192 ${formatBirthdayDate(parsed.month, parsed.day)}`);
       await message.reply(
-        `\uD83C\uDF82 Well, I've got it written down in ink! **${formatBirthdayDate(parsed.month, parsed.day)}** \u2014 ` +
-        `I'll make sure the whole town knows when your special day rolls around, sugar! \uD83C\uDF51\uD83C\uDF89`
+        `\uD83C\uDF82 Got it written down! **${formatBirthdayDate(parsed.month, parsed.day)}** \u2014 ` +
+        `I'll make sure the whole town knows when your special day rolls around. \uD83C\uDF32\uD83C\uDF89`
       );
     } else {
       await message.reply(
-        `Hmm, I couldn't quite make sense of that date, sugar. Try somethin' like ` +
-        `"my birthday is **January 15**" or "my birthday is **1/15**"! \uD83C\uDF51`
+        `Hmm, I couldn't quite make sense of that date. Try something like ` +
+        `"my birthday is **January 15**" or "my birthday is **1/15**"! \uD83C\uDF32`
       );
     }
     return;
@@ -148,17 +141,17 @@ export async function processChatbotMessage(
 
     if (charName.length > 0 && charName.length <= 100 && wordCount <= 5 && looksLikeName) {
       await setCharacterName(message.author.id, charName);
-      console.log(`[Peaches] Character name set: ${message.author.displayName} → "${charName}"`);
+      console.log(`[Avery] Character name set: ${message.author.displayName} → "${charName}"`);
       await message.reply(
-        `📝 I've got it written down, sugar! Your character's name is **${charName}**. ` +
-        `I'll use it for birthday announcements and town records! 🍑`
+        `📝 Got it written down! Your character's name is **${charName}**. ` +
+        `I'll use it for birthday announcements and town records! 🌲`
       );
       return;
     }
   }
 
   // 3. Keyword pattern matching — only test stripped query, never raw content
-  for (const conv of PEACHES_PATTERNS) {
+  for (const conv of AVERY_PATTERNS) {
     if (conv.patterns.some(p => p.test(query))) {
       const response = pick(conv.responses);
 
@@ -167,19 +160,19 @@ export async function processChatbotMessage(
         const entry = await lookupBirthday(message.author.id);
         if (entry) {
           await message.reply(
-            `Of course I know your birthday, sugar! It's **${formatBirthdayDate(entry.month, entry.day)}**! ` +
-            `Don't you worry \u2014 Peaches never forgets a birthday. \uD83C\uDF82\uD83C\uDF51`
+            `Of course I know your birthday! It's **${formatBirthdayDate(entry.month, entry.day)}**! ` +
+            `Don't worry \u2014 Avery never forgets a birthday. \uD83C\uDF82\uD83C\uDF32`
           );
         } else {
           await message.reply(
-            `I don't have your birthday on file yet, sugar! Tell me by sayin' ` +
-            `"**Peaches, my birthday is January 15**" (or whatever your date is) and I'll remember it forever! \uD83C\uDF82\uD83C\uDF51`
+            `I don't have your birthday on file yet! Just tell me by saying ` +
+            `"**Avery, my birthday is January 15**" (or whatever your date is) and I'll remember it. \uD83C\uDF82\uD83C\uDF32`
           );
         }
         return;
       }
 
-      console.log(`[Peaches] Keyword response to ${message.author.displayName}: "${query}"`);
+      console.log(`[Avery] Keyword response to ${message.author.displayName}: "${query}"`);
       await message.reply(response);
       return;
     }
@@ -187,8 +180,8 @@ export async function processChatbotMessage(
 
   // 4. Greeting check
   if (!query || query.length < 3 || /^(hi+|hey+|hello+|sup|yo+|hiya|heya|mornin|evening|afternoon|night|hey there|hola|ayo|ayy+|waddup|howdy|what'?s up|wassup|greetings|ello|henlo)$/i.test(query)) {
-    console.log(`[Peaches] Greeting response to ${message.author.displayName}`);
-    await message.reply(pick(PEACHES_GREETINGS));
+    console.log(`[Avery] Greeting response to ${message.author.displayName}`);
+    await message.reply(pick(AVERY_GREETINGS));
     return;
   }
 
@@ -196,14 +189,14 @@ export async function processChatbotMessage(
   if (anthropic) {
     // Rate-limit guard: shed load if too many concurrent requests
     if (anthropicConcurrent >= ANTHROPIC_MAX_CONCURRENT) {
-      console.warn(`[Peaches] AI rate-limit guard: ${anthropicConcurrent} concurrent — using fallback`);
-      await message.reply(pick(PEACHES_FALLBACK));
+      console.warn(`[Avery] AI rate-limit guard: ${anthropicConcurrent} concurrent — using fallback`);
+      await message.reply(pick(AVERY_FALLBACK));
       return;
     }
 
     anthropicConcurrent++;
     try {
-      if ('sendTyping' in message.channel) await message.channel.sendTyping();
+      if ('sendTyping' in message.channel) await message.channel.sendTyping().catch(() => {});
       const userName = message.member?.displayName ?? message.author.username;
       addToMemory(message.channel.id, 'user', `${userName}: ${cleanMessage || 'hey'}`);
 
@@ -212,7 +205,7 @@ export async function processChatbotMessage(
       const response = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 250,
-        system: PEACHES_SYSTEM_PROMPT,
+        system: AVERY_SYSTEM_PROMPT,
         messages: history.map(m => ({
           role: m.role === 'user' ? 'user' as const : 'assistant' as const,
           content: m.content,
@@ -225,7 +218,7 @@ export async function processChatbotMessage(
       const reply = firstBlock?.type === 'text' ? firstBlock.text.trim() : null;
       if (reply && reply.length > 0) {
         addToMemory(message.channel.id, 'assistant', reply);
-        console.log(`[Peaches] AI response to ${message.author.displayName}: "${cleanMessage?.slice(0, 80)}..."`);
+        console.log(`[Avery] AI response to ${message.author.displayName}: "${cleanMessage?.slice(0, 80)}..."`);
         // Split responses exceeding Discord's 2000-char limit
         if (reply.length <= 2000) {
           await message.reply(reply);
@@ -241,7 +234,7 @@ export async function processChatbotMessage(
         return;
       }
     } catch (err) {
-      console.error('[Peaches] AI error:', err);
+      console.error('[Avery] AI error:', err);
       // Fall through to fallback
     } finally {
       anthropicConcurrent--;
@@ -249,6 +242,6 @@ export async function processChatbotMessage(
   }
 
   // 6. Fallback
-  console.log(`[Peaches] Fallback response to ${message.author.displayName}: "${query?.slice(0, 80)}"`);
-  await message.reply(pick(PEACHES_FALLBACK));
+  console.log(`[Avery] Fallback response to ${message.author.displayName}: "${query?.slice(0, 80)}"`);
+  await message.reply(pick(AVERY_FALLBACK));
 }

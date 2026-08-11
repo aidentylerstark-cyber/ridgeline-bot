@@ -77,7 +77,7 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
     const parsed = parseBirthdayDate(dateStr);
     if (!parsed) {
       await interaction.reply({
-        content: `Hmm, couldn't make sense of that date, sugar. Try something like **January 15** or **1/15**! 🍑`,
+        content: `Hmm, couldn't make sense of that date. Try something like **January 15** or **1/15**! 🌲`,
         flags: 64,
       });
       return;
@@ -88,7 +88,7 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
       details: `Set birthday to ${formatBirthdayDate(parsed.month, parsed.day)}`,
     });
     await interaction.reply({
-      content: `🎂 Got it! I've written down **${formatBirthdayDate(parsed.month, parsed.day)}** for you. I'll make sure the whole town knows when your big day arrives! 🍑`,
+      content: `🎂 Got it! I've written down **${formatBirthdayDate(parsed.month, parsed.day)}** for you. I'll make sure the whole town knows when your big day arrives! 🌲`,
       flags: 64,
     });
     return;
@@ -98,12 +98,12 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
     const entry = await lookupBirthday(interaction.user.id);
     if (entry) {
       await interaction.reply({
-        content: `🎂 I've got your birthday on file! It's **${formatBirthdayDate(entry.month, entry.day)}**. Peaches never forgets! 🍑`,
+        content: `🎂 I've got your birthday on file! It's **${formatBirthdayDate(entry.month, entry.day)}**. Avery never forgets! 🌲`,
         flags: 64,
       });
     } else {
       await interaction.reply({
-        content: `I don't have your birthday yet, sugar! Use \`/birthday set\` to register it! 🍑`,
+        content: `I don't have your birthday yet! Use \`/birthday set\` to register it! 🌲`,
         flags: 64,
       });
     }
@@ -118,12 +118,12 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
         details: `Removed their birthday from the registry`,
       });
       await interaction.reply({
-        content: `🗑️ Your birthday has been removed from the records, sugar. You can always re-register with \`/birthday set\`! 🍑`,
+        content: `🗑️ Your birthday has been removed from the records. You can always re-register with \`/birthday set\`! 🌲`,
         flags: 64,
       });
     } else {
       await interaction.reply({
-        content: `I don't have a birthday on file for you, sugar! Nothing to delete. 🍑`,
+        content: `I don't have a birthday on file for you! Nothing to delete. 🌲`,
         flags: 64,
       });
     }
@@ -145,7 +145,7 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
     const birthdays = await storage.getUpcomingBirthdays(dates);
 
     if (birthdays.length === 0) {
-      await interaction.editReply({ content: "No birthdays coming up in the next 7 days, sugar! 🍑" });
+      await interaction.editReply({ content: "No birthdays coming up in the next 7 days! 🌲" });
       return;
     }
 
@@ -171,12 +171,12 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
     const embed = new EmbedBuilder()
       .setColor(0xD4A574)
       .setAuthor({
-        name: 'Peaches 🍑 — Upcoming Birthdays',
+        name: 'Avery 🌲 — Upcoming Birthdays',
         iconURL: client?.user?.displayAvatarURL({ size: 128 }),
       })
       .setTitle('🎂 Birthdays — Next 7 Days')
       .setDescription(lines.join('\n\n'))
-      .setFooter({ text: `${birthdays.length} birthday(s) coming up! 🍑` })
+      .setFooter({ text: `${birthdays.length} birthday(s) coming up! 🌲` })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });

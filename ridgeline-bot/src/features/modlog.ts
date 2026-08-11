@@ -4,13 +4,16 @@ import { isBotActive } from '../utilities/instance-lock.js';
 import { logAuditEvent } from './audit-log.js';
 import { wasDeletedBySpamGuard } from './anti-spam.js';
 
-function getModLogChannel(guild: Guild): TextChannel | null {
-  if (!CHANNELS.modLog) return null;
+function getLogChannel(guild: Guild, channelId: string): TextChannel | null {
+  if (!channelId || channelId === '0') return null;
   if (guild.id !== GUILD_ID) return null;
-  const channel = guild.channels.cache.get(CHANNELS.modLog);
+  const channel = guild.channels.cache.get(channelId);
   if (!channel || !channel.isTextBased() || channel.isDMBased()) return null;
   return channel as TextChannel;
 }
+const getModLogChannel = (guild: Guild): TextChannel | null => getLogChannel(guild, CHANNELS.modLog);
+const getMemberLogChannel = (guild: Guild): TextChannel | null => getLogChannel(guild, CHANNELS.memberLog);
+const getMessageLogChannel = (guild: Guild): TextChannel | null => getLogChannel(guild, CHANNELS.messageLog);
 
 /**
  * Resolve WHO performed a moderation action via Discord's native audit log.
@@ -64,7 +67,7 @@ export function setupModLog(client: Client): void {
   // ── Member joined ──────────────────────────────────────────
   client.on('guildMemberAdd', async (member) => {
     if (!isBotActive()) return;
-    const logChannel = getModLogChannel(member.guild);
+    const logChannel = getMemberLogChannel(member.guild);
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
@@ -99,12 +102,12 @@ export function setupModLog(client: Client): void {
     if (!raidModeActive && recentJoins.length >= RAID_THRESHOLD) {
       raidModeActive = true;
       preRaidVerificationLevel = member.guild.verificationLevel;
-      console.warn(`[Peaches] Anti-raid: ${recentJoins.length} joins in 60s — activating raid mode (was level ${preRaidVerificationLevel})`);
+      console.warn(`[Avery] Anti-raid: ${recentJoins.length} joins in 60s — activating raid mode (was level ${preRaidVerificationLevel})`);
 
       try {
         await member.guild.setVerificationLevel(GuildVerificationLevel.High);
       } catch (err) {
-        console.error('[Peaches] Anti-raid: failed to raise verification level:', err);
+        console.error('[Avery] Anti-raid: failed to raise verification level:', err);
       }
 
       const raidEmbed = new EmbedBuilder()
@@ -134,11 +137,11 @@ export function setupModLog(client: Client): void {
         raidModeActive = false;
         raidModeTimer = null;
         recentJoins.length = 0; // Clear stale join timestamps
-        console.log('[Peaches] Anti-raid: raid mode cleared after 10 minutes');
+        console.log('[Avery] Anti-raid: raid mode cleared after 10 minutes');
         // Re-fetch guild from client cache — the original member.guild reference may be stale after 10 minutes
         const freshGuild = client.guilds.cache.get(GUILD_ID);
         if (!freshGuild) {
-          console.error('[Peaches] Anti-raid: guild not found in cache during raid mode reset');
+          console.error('[Avery] Anti-raid: guild not found in cache during raid mode reset');
           preRaidVerificationLevel = null;
           return;
         }
@@ -157,7 +160,7 @@ export function setupModLog(client: Client): void {
             details: `Raid mode auto-cleared after 10 minutes. Verification level restored to ${restoreLevelName}.`,
           });
         } catch (err) {
-          console.error('[Peaches] Anti-raid: FAILED to lower verification level — it may still be High! Manual reset needed:', err);
+          console.error('[Avery] Anti-raid: FAILED to lower verification level — it may still be High! Manual reset needed:', err);
           const failEmbed = new EmbedBuilder()
             .setColor(0xFF0000)
             .setTitle('\u26A0\uFE0F Raid Mode Reset FAILED')
@@ -173,7 +176,7 @@ export function setupModLog(client: Client): void {
   // ── Member left / kicked (bans handled separately) ─────────
   client.on('guildMemberRemove', async (member) => {
     if (!isBotActive()) return;
-    const logChannel = getModLogChannel(member.guild);
+    const logChannel = getMemberLogChannel(member.guild);
     if (!logChannel) return;
 
     // A member can be removed as a ban, a kick, or a voluntary leave. A ban ALSO
@@ -247,7 +250,7 @@ export function setupModLog(client: Client): void {
     if (!message.guild) return;
     if (wasDeletedBySpamGuard(message.id)) return; // troll-guard cleanup — its report covers it
 
-    const logChannel = getModLogChannel(message.guild);
+    const logChannel = getMessageLogChannel(message.guild);
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
@@ -287,7 +290,7 @@ export function setupModLog(client: Client): void {
     const purgedBy = await resolveExecutor(guild, AuditLogEvent.MessageBulkDelete, channel.id);
     if (purgedBy === client.user?.id) return; // any other bot-initiated purge
 
-    const logChannel = getModLogChannel(guild);
+    const logChannel = getMessageLogChannel(guild);
     if (logChannel) {
       const embed = new EmbedBuilder()
         .setColor(0xED4245)
@@ -313,7 +316,7 @@ export function setupModLog(client: Client): void {
     if (!oldMessage.guild) return;
     if (oldMessage.content === newMessage.content) return;
 
-    const logChannel = getModLogChannel(oldMessage.guild);
+    const logChannel = getMessageLogChannel(oldMessage.guild);
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
@@ -422,8 +425,6 @@ export function setupModLog(client: Client): void {
   // ── Member updated (roles, timeouts, nickname) ────────────
   client.on('guildMemberUpdate', async (oldMember, newMember) => {
     if (!isBotActive()) return;
-    const logChannel = getModLogChannel(newMember.guild);
-    if (!logChannel) return;
 
     const fields: { name: string; value: string; inline?: boolean }[] = [];
 
@@ -451,14 +452,9 @@ export function setupModLog(client: Client): void {
 
     if (fields.length === 0) return;
 
-    const embed = new EmbedBuilder()
-      .setColor(0xFEE75C)
-      .setTitle('🔄 Member Updated')
-      .setDescription(`${newMember}`)
-      .addFields(fields)
-      .setTimestamp();
-
-    await logChannel.send({ embeds: [embed] }).catch(() => {});
+    // Each change is logged itemized to its dedicated channel below (role-log,
+    // mod-log for timeouts). No generic summary embed — keeps logs organized and
+    // avoids double-posting timeouts.
 
     // ── DB audit logging (searchable in /auditlog) ──
     // Skip bot members (their role/nick churn is infrastructure noise).
@@ -479,13 +475,13 @@ export function setupModLog(client: Client): void {
       if (executor && executor !== botId) {
         if (addedRoles.size > 0) {
           logAuditEvent(client, newMember.guild, {
-            action: 'role_assign', actorId: executor, targetId: newMember.id, dbOnly: true,
+            action: 'role_assign', actorId: executor, targetId: newMember.id,
             details: `Role(s) added to ${who}: ${addedRoles.map(r => r.name).join(', ')}`,
           });
         }
         if (removedRoles.size > 0) {
           logAuditEvent(client, newMember.guild, {
-            action: 'role_remove', actorId: executor, targetId: newMember.id, dbOnly: true,
+            action: 'role_remove', actorId: executor, targetId: newMember.id,
             details: `Role(s) removed from ${who}: ${removedRoles.map(r => r.name).join(', ')}`,
           });
         }
@@ -500,19 +496,19 @@ export function setupModLog(client: Client): void {
       if (executor && executor !== botId) {
         if (timeoutApplied) {
           logAuditEvent(client, newMember.guild, {
-            action: 'member_timeout', actorId: executor, targetId: newMember.id, dbOnly: true,
+            action: 'member_timeout', actorId: executor, targetId: newMember.id,
             details: `${who} timed out until ${newMember.communicationDisabledUntil!.toISOString()}`,
             severity: 'warning',
           });
         } else if (timeoutRemoved) {
           logAuditEvent(client, newMember.guild, {
-            action: 'member_untimeout', actorId: executor, targetId: newMember.id, dbOnly: true,
+            action: 'member_untimeout', actorId: executor, targetId: newMember.id,
             details: `Timeout lifted for ${who}`,
           });
         }
         if (nickChanged) {
           logAuditEvent(client, newMember.guild, {
-            action: 'nickname_change', actorId: executor, targetId: newMember.id, dbOnly: true,
+            action: 'nickname_change', actorId: executor, targetId: newMember.id,
             details: `Nickname for ${who}: "${oldMember.nickname ?? '(none)'}" → "${newMember.nickname ?? '(none)'}"`,
           });
         }

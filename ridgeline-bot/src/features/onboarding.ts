@@ -14,21 +14,21 @@ import { getOnboardingRecord, createOnboardingRecord, updateOnboardingStep } fro
 // ─────────────────────────────────────────
 
 const WELCOME_GREETINGS = [
-  "Well butter my biscuit, look who just rolled into town!",
-  "Lord have mercy, another pretty face in Ridgeline!",
-  "Somebody ring the dinner bell — we got a new neighbor!",
-  "Well I'll be! Welcome to the sweetest little town this side of the Mississippi!",
-  "Bless your heart, you found us! Welcome to Ridgeline, sugar!",
-  "Hot diggity! A brand new face in our little slice of heaven!",
-  "Well shut the front door — another soul found their way to Ridgeline!",
-  "Sweeter than sweet tea on a porch swing — welcome home, darlin'!",
+  "Look who just found their way to the city!",
+  "A brand new face in Avelora — wonderful!",
+  "We've got a new neighbor, everyone!",
+  "Welcome to the friendliest city in Southern California!",
+  "You found us! Welcome to Avelora!",
+  "A fresh face in the city — welcome!",
+  "Another good soul found their way to Avelora!",
+  "Warm welcome and a fresh cup of coffee — welcome home!",
 ];
 
 const RETURNING_GREETINGS = [
-  "Well, well, well — look who came back to town!",
-  "I knew you couldn't stay away, sugar!",
-  "The porch light was on and waitin' for ya!",
-  "Back where you belong, darlin'!",
+  "Look who came back to the city!",
+  "I had a feeling we'd see you again!",
+  "The lights were on and waiting for you!",
+  "Back where you belong!",
 ];
 
 export function getRandomGreeting(): string {
@@ -48,17 +48,17 @@ export function buildWelcomeButtons(): ActionRowBuilder<ButtonBuilder> {
     new ButtonBuilder()
       .setLabel('Read the Rules')
       .setStyle(ButtonStyle.Link)
-      .setURL(`https://discord.com/channels/1096864059946709033/${CHANNELS.rules}`)
+      .setURL(`https://discord.com/channels/1536851087078858852/${CHANNELS.rules}`)
       .setEmoji('📜'),
     new ButtonBuilder()
       .setLabel('Pick Your Roles')
       .setStyle(ButtonStyle.Link)
-      .setURL(`https://discord.com/channels/1096864059946709033/${CHANNELS.getRoles}`)
+      .setURL(`https://discord.com/channels/1536851087078858852/${CHANNELS.getRoles}`)
       .setEmoji('🎭'),
     new ButtonBuilder()
-      .setLabel('Say Howdy')
+      .setLabel('Say Hello')
       .setStyle(ButtonStyle.Link)
-      .setURL(`https://discord.com/channels/1096864059946709033/${CHANNELS.generalChat}`)
+      .setURL(`https://discord.com/channels/1536851087078858852/${CHANNELS.generalChat}`)
       .setEmoji('👋'),
   );
 }
@@ -78,7 +78,7 @@ export function buildAccountAgeWarningEmbed(member: GuildMember, accountAgeDays:
       { name: 'Account Created', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`, inline: false },
       { name: 'Joined Server', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
     )
-    .setFooter({ text: 'Peaches Auto-Detection — Keep an eye on this one, y\'all' })
+    .setFooter({ text: 'Avery Auto-Detection — Worth keeping an eye on' })
     .setTimestamp();
 }
 
@@ -90,24 +90,24 @@ export function buildStep1Embed(client: Client): { embed: EmbedBuilder; row: Act
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
     .setAuthor({
-      name: 'Peaches \uD83C\uDF51 — Town Secretary',
+      name: 'Avery \uD83C\uDF32 — Community Concierge',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
-    .setTitle('\uD83C\uDFE1 Welcome to Ridgeline, Georgia')
+    .setTitle('\uD83C\uDFE1 Welcome to Avelora, California')
     .setDescription(
-      `You pull up to the **Ridgeline Town Office** on a warm Georgia afternoon. ` +
-      `Through the screen door, you can hear the hum of a ceiling fan and the clink of sweet tea glasses. ` +
-      `A woman with a warm smile looks up from the front desk...\n\n` +
-      `*"Well hey there, darlin'! You must be new in town. I'm **Peaches**, the town secretary. ` +
-      `Come on inside — I'll get you all set up with everything you need to know about our little corner of Georgia."*`
+      `You step into the **Avelora City Hall** on a warm California afternoon. ` +
+      `The scent of fresh coffee drifts from the corner, and sunlight spills across the front desk. ` +
+      `Someone with a warm smile looks up to greet you...\n\n` +
+      `*"Hi there, welcome! You must be new in the city. I'm **Avery**, the community concierge. ` +
+      `Come on in — I'll get you all set up with everything you need to know about our little corner of California."*`
     )
-    .setFooter({ text: 'Your Ridgeline Journey Begins Here \uD83C\uDF51' })
+    .setFooter({ text: 'Your Avelora Journey Begins Here \uD83C\uDF32' })
     .setTimestamp();
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('onboard_start')
-      .setLabel("Come on in, sugar!")
+      .setLabel("Come on in!")
       .setStyle(ButtonStyle.Primary)
       .setEmoji('\uD83D\uDEAA'),
   );
@@ -119,19 +119,19 @@ export function buildStep2Embed(client: Client): { embed: EmbedBuilder; row: Act
   const embed = new EmbedBuilder()
     .setColor(0x8B6F47)
     .setAuthor({
-      name: 'Peaches \uD83C\uDF51 — Town Secretary',
+      name: 'Avery \uD83C\uDF32 — Community Concierge',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
-    .setTitle('\uD83D\uDCDC Town Guidelines')
+    .setTitle('\uD83D\uDCDC City Guidelines')
     .setDescription(
-      `*Peaches slides a laminated sheet across the counter*\n\n` +
-      `"Now sugar, every good town has a few guidelines to keep things runnin' smooth. ` +
-      `Nothin' too fancy — just good Southern common sense."`
+      `*Avery slides a laminated sheet across the counter*\n\n` +
+      `"Every good city has a few guidelines to keep things running smoothly. ` +
+      `Nothing too fancy — just good common sense."`
     )
     .addFields(
       {
         name: '\uD83E\uDD1D Be Kind',
-        value: 'Treat everyone with Southern hospitality. We\'re all neighbors here — respect, warmth, and good manners go a long way.',
+        value: 'Treat everyone with genuine warmth. We\'re all neighbors here — respect, kindness, and good manners go a long way.',
         inline: false,
       },
       {
@@ -146,16 +146,16 @@ export function buildStep2Embed(client: Client): { embed: EmbedBuilder; row: Act
       },
       {
         name: '\uD83C\uDD98 Need Help?',
-        value: `Open a ticket in <#${CHANNELS.ticketPanel}> or just say "hey Peaches" in any channel — I'm always around!`,
+        value: `Open a ticket in <#${CHANNELS.ticketPanel}> or just say "hey Avery" in any channel — I'm always around!`,
         inline: false,
       },
     )
-    .setFooter({ text: `Full rules available in #rules \u2022 Take your time, hon!` });
+    .setFooter({ text: `Full rules available in #rules \u2022 Take your time!` });
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('onboard_rules_ack')
-      .setLabel("I understand, Peaches!")
+      .setLabel("I understand, Avery!")
       .setStyle(ButtonStyle.Success)
       .setEmoji('\u2705'),
   );
@@ -167,15 +167,15 @@ export function buildStep3Embed(client: Client): { embed: EmbedBuilder; row: Act
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
     .setAuthor({
-      name: 'Peaches \uD83C\uDF51 — Town Secretary',
+      name: 'Avery \uD83C\uDF32 — Community Concierge',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
     .setTitle('\uD83D\uDCCB Your Resident Card')
     .setDescription(
-      `*Peaches pulls out a fresh form and clicks her pen*\n\n` +
+      `*Avery pulls out a fresh form and clicks her pen*\n\n` +
       `"Now that you know the lay of the land, let's get you set up! ` +
-      `I just need a couple details for your official Ridgeline Resident Card. ` +
-      `Don't worry — everything's optional, sugar. You can always come back to this later."`
+      `I just need a couple details for your official Avelora Resident Card. ` +
+      `Don't worry — everything's optional. You can always come back to this later."`
     )
     .setFooter({ text: 'Click below to fill out your details (all fields optional)' });
 
@@ -206,10 +206,10 @@ export function buildResidentCardEmbed(
   const embed = new EmbedBuilder()
     .setColor(0xD4A574)
     .setAuthor({
-      name: 'Peaches \uD83C\uDF51 — Town Secretary',
+      name: 'Avery \uD83C\uDF32 — Community Concierge',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
-    .setTitle('\uD83C\uDFE1 Official Ridgeline Resident Card')
+    .setTitle('\uD83C\uDFE1 Official Avelora Resident Card')
     .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
     .addFields(
       { name: '\uD83D\uDCDB Name', value: characterName || member.displayName, inline: true },
@@ -224,7 +224,7 @@ export function buildResidentCardEmbed(
   // Key channel links
   embed.addFields(
     {
-      name: '\uD83D\uDDFA\uFE0F Your Town Map',
+      name: '\uD83D\uDDFA\uFE0F Your City Map',
       value:
         `> <#${CHANNELS.generalChat}> — Chat with the community\n` +
         `> <#${CHANNELS.characterIntros}> — Introduce your character\n` +
@@ -235,7 +235,7 @@ export function buildResidentCardEmbed(
     },
   );
 
-  embed.setFooter({ text: 'Welcome home, sugar. Where Every Story Matters. \uD83C\uDF51' });
+  embed.setFooter({ text: 'Welcome home. Where Every Story Matters. \uD83C\uDF32' });
   embed.setTimestamp();
 
   return embed;
@@ -245,15 +245,15 @@ export function buildReturningWelcomeEmbed(client: Client, member: GuildMember):
   return new EmbedBuilder()
     .setColor(0xD4A574)
     .setAuthor({
-      name: 'Peaches \uD83C\uDF51 — Town Secretary',
+      name: 'Avery \uD83C\uDF32 — Community Concierge',
       iconURL: client.user?.displayAvatarURL({ size: 128 }),
     })
-    .setTitle('\uD83C\uDFE1 Welcome Back to Ridgeline!')
+    .setTitle('\uD83C\uDFE1 Welcome Back to Avelora!')
     .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
     .setDescription(
-      `*Peaches looks up from her desk and breaks into a big smile*\n\n` +
-      `"Well, well, well — look who came back! I knew you couldn't stay away from Ridgeline, sugar. ` +
-      `The porch light's been on waitin' for ya."\n\n` +
+      `*Avery looks up from her desk and breaks into a big smile*\n\n` +
+      `"Look who came back! I had a feeling you couldn't stay away from Avelora. ` +
+      `The lights have been on waiting for you."\n\n` +
       `Everything's right where you left it. Here are the spots you'll want to visit:`
     )
     .addFields(
@@ -267,7 +267,7 @@ export function buildReturningWelcomeEmbed(client: Client, member: GuildMember):
         inline: false,
       },
     )
-    .setFooter({ text: 'Welcome home, sugar. Where Every Story Matters. \uD83C\uDF51' })
+    .setFooter({ text: 'Welcome home. Where Every Story Matters. \uD83C\uDF32' })
     .setTimestamp();
 }
 
@@ -288,7 +288,7 @@ export async function sendOnboardingDM(client: Client, member: GuildMember): Pro
       // Returning member — send welcome-back embed
       const embed = buildReturningWelcomeEmbed(client, member);
       await member.send({ embeds: [embed] });
-      console.log(`[Peaches] Sent returning welcome DM to ${member.displayName}`);
+      console.log(`[Avery] Sent returning welcome DM to ${member.displayName}`);
       return true;
     }
 
@@ -296,7 +296,7 @@ export async function sendOnboardingDM(client: Client, member: GuildMember): Pro
     await createOnboardingRecord(member.id);
     const { embed, row } = buildStep1Embed(client);
     await member.send({ embeds: [embed], components: [row] });
-    console.log(`[Peaches] Sent onboarding Step 1 DM to ${member.displayName}`);
+    console.log(`[Avery] Sent onboarding Step 1 DM to ${member.displayName}`);
     return true;
   } catch {
     console.log(`[Discord Bot] Could not DM ${member.displayName} (DMs likely disabled)`);

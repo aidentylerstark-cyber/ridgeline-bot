@@ -29,11 +29,11 @@ export function setupMessageHandler(client: Client) {
       // DM received — send a friendly redirect
       try {
         await message.reply(
-          "Hey sugar! I appreciate you reachin' out, but I can only chat in the Ridgeline server. " +
-          "Head on over there and I'll be happy to help! \uD83C\uDF51"
+          "Hi there! I appreciate you reaching out, but I can only chat in the Avelora server. " +
+          "Head on over there and I'll be happy to help! \uD83C\uDF32"
         );
       } catch {
-        console.warn('[Peaches] Failed to reply to DM from', message.author.id);
+        console.warn('[Avery] Failed to reply to DM from', message.author.id);
       }
       return;
     }
@@ -57,8 +57,8 @@ export function setupMessageHandler(client: Client) {
         const isStaffMember = GLOBAL_STAFF_ROLES.some(roleName =>
           member.roles.cache.some(r => r.name === roleName)
         ) || member.roles.cache.some(r =>
-          ['Community Manager', 'Community Moderator', 'Rental Manager', 'Rental Moderator',
-           'Events Director', 'Events Team', 'Marketing Director', 'Marketing Team'].includes(r.name)
+          ['Community Manager', 'Moderator', 'Rental Manager', 'Rental Team',
+           'Events Manager', 'Events Team', 'Marketing Manager', 'Marketing Team'].includes(r.name)
         );
 
         if (isStaffMember) {
@@ -67,19 +67,6 @@ export function setupMessageHandler(client: Client) {
       }
     }
 
-    // Auto-thread every post in #character-intros (keep channel tidy)
-    if (
-      message.channel.id === CHANNELS.characterIntros &&
-      message.channel.type === ChannelType.GuildText &&
-      !message.hasThread
-    ) {
-      const threadName = `${message.member?.displayName ?? message.author.username}'s Introduction`.slice(0, 100);
-      message.startThread({
-        name: threadName,
-        autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
-        reason: 'Auto-thread for character introduction',
-      }).catch(() => {});
-    }
 
     const content = message.content.toLowerCase().trim();
     const originalContent = message.content.trim();
@@ -87,11 +74,11 @@ export function setupMessageHandler(client: Client) {
     if (!botUser) return;
 
     const isMentioned = message.mentions.has(botUser, { ignoreEveryone: true, ignoreRoles: true });
-    // Only trigger on direct address — not third-person statements like "Peaches was helpful"
-    const isBotTrigger = /^hey peaches\b/.test(content) ||
-                         /^yo peaches\b/.test(content) ||
-                         /^peaches[,!?]\s/.test(content) ||
-                         /^peaches\s+(can|do|does|will|would|could|should|what|where|when|how|why|who|tell|help|show|give|get|find|check|look|make|set|please|plz|pls)\b/.test(content);
+    // Only trigger on direct address — not third-person statements like "Avery was helpful"
+    const isBotTrigger = /^hey avery\b/.test(content) ||
+                         /^yo avery\b/.test(content) ||
+                         /^avery[,!?]\s/.test(content) ||
+                         /^avery\s+(can|do|does|will|would|could|should|what|where|when|how|why|who|tell|help|show|give|get|find|check|look|make|set|please|plz|pls)\b/.test(content);
 
     if (!isMentioned && !isBotTrigger) return;
 
@@ -116,18 +103,18 @@ export function setupMessageHandler(client: Client) {
     // Strip the mention/trigger
     const query = content
       .replace(/<@!?\d+>/g, '')
-      .replace(/\b(?:hey peaches|yo peaches|peaches),?\b/gi, '')
+      .replace(/\b(?:hey avery|yo avery|avery),?\b/gi, '')
       .trim();
 
     const cleanMessage = originalContent
       .replace(/<@!?\d+>/g, '')
-      .replace(/\b(?:hey peaches|yo peaches|peaches),?\b/gi, '')
+      .replace(/\b(?:hey avery|yo avery|avery),?\b/gi, '')
       .trim();
 
     try {
       await processChatbotMessage(message, query, cleanMessage);
     } catch (err) {
-      console.error('[Peaches] Message handler error:', err);
+      console.error('[Avery] Message handler error:', err);
     }
   });
 }

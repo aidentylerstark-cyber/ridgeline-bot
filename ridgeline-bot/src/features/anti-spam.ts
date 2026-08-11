@@ -130,7 +130,7 @@ export async function handleSpamCheck(message: Message, client: Client): Promise
   try {
     await actOnSpammer(client, message.member, act.msgs.slice());
   } catch (err) {
-    console.error('[Peaches] Anti-spam: failed to act on spammer:', err);
+    console.error('[Avery] Anti-spam: failed to act on spammer:', err);
   }
   return true;
 }
@@ -149,7 +149,7 @@ async function actOnSpammer(client: Client, member: GuildMember, msgs: TrackedMe
     await member.timeout(ANTI_SPAM.timeoutMs, 'Auto-moderation: mention/cross-channel spam');
     timedOut = true;
   } catch (err) {
-    console.error(`[Peaches] Anti-spam: failed to timeout ${member.user.tag}:`, err);
+    console.error(`[Avery] Anti-spam: failed to timeout ${member.user.tag}:`, err);
   }
 
   // 2. Bulk-delete their spam, grouped by channel (best-effort).
@@ -184,7 +184,7 @@ async function actOnSpammer(client: Client, member: GuildMember, msgs: TrackedMe
 
     const embed = new EmbedBuilder()
       .setColor(0xFF0000)
-      .setAuthor({ name: 'Peaches 🍑 — Troll Guard', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
+      .setAuthor({ name: 'Avery 🌲 — Troll Guard', iconURL: client.user?.displayAvatarURL({ size: 64 }) })
       .setTitle('🛑 Mention-Spam Detected — User Auto-Timed-Out')
       .setDescription(`<@${member.id}> (\`${member.user.tag}\`) was caught spamming and has been **${timedOut ? 'timed out for 24 hours' : 'flagged (timeout FAILED — act manually)'}**.`)
       .addFields(
@@ -209,13 +209,13 @@ async function actOnSpammer(client: Client, member: GuildMember, msgs: TrackedMe
     const ping = formatAlertPing(guild);
     try {
       await (modLog as TextChannel).send({
-        content: `${ping.text} — a possible troll needs your eyes on a **ban** decision. 🍑`,
+        content: `${ping.text} — a possible troll needs your eyes on a **ban** decision. 🌲`,
         embeds: [embed],
         components: [row],
         allowedMentions: { roles: ping.isRole ? [SPAM_ALERT_PING_ID] : [], users: ping.isRole ? [] : [SPAM_ALERT_PING_ID] },
       });
     } catch (err) {
-      console.error('[Peaches] Anti-spam: failed to post report:', err);
+      console.error('[Avery] Anti-spam: failed to post report:', err);
     }
   }
 
@@ -228,7 +228,7 @@ async function actOnSpammer(client: Client, member: GuildMember, msgs: TrackedMe
     severity: 'critical',
   });
 
-  console.warn(`[Peaches] Anti-spam: ${member.user.tag} auto-timed-out (${msgs.length} msgs, ${channelsHit.length} channels, ${deleted} deleted)`);
+  console.warn(`[Avery] Anti-spam: ${member.user.tag} auto-timed-out (${msgs.length} msgs, ${channelsHit.length} channels, ${deleted} deleted)`);
 }
 
 /** Resolve the alert ping as a role mention if the ID is a role, else a user mention. */
@@ -248,7 +248,7 @@ function parseSpamTarget(customId: string, prefix: string): string {
 async function ackStaff(interaction: ButtonInteraction): Promise<GuildMember | null> {
   const member = interaction.member as GuildMember | null;
   if (!member || !isStaff(member)) {
-    await interaction.reply({ content: 'Only staff can action troll reports, sugar! 🍑', flags: 64 }).catch(() => {});
+    await interaction.reply({ content: 'Only staff can action troll reports! 🌲', flags: 64 }).catch(() => {});
     return null;
   }
   return member;
@@ -269,11 +269,11 @@ export async function handleSpamBan(interaction: ButtonInteraction, _client: Cli
   const userId = parseSpamTarget(interaction.customId, 'spam_ban_');
   try {
     await interaction.guild.bans.create(userId, { reason: `Spam troll — ban approved by ${staff.user.tag}`, deleteMessageSeconds: 24 * 60 * 60 });
-    await interaction.editReply({ content: `🔨 Banned <@${userId}>. Good riddance, sugar.` });
+    await interaction.editReply({ content: `🔨 Banned <@${userId}>.` });
     await disableReport(interaction, `🔨 Banned by ${staff.user.tag}`);
   } catch (err) {
-    console.error('[Peaches] Anti-spam ban failed:', err);
-    await interaction.editReply({ content: `Couldn't ban them, sugar — check my permissions. 🍑` });
+    console.error('[Avery] Anti-spam ban failed:', err);
+    await interaction.editReply({ content: `Couldn't ban them — check my permissions. 🌲` });
   }
 }
 
@@ -288,8 +288,8 @@ export async function handleSpamKick(interaction: ButtonInteraction, _client: Cl
     await interaction.editReply({ content: `👢 Kicked <@${userId}>.` });
     await disableReport(interaction, `👢 Kicked by ${staff.user.tag}`);
   } catch (err) {
-    console.error('[Peaches] Anti-spam kick failed:', err);
-    await interaction.editReply({ content: `Couldn't kick them, sugar — they may have already left, or check my permissions. 🍑` });
+    console.error('[Avery] Anti-spam kick failed:', err);
+    await interaction.editReply({ content: `Couldn't kick them — they may have already left, or check my permissions. 🌲` });
   }
 }
 
@@ -309,8 +309,8 @@ export async function handleSpamUntimeout(interaction: ButtonInteraction, client
     await interaction.editReply({ content: `✅ Timeout removed for <@${userId}>. Sorry for the mix-up!` });
     await disableReport(interaction, `✅ Timeout removed (false alarm) by ${staff.user.tag}`);
   } catch (err) {
-    console.error('[Peaches] Anti-spam untimeout failed:', err);
-    await interaction.editReply({ content: `Couldn't remove the timeout, sugar — check my permissions. 🍑` });
+    console.error('[Avery] Anti-spam untimeout failed:', err);
+    await interaction.editReply({ content: `Couldn't remove the timeout — check my permissions. 🌲` });
   }
 }
 

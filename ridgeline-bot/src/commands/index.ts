@@ -8,7 +8,7 @@ import { GUILD_ID } from '../config.js';
 export async function registerSlashCommands(client: Client): Promise<void> {
   const guild = client.guilds.cache.get(GUILD_ID);
   if (!guild) {
-    console.error('[Peaches] Cannot register slash commands: guild not found in cache');
+    console.error('[Avery] Cannot register slash commands: guild not found in cache');
     return;
   }
 
@@ -16,7 +16,7 @@ export async function registerSlashCommands(client: Client): Promise<void> {
     // /birthday
     new SlashCommandBuilder()
       .setName('birthday')
-      .setDescription('Manage your birthday with Peaches')
+      .setDescription('Manage your birthday with Avery')
       .addSubcommand(sub => sub
         .setName('set')
         .setDescription('Register your birthday')
@@ -42,7 +42,7 @@ export async function registerSlashCommands(client: Client): Promise<void> {
     // /suggest
     new SlashCommandBuilder()
       .setName('suggest')
-      .setDescription('Submit a suggestion or idea for Ridgeline')
+      .setDescription('Submit a suggestion or idea for Avelora')
       .addStringOption(opt =>
         opt.setName('idea')
           .setDescription('Your suggestion or idea')
@@ -385,12 +385,12 @@ export async function registerSlashCommands(client: Client): Promise<void> {
     // /serverstats (public)
     new SlashCommandBuilder()
       .setName('serverstats')
-      .setDescription('View community statistics for Ridgeline'),
+      .setDescription('View community statistics for Avelora'),
 
     // /help
     new SlashCommandBuilder()
       .setName('help')
-      .setDescription('Get help with Peaches and server features'),
+      .setDescription('Get help with Avery and server features'),
 
     // /admin (owner only — server management utilities)
     new SlashCommandBuilder()
@@ -406,7 +406,7 @@ export async function registerSlashCommands(client: Client): Promise<void> {
             .addChoices(
               { name: 'Town Hall', value: 'town-hall' },
               { name: 'In Character', value: 'in-character' },
-              { name: 'Ridgeline News', value: 'breaking-news' },
+              { name: 'Avelora News', value: 'breaking-news' },
               { name: 'Community Hub', value: 'community-hub' },
               { name: 'Gaming Corner', value: 'gaming-corner' },
               { name: 'Get Support', value: 'get-support' },
@@ -432,10 +432,6 @@ export async function registerSlashCommands(client: Client): Promise<void> {
         )
       )
       .addSubcommand(sub => sub
-        .setName('setup')
-        .setDescription('One-time setup: create Vet Clinic & Post Office categories, channels, roles')
-      )
-      .addSubcommand(sub => sub
         .setName('panel')
         .setDescription('Post or refresh a bot panel')
         .addStringOption(opt =>
@@ -447,6 +443,8 @@ export async function registerSlashCommands(client: Client): Promise<void> {
               { name: 'Ticket Panel', value: 'tickets' },
               { name: 'Suggestion Box', value: 'suggestions' },
               { name: 'Trigger Reference', value: 'triggers' },
+              { name: 'Rules + Passport Gate', value: 'rules' },
+              { name: '18+ Verification Gate', value: 'nsfw' },
             )
         )
       )
@@ -455,5 +453,5 @@ export async function registerSlashCommands(client: Client): Promise<void> {
   ];
 
   await guild.commands.set(commands.map(c => c.toJSON()));
-  console.log(`[Peaches] Registered ${commands.length} commands in guild`);
+  console.log(`[Avery] Registered ${commands.length} commands in guild`);
 }
