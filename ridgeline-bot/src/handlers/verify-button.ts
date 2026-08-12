@@ -1,6 +1,7 @@
 import { type ButtonInteraction, type Client, type GuildMember } from 'discord.js';
 import { CHANNELS, CITIZEN_ROLE, VISITOR_ROLE, NSFW_ROLE } from '../config.js';
 import { logAuditEvent } from '../features/audit-log.js';
+import { findRoleByName } from '../utilities/permissions.js';
 
 /**
  * Members whose passport stamp is mid-flight. Impatient double-clicks fire a second
@@ -43,7 +44,7 @@ export async function handleRulesAgree(interaction: ButtonInteraction, client: C
       return;
     }
 
-    const citizenRole = interaction.guild.roles.cache.find(r => r.name === CITIZEN_ROLE);
+    const citizenRole = findRoleByName(interaction.guild, CITIZEN_ROLE);
     if (!citizenRole) {
       await interaction.editReply({ content: `Hmm, I couldn't find the citizen role — please ping a staff member so they can sort it out.` });
       return;
@@ -52,7 +53,7 @@ export async function handleRulesAgree(interaction: ButtonInteraction, client: C
     stampInFlight.add(member.id);
     try {
       await member.roles.add(citizenRole);
-      const visitorRole = interaction.guild.roles.cache.find(r => r.name === VISITOR_ROLE);
+      const visitorRole = findRoleByName(interaction.guild, VISITOR_ROLE);
       if (visitorRole && member.roles.cache.has(visitorRole.id)) {
         await member.roles.remove(visitorRole).catch(() => {});
       }
@@ -76,8 +77,16 @@ export async function handleRulesAgree(interaction: ButtonInteraction, client: C
     console.log(`[Avery] ${member.displayName} stamped their passport → granted ${CITIZEN_ROLE}`);
   } catch (err) {
     console.error('[Avery] Rules-agree (passport) failed:', err);
+    // 50013 = Missing Permissions. For a role grant that almost always means Avery's own
+    // role sits below the citizen role, which no amount of retrying will fix — say so
+    // plainly so staff get an actionable report instead of "it's broken".
+    const missingPerms = (err as { code?: number })?.code === 50013;
     try {
-      await interaction.editReply({ content: `Something went wrong stamping your passport — please ping a staff member for help.` });
+      await interaction.editReply({
+        content: missingPerms
+          ? `I'm not allowed to hand out the **${CITIZEN_ROLE}** role right now — please ping a staff member and let them know my role needs to sit above it in Server Settings → Roles.`
+          : `Something went wrong stamping your passport — please ping a staff member for help.`,
+      });
     } catch { /* interaction may have expired */ }
   }
 }
@@ -104,7 +113,7 @@ export async function handleAgeVerify(interaction: ButtonInteraction, client: Cl
       await interaction.editReply({ content: `You already have **${NSFW_ROLE}** access. 🔞` });
       return;
     }
-    const nsfwRole = interaction.guild.roles.cache.find(r => r.name === NSFW_ROLE);
+    const nsfwRole = findRoleByName(interaction.guild, NSFW_ROLE);
     if (!nsfwRole) {
       await interaction.editReply({ content: `Couldn't find the ${NSFW_ROLE} role — please ping a staff member.` });
       return;

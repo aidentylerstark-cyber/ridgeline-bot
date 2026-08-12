@@ -5,6 +5,7 @@ import {
   type GuildMember,
 } from 'discord.js';
 import { logAuditEvent } from '../features/audit-log.js';
+import { findRoleByName } from '../utilities/permissions.js';
 
 /**
  * Self-serve role toggle from the #get-roles panel.
@@ -29,8 +30,7 @@ export async function handleRoleButton(interaction: ButtonInteraction, client: C
     return;
   }
 
-  const role = guild.roles.cache.find(r => r.name === roleName)
-    ?? guild.roles.cache.find(r => r.name.replace(/[^\w\s/]/g, '').trim() === roleName);
+  const role = findRoleByName(guild, roleName);
   if (!role) {
     await interaction.editReply({ content: `Oh no! I couldn't find the ${roleName} role. Let the staff know and they'll get it sorted out! 🌲` });
     return;

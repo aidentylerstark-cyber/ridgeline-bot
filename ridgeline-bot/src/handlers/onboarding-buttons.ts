@@ -29,14 +29,23 @@ import { logAuditEvent } from '../features/audit-log.js';
  * Step 1 -> Step 2: "Come on in!" button
  */
 export async function handleOnboardStart(interaction: ButtonInteraction, client: Client): Promise<void> {
+  // ACK before the DB write below \u2014 a cold pool connection can take longer than
+  // Discord's 3s window and leave the new arrival staring at a failed button.
+  try {
+    await interaction.deferUpdate();
+  } catch (err) {
+    console.error('[Avery] Onboard start \u2014 could not defer:', err);
+    return;
+  }
+
   try {
     await updateOnboardingStep(interaction.user.id, 2);
     const { embed, row } = buildStep2Embed(client);
-    await interaction.update({ embeds: [embed], components: [row] });
+    await interaction.editReply({ embeds: [embed], components: [row] });
   } catch (err) {
     console.error('[Avery] Error in onboard_start handler:', err);
     try {
-      await interaction.reply({
+      await interaction.followUp({
         content: "Something went a little sideways. Try clicking that button again! \uD83C\uDF32",
         flags: 64,
       });
@@ -50,14 +59,22 @@ export async function handleOnboardStart(interaction: ButtonInteraction, client:
  * Step 2 -> Step 3: "I understand, Avery!" button
  */
 export async function handleOnboardRulesAck(interaction: ButtonInteraction, client: Client): Promise<void> {
+  // Same as above: the DB write can outrun the 3s ACK window on a cold connection.
+  try {
+    await interaction.deferUpdate();
+  } catch (err) {
+    console.error('[Avery] Onboard rules-ack \u2014 could not defer:', err);
+    return;
+  }
+
   try {
     await updateOnboardingStep(interaction.user.id, 3);
     const { embed, row } = buildStep3Embed(client);
-    await interaction.update({ embeds: [embed], components: [row] });
+    await interaction.editReply({ embeds: [embed], components: [row] });
   } catch (err) {
     console.error('[Avery] Error in onboard_rules_ack handler:', err);
     try {
-      await interaction.reply({
+      await interaction.followUp({
         content: "Something went a little sideways. Try clicking that button again! \uD83C\uDF32",
         flags: 64,
       });
