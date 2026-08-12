@@ -67,6 +67,7 @@
 | Warnings | `features/warnings.ts` | — | `addWarning`, `getWarnings`, `deleteWarning` |
 | Audit Log | `features/audit-log.ts` | — | `logAuditEvent`, `searchAuditLog` |
 | Regions | `features/region-monitoring.ts` | — | `insertRegionSnapshot`, `getRegionSnapshots` |
+| Underworld | `features/underworld.ts` | (inline buttons) | `getOrCreateDarkwebHandle`, `lookupDarkwebHandle` |
 
 ### Database Tables
 
@@ -81,6 +82,7 @@
 | discordAuditLog | Full audit trail | action, actorDiscordId, targetDiscordId, referenceId |
 | discordScheduledRoleRemovals | Auto role removal | discordUserId + roleName, removeAt |
 | regionSnapshots | SL region history | regionName, fps, dilation, agentCount, eventType |
+| discordDarkwebHandles | Dark web pseudonyms | discordUserId (PK), handle (UNIQUE), postCount |
 
 ### Ticket Departments
 

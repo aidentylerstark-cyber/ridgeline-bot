@@ -41,6 +41,7 @@ src/
     onboarding.ts              — Interactive onboarding DM flow, rotating greetings, account age alerts
     modlog.ts                  — Auto-raid detection, verification level management
     stats-channels.ts          — Voice channel member/online count (every 10 min)
+    underworld.ts              — The Underworld: /admin underworld builds the crime category, roles & channels (idempotent); Back Alley role buttons (underworld_join / underworld_hustle_); /darkweb post|handle|whois — anonymous board with stable per-member handles, staff-traceable via audit log
   handlers/
     ticket-buttons.ts          — Ticket button interactions (open, claim, close, add user, resolution modal)
     ticket-modal.ts            — Ticket creation modal & department selection (w/ priority auto-detection)
@@ -52,6 +53,7 @@ src/
     role-panel.ts              — Posts role selection panels (Notifications, Pronouns, Community)
     polls.ts                   — Community poll posting
     trigger-reference.ts       — Avery trigger reference guide
+    underworld-panel.ts        — Back Alley entrance panel (#get-roles) + The Code house rules (posted in-category)
   scheduled/
     birthday-check.ts          — Daily 8 AM ET: birthday celebrations + role assignment
     milestone-check.ts         — Daily 9 AM ET: member anniversary milestones
@@ -120,6 +122,7 @@ Global staff (all depts): Avelora Owner, First Lady, Avelora Management, Avelora
 | regionSnapshots | SL region history | regionName, fps, dilation, agentCount, eventType |
 | discordTicketFeedback | Satisfaction surveys | ticketId (FK), rating (1-5), comment |
 | discordOnboarding | Interactive DM onboarding state | userId (PK), characterName, interests, step, completedAt |
+| discordDarkwebHandles | Dark web pseudonyms | discordUserId (PK), handle (UNIQUE), postCount |
 
 ## Chatbot Pipeline (pipeline.ts)
 

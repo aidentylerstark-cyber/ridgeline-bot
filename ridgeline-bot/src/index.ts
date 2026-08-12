@@ -30,6 +30,7 @@ import { scheduleBirthdayMonthlySummary } from './scheduled/birthday-monthly-sum
 import { destroyRegionCooldowns } from './features/region-monitoring.js';
 import { destroySuggestCooldowns } from './features/suggestions.js';
 import { destroyAnnounceCooldowns } from './features/announce.js';
+import { destroyDarkwebCooldowns } from './features/underworld.js';
 import { pool } from './db/index.js';
 
 // Single-instance guard: the live bot runs ONLY on Railway. A second process on the
@@ -165,6 +166,7 @@ async function main() {
     destroyRegionCooldowns();
     destroySuggestCooldowns();
     destroyAnnounceCooldowns();
+    destroyDarkwebCooldowns();
     destroyStatsInterval();
     destroyAuditLogInterval();
     destroyWelcomeQueue();

@@ -445,10 +445,42 @@ export async function registerSlashCommands(client: Client): Promise<void> {
               { name: 'Trigger Reference', value: 'triggers' },
               { name: 'Rules + Passport Gate', value: 'rules' },
               { name: '18+ Verification Gate', value: 'nsfw' },
+              { name: 'Back Alley (Underworld)', value: 'underworld' },
             )
         )
       )
+      .addSubcommand(sub => sub
+        .setName('underworld')
+        .setDescription('Create the underworld roles, category and channels (safe to re-run)')
+      )
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+    new SlashCommandBuilder()
+      .setName('darkweb')
+      .setDescription('The anonymous board down in the underworld')
+      .addSubcommand(sub => sub
+        .setName('post')
+        .setDescription('Post anonymously to the dark web board')
+        .addStringOption(opt =>
+          opt.setName('message')
+            .setDescription('What do you want the city to see?')
+            .setRequired(true)
+            .setMaxLength(1500)
+        )
+      )
+      .addSubcommand(sub => sub
+        .setName('handle')
+        .setDescription('Find out what name you post under')
+      )
+      .addSubcommand(sub => sub
+        .setName('whois')
+        .setDescription('[Staff] Trace a dark web handle back to an account')
+        .addStringOption(opt =>
+          opt.setName('handle')
+            .setDescription('The handle to trace, e.g. NIGHTJAR_4F2A')
+            .setRequired(true)
+        )
+      ),
 
   ];
 

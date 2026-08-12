@@ -10,6 +10,8 @@ import { postSuggestionPanel } from '../panels/suggestion-panel.js';
 import { postTriggerReference } from '../panels/trigger-reference.js';
 import { postRulesPanel } from '../panels/rules-panel.js';
 import { postAgeVerifyPanel } from '../panels/nsfw-panel.js';
+import { postUnderworldPanel, postUnderworldCode } from '../panels/underworld-panel.js';
+import { setupUnderworld, findUnderworldChannel } from './underworld.js';
 import { GLOBAL_STAFF_ROLES, CHANNELS } from '../config.js';
 import { logAuditEvent } from './audit-log.js';
 
@@ -91,6 +93,10 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
             await postAgeVerifyPanel(client);
             await interaction.editReply({ content: `\u2705 18+ age-verification gate posted! \uD83D\uDD1E` });
             break;
+          case 'underworld':
+            await postUnderworldPanel(client);
+            await interaction.editReply({ content: `\u2705 Back Alley panel posted to <#${CHANNELS.getRoles}>! \uD83D\uDD76\uFE0F` });
+            break;
           default:
             await interaction.editReply({ content: `Unknown panel type.` });
         }
@@ -101,6 +107,37 @@ export async function handleAdminCommand(interaction: ChatInputCommandInteractio
       } catch (err) {
         console.error('[Avery] Admin panel failed:', err);
         await interaction.editReply({ content: `That panel didn't want to cooperate. Check the logs for what went wrong! \uD83C\uDF32` });
+      }
+      return;
+    }
+
+    case 'underworld': {
+      await interaction.deferReply({ flags: 64 });
+      try {
+        const report = await setupUnderworld(client);
+
+        // Drop the house rules into #the-code the first time it's built.
+        const guild = interaction.guild;
+        const codeChannel = guild ? findUnderworldChannel(guild, 'the-code') : undefined;
+        if (codeChannel) {
+          const existing = await codeChannel.messages.fetch({ limit: 5 }).catch(() => null);
+          const alreadyPosted = existing?.some(m => m.author.id === client.user?.id);
+          if (!alreadyPosted) await postUnderworldCode(client, codeChannel);
+        }
+
+        if (guild) logAuditEvent(client, guild, {
+          action: 'admin_setup', actorId: interaction.user.id,
+          details: `Built the underworld: ${report.join(' \u00B7 ')}`, severity: 'warning',
+        });
+        await interaction.editReply({
+          content: `\uD83D\uDD76\uFE0F **The underworld is open.**\n${report.map(r => `\u2022 ${r}`).join('\n')}\n\n` +
+            `Post the entrance panel with \`/admin panel type:Back Alley\`.`,
+        });
+      } catch (err) {
+        console.error('[Avery] Underworld setup failed:', err);
+        await interaction.editReply({
+          content: `That didn't go to plan \u2014 check the logs. Partial progress is kept, so it's safe to run again. \uD83D\uDD76\uFE0F`,
+        });
       }
       return;
     }

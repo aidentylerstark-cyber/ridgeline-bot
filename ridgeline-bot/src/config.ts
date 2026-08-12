@@ -142,6 +142,99 @@ export const ROLE_CATEGORY_STYLE: Record<string, { color: number; icon: string; 
 };
 
 // ─────────────────────────────────────────
+// The Underworld (in-character crime scene)
+// ─────────────────────────────────────────
+
+/**
+ * Gate role for the whole underworld category. Self-assigned from the Back Alley
+ * panel, but only by members who have already stamped their passport — so the crime
+ * scene inherits the same "you've read the rules" bar as the rest of the city.
+ */
+export const UNDERWORLD_ROLE = 'Underworld';
+
+/** Colour used for the Underworld role and every panel embed down there. */
+export const UNDERWORLD_COLOR = 0x8B0000;
+
+/**
+ * Criminal archetypes — a member's "hustle". Purely cosmetic/IC flavour: they colour
+ * the member list and let people find scene partners. None of them grant extra access;
+ * UNDERWORLD_ROLE is the only thing that opens channels.
+ */
+export const UNDERWORLD_HUSTLES: Array<{ name: string; emoji: string; blurb: string }> = [
+  { name: 'Fixer',     emoji: '🎭', blurb: 'Knows a guy who knows a guy. Makes problems disappear.' },
+  { name: 'Enforcer',  emoji: '💪', blurb: 'Muscle for hire. Collects what is owed.' },
+  { name: 'Wheelman',  emoji: '🚗', blurb: 'Engine running, doors unlocked, ninety seconds.' },
+  { name: 'Hacker',    emoji: '💻', blurb: 'Owns the cameras, the records, and your bank login.' },
+  { name: 'Smuggler',  emoji: '📦', blurb: 'Moves product through the canyons and the port.' },
+  { name: 'Grifter',   emoji: '🃏', blurb: 'Long cons, short marks, easy smiles.' },
+  { name: 'Launderer', emoji: '💰', blurb: 'Dirty money in, clean money out, small fee.' },
+  { name: 'Informant', emoji: '🕵️', blurb: 'Plays every side. Trust at your own risk.' },
+];
+
+/**
+ * Channels created inside the underworld category. `key` is the stable lookup handle
+ * used at runtime; channels are found by matching the tail of their name, so the
+ * emoji prefix can be restyled without breaking anything.
+ */
+export const UNDERWORLD_CHANNELS: Array<{
+  key: string;
+  name: string;
+  topic: string;
+  voice?: boolean;
+  readOnly?: boolean;
+}> = [
+  {
+    key: 'the-code',
+    name: '📜┊the-code',
+    topic: 'House rules for the underworld. Read before you post.',
+    readOnly: true,
+  },
+  {
+    key: 'dark-web',
+    name: '🕶️┊dark-web',
+    topic: 'Anonymous board. Post with /darkweb post — your handle stays, your name does not.',
+    readOnly: true,
+  },
+  {
+    key: 'criminals-united',
+    name: '💀┊criminals-united',
+    topic: 'Main in-character chat for Avelora’s less reputable residents.',
+  },
+  {
+    key: 'back-alley',
+    name: '🤝┊back-alley-deals',
+    topic: 'Strike deals, hire help, settle debts. In character.',
+  },
+  {
+    key: 'heist-planning',
+    name: '🗺️┊heist-planning',
+    topic: 'Plan the job. Bring a map, a driver, and an exit.',
+  },
+  {
+    key: 'fence-market',
+    name: '💎┊fence-market',
+    topic: 'Buy, sell, and move goods that fell off a truck.',
+  },
+  {
+    key: 'police-scanner',
+    name: '📻┊scanner-chatter',
+    topic: 'Rumours, sirens in the hills, and who got picked up last night.',
+  },
+  {
+    key: 'burner-phones',
+    name: '🔊┊burner-phones',
+    topic: 'Voice channel for jobs in progress.',
+    voice: true,
+  },
+];
+
+/** Category the underworld channels live in. */
+export const UNDERWORLD_CATEGORY_NAME = '🕶️ THE UNDERWORLD';
+
+/** Cooldown between /darkweb posts, per member. */
+export const DARKWEB_COOLDOWN_MS = 30_000;
+
+// ─────────────────────────────────────────
 // Ticket System Configuration
 // ─────────────────────────────────────────
 

@@ -37,6 +37,11 @@ import {
   handleOnboardModalSubmit,
 } from '../handlers/onboarding-buttons.js';
 import { handleSpamBan, handleSpamKick, handleSpamUntimeout } from '../features/anti-spam.js';
+import {
+  handleDarkwebCommand,
+  handleUnderworldJoin,
+  handleUnderworldHustle,
+} from '../features/underworld.js';
 import { CHANNELS } from '../config.js';
 import { isStaff } from '../utilities/permissions.js';
 
@@ -146,6 +151,7 @@ const SLASH_COMMANDS: Record<string, SlashHandler> = {
   userinfo:    handleUserInfoCommand,
   welcome:     handleWelcomeCommand,
   serverstats: handleServerStatsCommand,
+  darkweb:     handleDarkwebCommand,
 };
 
 export function setupInteractionHandler(client: Client, ticketCooldowns: CooldownManager) {
@@ -153,6 +159,9 @@ export function setupInteractionHandler(client: Client, ticketCooldowns: Cooldow
 
   const BUTTON_HANDLERS: Array<{ match: string; exact?: boolean; handler: (i: ButtonInteraction, c: Client) => Promise<void> }> = [
     { match: 'role_', handler: handleRoleButton },
+    // Underworld — exact match first so it can't be shadowed by the prefix entry
+    { match: 'underworld_join', exact: true, handler: handleUnderworldJoin },
+    { match: 'underworld_hustle_', handler: handleUnderworldHustle },
     { match: 'rules_agree', exact: true, handler: handleRulesAgree },
     { match: 'age_verify', exact: true, handler: handleAgeVerify },
     { match: 'suggestion_approve_', handler: (i, c) => handleSuggestionReview(i, 'approved', c) },

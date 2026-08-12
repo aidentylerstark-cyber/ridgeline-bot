@@ -169,7 +169,24 @@ export const discordOnboarding = pgTable("discord_onboarding", {
   completedAt: timestamp("completed_at"),
 });
 
+// ============================================
+// Dark Web handles
+// ============================================
+
+/**
+ * Stable pseudonym for a member posting on the dark-web board. One handle per person,
+ * kept forever so a handle builds an in-character reputation — and so staff can always
+ * tie a post back to a real account via /darkweb whois.
+ */
+export const discordDarkwebHandles = pgTable("discord_darkweb_handles", {
+  discordUserId: varchar("discord_user_id", { length: 30 }).primaryKey(),
+  handle: varchar("handle", { length: 40 }).notNull().unique(),
+  postCount: integer("post_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export type SiteContent = typeof siteContent.$inferSelect;
+export type DiscordDarkwebHandle = typeof discordDarkwebHandles.$inferSelect;
 export type DiscordTicket = typeof discordTickets.$inferSelect;
 export type DiscordTicketNote = typeof discordTicketNotes.$inferSelect;
 export type DiscordBirthday = typeof discordBirthdays.$inferSelect;

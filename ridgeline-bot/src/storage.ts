@@ -1106,3 +1106,77 @@ export async function getBirthdaysByMonth(month: number): Promise<DiscordBirthda
     .where(eq(discordBirthdays.month, month));
 }
 
+
+// ============================================
+// Dark Web handles
+// ============================================
+
+/**
+ * Fetch this member's dark-web handle, minting one on first use.
+ *
+ * The handle is deliberately permanent: it is what makes the board feel like a real
+ * underground forum (people recognise "NIGHTJAR_4F2A" across weeks) and it is what
+ * keeps the anonymity moderatable — every post traces back to an account via whois.
+ *
+ * Generation retries on collision; the UNIQUE constraint on handle is the real
+ * guarantee, the loop just avoids surfacing an error for an unlucky draw.
+ */
+export async function getOrCreateDarkwebHandle(
+  discordUserId: string,
+  generate: () => string,
+): Promise<string> {
+  const existing = await pool.query<{ handle: string }>(
+    `SELECT handle FROM discord_darkweb_handles WHERE discord_user_id = $1`,
+    [discordUserId]
+  );
+  if (existing.rows[0]) return existing.rows[0].handle;
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const candidate = generate();
+    try {
+      const { rows } = await pool.query<{ handle: string }>(
+        `INSERT INTO discord_darkweb_handles (discord_user_id, handle)
+         VALUES ($1, $2)
+         ON CONFLICT (discord_user_id) DO UPDATE SET handle = discord_darkweb_handles.handle
+         RETURNING handle`,
+        [discordUserId, candidate]
+      );
+      if (rows[0]) return rows[0].handle;
+    } catch (err) {
+      // Unique violation on `handle` — another member already took this codename.
+      const code = (err as { code?: string }).code;
+      if (code !== '23505') throw err;
+    }
+  }
+  throw new Error(`Could not mint a unique dark web handle for ${discordUserId}`);
+}
+
+/** Bump the post counter for a handle. Fire-and-forget safe. */
+export async function incrementDarkwebPostCount(discordUserId: string): Promise<void> {
+  await pool.query(
+    `UPDATE discord_darkweb_handles SET post_count = post_count + 1 WHERE discord_user_id = $1`,
+    [discordUserId]
+  );
+}
+
+/** Staff lookup: which account is behind a handle? Case-insensitive. */
+export async function lookupDarkwebHandle(
+  handle: string,
+): Promise<{ discordUserId: string; handle: string; postCount: number; createdAt: Date } | null> {
+  const { rows } = await pool.query<{
+    discord_user_id: string; handle: string; post_count: number; created_at: Date;
+  }>(
+    `SELECT discord_user_id, handle, post_count, created_at
+       FROM discord_darkweb_handles
+      WHERE UPPER(handle) = UPPER($1)`,
+    [handle.trim()]
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    discordUserId: row.discord_user_id,
+    handle: row.handle,
+    postCount: row.post_count,
+    createdAt: row.created_at,
+  };
+}
