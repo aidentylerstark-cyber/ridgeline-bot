@@ -127,9 +127,26 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
     return;
   }
 
+  // Check the embed exists BEFORE any await — both so we never half-update the DB,
+  // and so every cheap synchronous bail-out happens while we can still reply directly.
+  const originalEmbed = interaction.message.embeds[0];
+  if (!originalEmbed) {
+    await interaction.reply({ content: 'Could not update the suggestion embed. 🌲', flags: 64 });
+    return;
+  }
+
+  // ACK now: what follows is a DB read, a DB write, a user fetch and a DM — far more
+  // than Discord's 3s initial-response window allows.
+  try {
+    await interaction.deferUpdate();
+  } catch (err) {
+    console.error(`[Avery] Suggestion review — could not defer:`, err);
+    return;
+  }
+
   const suggestion = await getSuggestion(suggestionId);
   if (!suggestion) {
-    await interaction.reply({ content: "That suggestion doesn't exist anymore. 🌲", flags: 64 });
+    await interaction.followUp({ content: "That suggestion doesn't exist anymore. 🌲", flags: 64 }).catch(() => {});
     return;
   }
 
@@ -145,13 +162,6 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   const reviewerName = interaction.member && 'displayName' in interaction.member
     ? (interaction.member as GuildMember).displayName
     : interaction.user.username;
-
-  // Check embed exists BEFORE updating DB to avoid inconsistent state
-  const originalEmbed = interaction.message.embeds[0];
-  if (!originalEmbed) {
-    await interaction.reply({ content: 'Could not update the suggestion embed. 🌲', flags: 64 });
-    return;
-  }
 
   await updateSuggestionStatus(suggestionId, status, interaction.user.id);
 
@@ -188,13 +198,11 @@ export async function handleSuggestionReview(interaction: ButtonInteraction, sta
   }
 
   try {
-    await interaction.update({ embeds: [updatedEmbed.toJSON()], components });
+    await interaction.editReply({ embeds: [updatedEmbed.toJSON()], components });
   } catch (err) {
     console.error(`[Avery] Failed to update suggestion #${suggestionId} embed:`, err);
-    // Fall back to replying if update fails (e.g. interaction expired)
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: `Suggestion #${suggestionId} has been ${status}. 🌲`, flags: 64 }).catch(() => {});
-    }
+    // The status change already landed in the DB — make sure the reviewer hears about it
+    await interaction.followUp({ content: `Suggestion #${suggestionId} has been ${status}. 🌲`, flags: 64 }).catch(() => {});
   }
   console.log(`[Avery] Suggestion #${suggestionId} ${status} by ${interaction.user.username}`);
 

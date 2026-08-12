@@ -74,10 +74,13 @@ export function setupMessageHandler(client: Client) {
     if (!botUser) return;
 
     const isMentioned = message.mentions.has(botUser, { ignoreEveryone: true, ignoreRoles: true });
-    // Only trigger on direct address — not third-person statements like "Avery was helpful"
-    const isBotTrigger = /^hey avery\b/.test(content) ||
-                         /^yo avery\b/.test(content) ||
-                         /^avery[,!?]\s/.test(content) ||
+    // Only trigger on direct address — not third-person statements like "Avery was helpful".
+    // \s+ rather than a literal space so double-spaced greetings still land, and the bare
+    // forms ("Avery", "Avery?", "Avery!") count as direct address on their own.
+    const isBotTrigger = /^hey\s+avery\b/.test(content) ||
+                         /^yo\s+avery\b/.test(content) ||
+                         /^avery\s*[,!?]/.test(content) ||
+                         /^avery$/.test(content) ||
                          /^avery\s+(can|do|does|will|would|could|should|what|where|when|how|why|who|tell|help|show|give|get|find|check|look|make|set|please|plz|pls)\b/.test(content);
 
     if (!isMentioned && !isBotTrigger) return;
@@ -100,16 +103,17 @@ export function setupMessageHandler(client: Client) {
     }
     messageCooldowns.set(message.author.id);
 
-    // Strip the mention/trigger
-    const query = content
+    // Strip the mention/trigger, then any punctuation it left stranded at the front
+    // ("hey avery, what's the rent?" -> "what's the rent?") so the FAQ matcher and the
+    // AI both see the actual question.
+    const stripTrigger = (text: string) => text
       .replace(/<@!?\d+>/g, '')
-      .replace(/\b(?:hey avery|yo avery|avery),?\b/gi, '')
+      .replace(/\b(?:hey\s+avery|yo\s+avery|avery),?\b/gi, '')
+      .replace(/^[\s,!?.:;-]+/, '')
       .trim();
 
-    const cleanMessage = originalContent
-      .replace(/<@!?\d+>/g, '')
-      .replace(/\b(?:hey avery|yo avery|avery),?\b/gi, '')
-      .trim();
+    const query = stripTrigger(content);
+    const cleanMessage = stripTrigger(originalContent);
 
     try {
       await processChatbotMessage(message, query, cleanMessage);

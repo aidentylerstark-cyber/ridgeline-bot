@@ -56,13 +56,22 @@ export async function handleTicketCommand(interaction: ChatInputCommandInteracti
 
 async function handlePriority(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
+
+  // ACK before the DB round-trips below (see the passport handler) — a slow query
+  // otherwise burns Discord's 3s window and the command reports a failure it didn't have.
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (err) {
+    console.error('[Avery] /ticket priority — could not defer:', err);
+    return;
+  }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32" });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can change ticket priority! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Only staff can change ticket priority! \uD83C\uDF32" });
     return;
   }
 
@@ -80,7 +89,11 @@ async function handlePriority(interaction: ChatInputCommandInteraction, client: 
     .setFooter({ text: `Ticket #${ticketId}` })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed] });
+  // Public record in the ticket channel; the command's own reply stays ephemeral.
+  if (interaction.channel && 'send' in interaction.channel) {
+    await interaction.channel.send({ embeds: [embed] }).catch(() => {});
+  }
+  await interaction.editReply({ content: `✅ Priority updated to **${priority.toUpperCase()}**.` });
 
   // Update channel topic
   const channel = interaction.channel as TextChannel;
@@ -109,13 +122,22 @@ async function handlePriority(interaction: ChatInputCommandInteraction, client: 
 
 async function handleStatus(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
+
+  // ACK before the DB round-trips below (see the passport handler) — a slow query
+  // otherwise burns Discord's 3s window and the command reports a failure it didn't have.
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (err) {
+    console.error('[Avery] /ticket status — could not defer:', err);
+    return;
+  }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32" });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can change ticket status! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Only staff can change ticket status! \uD83C\uDF32" });
     return;
   }
 
@@ -138,7 +160,11 @@ async function handleStatus(interaction: ChatInputCommandInteraction, client: Cl
     .setFooter({ text: `Ticket #${ticketId}` })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed] });
+  // Public record in the ticket channel; the command's own reply stays ephemeral.
+  if (interaction.channel && 'send' in interaction.channel) {
+    await interaction.channel.send({ embeds: [embed] }).catch(() => {});
+  }
+  await interaction.editReply({ content: `✅ Status updated.` });
 
   // Update channel topic
   const channel = interaction.channel as TextChannel;
@@ -167,13 +193,22 @@ async function handleStatus(interaction: ChatInputCommandInteraction, client: Cl
 
 async function handleNote(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
+
+  // ACK before the DB round-trips below (see the passport handler) — a slow query
+  // otherwise burns Discord's 3s window and the command reports a failure it didn't have.
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (err) {
+    console.error('[Avery] /ticket note — could not defer:', err);
+    return;
+  }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32" });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can add notes! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Only staff can add notes! \uD83C\uDF32" });
     return;
   }
 
@@ -182,9 +217,8 @@ async function handleNote(interaction: ChatInputCommandInteraction, client: Clie
   updateTicketLastActivity(interaction.channelId).catch(() => {});
 
   const ticketId = String(ticket.ticketNumber).padStart(4, '0');
-  await interaction.reply({
+  await interaction.editReply({
     content: `\uD83D\uDCDD Note added to Ticket #${ticketId}. \uD83C\uDF32`,
-    flags: 64,
   });
 
   if (interaction.guild) {
@@ -205,19 +239,28 @@ async function handleNote(interaction: ChatInputCommandInteraction, client: Clie
 
 async function handleNotes(interaction: ChatInputCommandInteraction, _client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
+
+  // ACK before the DB round-trips below (see the passport handler) — a slow query
+  // otherwise burns Discord's 3s window and the command reports a failure it didn't have.
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (err) {
+    console.error('[Avery] /ticket notes — could not defer:', err);
+    return;
+  }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32" });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can view notes! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Only staff can view notes! \uD83C\uDF32" });
     return;
   }
 
   const notes = await storage.getTicketNotes(ticket.id);
   if (notes.length === 0) {
-    await interaction.reply({ content: "No notes on this ticket yet. \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "No notes on this ticket yet. \uD83C\uDF32" });
     return;
   }
 
@@ -239,7 +282,7 @@ async function handleNotes(interaction: ChatInputCommandInteraction, _client: Cl
     .setFooter({ text: `${notes.length} note(s)` })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed], flags: 64 });
+  await interaction.editReply({ embeds: [embed] });
 }
 
 // ─────────────────────────────────────────
@@ -416,20 +459,29 @@ async function handleStats(interaction: ChatInputCommandInteraction, client: Cli
 
 async function handleAssign(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
+
+  // ACK before the DB round-trips below (see the passport handler) — a slow query
+  // otherwise burns Discord's 3s window and the command reports a failure it didn't have.
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (err) {
+    console.error('[Avery] /ticket assign — could not defer:', err);
+    return;
+  }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32" });
     return;
   }
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can reassign tickets! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Only staff can reassign tickets! \uD83C\uDF32" });
     return;
   }
 
   const targetUser = interaction.options.getUser('staff', true);
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.reply({ content: "Something went wrong. \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Something went wrong. \uD83C\uDF32" });
     return;
   }
 
@@ -437,19 +489,19 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
   try {
     targetMember = await guild.members.fetch(targetUser.id);
   } catch {
-    await interaction.reply({ content: "Couldn't find that member in the server. \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Couldn't find that member in the server. \uD83C\uDF32" });
     return;
   }
 
   if (!isStaffForTicket(targetMember, ticket.department)) {
-    await interaction.reply({ content: `${targetMember.displayName} doesn't have the right roles for this department. \uD83C\uDF32`, flags: 64 });
+    await interaction.editReply({ content: `${targetMember.displayName} doesn't have the right roles for this department. \uD83C\uDF32` });
     return;
   }
 
   const previousClaimer = ticket.claimedBy;
   const assigned = await storage.updateTicketClaim(interaction.channelId, targetMember.id);
   if (!assigned) {
-    await interaction.reply({ content: "Couldn't assign this ticket — it may have been closed or modified. 🌲", flags: 64 });
+    await interaction.editReply({ content: "Couldn't assign this ticket — it may have been closed or modified. 🌲" });
     return;
   }
   updateTicketLastActivity(interaction.channelId).catch(() => {});
@@ -466,7 +518,11 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
     .setFooter({ text: `Ticket #${ticketId}` })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed] });
+  // Public record in the ticket channel; the command's own reply stays ephemeral.
+  if (interaction.channel && 'send' in interaction.channel) {
+    await interaction.channel.send({ embeds: [embed] }).catch(() => {});
+  }
+  await interaction.editReply({ content: `✅ Ticket reassigned to ${targetMember.displayName}.` });
 
   // DM old claimer
   if (previousClaimer && previousClaimer !== targetMember.id) {
@@ -501,8 +557,17 @@ async function handleAssign(interaction: ChatInputCommandInteraction, client: Cl
 
 async function handleReopen(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
+
+  // ACK before the DB round-trips below (see the passport handler) — a slow query
+  // otherwise burns Discord's 3s window and the command reports a failure it didn't have.
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (err) {
+    console.error('[Avery] /ticket reopen — could not defer:', err);
+    return;
+  }
   if (!isStaff(member)) {
-    await interaction.reply({ content: "Only staff can reopen tickets! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Only staff can reopen tickets! \uD83C\uDF32" });
     return;
   }
 
@@ -510,7 +575,7 @@ async function handleReopen(interaction: ChatInputCommandInteraction, client: Cl
   const ticket = await storage.getClosedTicketByNumber(ticketNumber);
 
   if (!ticket) {
-    await interaction.reply({ content: `Couldn't find a closed ticket #${ticketNumber}. \uD83C\uDF32`, flags: 64 });
+    await interaction.editReply({ content: `Couldn't find a closed ticket #${ticketNumber}. \uD83C\uDF32` });
     return;
   }
 
@@ -520,16 +585,15 @@ async function handleReopen(interaction: ChatInputCommandInteraction, client: Cl
   const ownerRoles = ['Owner'];
   const hasOwnerOverride = ownerRoles.some(name => member.roles.cache.some(r => r.name === name));
   if (hoursSinceClosed > 48 && !hasOwnerOverride) {
-    await interaction.reply({ content: `Ticket #${ticketNumber} was closed more than 48 hours ago and can't be reopened. \uD83C\uDF32`, flags: 64 });
+    await interaction.editReply({ content: `Ticket #${ticketNumber} was closed more than 48 hours ago and can't be reopened. \uD83C\uDF32` });
     return;
   }
 
   if (!isValidDepartment(ticket.department)) {
-    await interaction.reply({ content: "Invalid department on this ticket. \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Invalid department on this ticket. \uD83C\uDF32" });
     return;
   }
 
-  await interaction.deferReply({ flags: 64 });
 
   const guild = interaction.guild;
   if (!guild) {
@@ -639,35 +703,43 @@ async function handleMine(interaction: ChatInputCommandInteraction, _client: Cli
 
 async function handleTransfer(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const member = interaction.member as GuildMember;
+
+  // ACK before the DB round-trips below (see the passport handler) — a slow query
+  // otherwise burns Discord's 3s window and the command reports a failure it didn't have.
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (err) {
+    console.error('[Avery] /ticket transfer — could not defer:', err);
+    return;
+  }
   const ticket = await storage.getOpenTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await interaction.reply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "This command must be run inside a ticket channel! \uD83C\uDF32" });
     return;
   }
 
   if (!isValidDepartment(ticket.department) || !isStaffForTicket(member, ticket.department)) {
-    await interaction.reply({ content: "Only staff can transfer tickets! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Only staff can transfer tickets! \uD83C\uDF32" });
     return;
   }
 
   const newDept = interaction.options.getString('department', true);
   if (!isValidDepartment(newDept)) {
-    await interaction.reply({ content: "That's not a valid department! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "That's not a valid department! \uD83C\uDF32" });
     return;
   }
 
   if (newDept === ticket.department) {
-    await interaction.reply({ content: "This ticket is already in that department! \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "This ticket is already in that department! \uD83C\uDF32" });
     return;
   }
 
   const guild = interaction.guild;
   if (!guild) {
-    await interaction.reply({ content: "Something went wrong. \uD83C\uDF32", flags: 64 });
+    await interaction.editReply({ content: "Something went wrong. \uD83C\uDF32" });
     return;
   }
 
-  await interaction.deferReply();
 
   const newConfig = TICKET_CATEGORIES[newDept];
   const oldConfig = TICKET_CATEGORIES[ticket.department as TicketDepartment];
@@ -761,7 +833,10 @@ async function handleTransfer(interaction: ChatInputCommandInteraction, client: 
 
   const staffMentions = getStaffMentions(guild, newDept);
 
-  await interaction.editReply({ content: staffMentions ? `${staffMentions}` : undefined, embeds: [embed] });
+  if (interaction.channel && 'send' in interaction.channel) {
+    await interaction.channel.send({ content: staffMentions || undefined, embeds: [embed] }).catch(() => {});
+  }
+  await interaction.editReply({ content: `✅ Ticket transferred to **${newConfig.label}**.` });
 
   logAuditEvent(client, guild, {
     action: 'ticket_reassign',

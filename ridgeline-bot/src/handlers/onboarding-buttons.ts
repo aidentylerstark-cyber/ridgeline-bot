@@ -115,6 +115,15 @@ export async function handleOnboardDetailsModal(interaction: ButtonInteraction):
  * Step 3: Skip details, complete with no extra info
  */
 export async function handleOnboardSkipDetails(interaction: ButtonInteraction, client: Client): Promise<void> {
+  // ACK before the DB write and member fetch below — together they can outrun
+  // Discord's 3s window and leave the new arrival staring at a failed button.
+  try {
+    await interaction.deferUpdate();
+  } catch (err) {
+    console.error('[Avery] Onboard skip-details — could not defer:', err);
+    return;
+  }
+
   try {
     await completeOnboarding(interaction.user.id, null, null);
 
@@ -131,9 +140,9 @@ export async function handleOnboardSkipDetails(interaction: ButtonInteraction, c
 
     if (member) {
       const embed = buildResidentCardEmbed(client, member, null, null);
-      await interaction.update({ embeds: [embed], components: [] });
+      await interaction.editReply({ embeds: [embed], components: [] });
     } else {
-      await interaction.update({
+      await interaction.editReply({
         embeds: [],
         components: [],
         content: "You're all set! Welcome to Avelora! \uD83C\uDF32",
@@ -155,7 +164,7 @@ export async function handleOnboardSkipDetails(interaction: ButtonInteraction, c
   } catch (err) {
     console.error('[Avery] Error in onboard_skip_details handler:', err);
     try {
-      await interaction.reply({
+      await interaction.followUp({
         content: "Something went a little sideways. Try again! \uD83C\uDF32",
         flags: 64,
       });
@@ -169,6 +178,15 @@ export async function handleOnboardSkipDetails(interaction: ButtonInteraction, c
  * Modal submit: Complete onboarding with character name and interests
  */
 export async function handleOnboardModalSubmit(interaction: ModalSubmitInteraction, client: Client): Promise<void> {
+  // Modal submissions have no .update() — deferUpdate + editReply edits the original
+  // message. Defer up front so the DB write and member fetch happen on our own time.
+  try {
+    await interaction.deferUpdate();
+  } catch (err) {
+    console.error('[Avery] Onboard modal submit — could not defer:', err);
+    return;
+  }
+
   try {
     const characterName = interaction.fields.getTextInputValue('character_name').trim() || null;
     const interests = interaction.fields.getTextInputValue('interests').trim() || null;
@@ -188,11 +206,8 @@ export async function handleOnboardModalSubmit(interaction: ModalSubmitInteracti
 
     if (member) {
       const embed = buildResidentCardEmbed(client, member, characterName, interests);
-      // Modal submissions don't have .update() — use deferUpdate + editReply to update the original message
-      await interaction.deferUpdate();
       await interaction.editReply({ embeds: [embed], components: [] });
     } else {
-      await interaction.deferUpdate();
       await interaction.editReply({
         embeds: [],
         components: [],
@@ -222,12 +237,10 @@ export async function handleOnboardModalSubmit(interaction: ModalSubmitInteracti
   } catch (err) {
     console.error('[Avery] Error in onboard modal submit handler:', err);
     try {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: "Something went a little sideways. Try again! \uD83C\uDF32",
-          flags: 64,
-        });
-      }
+      await interaction.followUp({
+        content: "Something went a little sideways. Try again! \uD83C\uDF32",
+        flags: 64,
+      });
     } catch {
       // Interaction already handled or expired
     }

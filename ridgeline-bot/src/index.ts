@@ -32,15 +32,26 @@ import { destroySuggestCooldowns } from './features/suggestions.js';
 import { destroyAnnounceCooldowns } from './features/announce.js';
 import { pool } from './db/index.js';
 
-// Single-instance guard: the live bot runs ONLY on Railway. A second instance on
-// the same token (e.g. a Replit Deployment) fights Railway over the DB instance-lock,
-// flapping the gateway connection and causing "This interaction failed" for users.
-// Railway never sets REPLIT_DEPLOYMENT; Replit Deployments do. The Replit dev Run
-// button (npm run dev) does NOT set it, so local editing still works. Override with
-// ALLOW_REPLIT_BOT=true if you ever intentionally want Replit to be the primary host.
-if (process.env.REPLIT_DEPLOYMENT && process.env.ALLOW_REPLIT_BOT !== 'true') {
-  console.error('[Avery] Refusing to start on a Replit Deployment — Railway is the primary instance. ' +
-    'Set ALLOW_REPLIT_BOT=true to override.');
+// Single-instance guard: the live bot runs ONLY on Railway. A second process on the
+// same token fights Railway over the DB instance-lock — each one claims it, the loser
+// exits, its host restarts it, and it claims the lock right back. While that ping-pong
+// runs, the gateway keeps reconnecting: interactions land on a dying process and never
+// get acknowledged ("This interaction failed" / "did not respond"), and messageCreate
+// events are dropped, so "hey Avery" goes unanswered.
+//
+// This previously keyed off REPLIT_DEPLOYMENT, which only covers Replit Deployments —
+// the dev Run button (npm run dev) sets REPL_ID but NOT REPLIT_DEPLOYMENT, so it sailed
+// past the guard and became exactly the second instance this is meant to prevent.
+// REPL_ID is set in every Replit environment; Railway sets none of them.
+//
+// To run the bot from Replit on purpose, set ALLOW_REPLIT_BOT=true — and stop the
+// Railway deployment first, or you are back to two instances fighting.
+if (process.env.REPL_ID && process.env.ALLOW_REPLIT_BOT !== 'true') {
+  console.error(
+    '[Avery] Refusing to start on Replit — Railway is the primary instance and a second ' +
+    'process on the same token knocks the live bot offline. Set ALLOW_REPLIT_BOT=true to ' +
+    'override (and stop the Railway deployment first).'
+  );
   process.exit(0);
 }
 

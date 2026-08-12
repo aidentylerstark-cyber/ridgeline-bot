@@ -72,13 +72,21 @@ export async function lookupBirthday(discordUserId: string) {
 export async function handleBirthdayCommand(interaction: ChatInputCommandInteraction, client?: Client): Promise<void> {
   const sub = interaction.options.getSubcommand();
 
+  // Every branch below reads or writes the DB first. ACK up front so a slow query
+  // can't burn Discord's 3s window.
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (err) {
+    console.error('[Avery] /birthday — could not defer:', err);
+    return;
+  }
+
   if (sub === 'set') {
     const dateStr = interaction.options.getString('date', true);
     const parsed = parseBirthdayDate(dateStr);
     if (!parsed) {
-      await interaction.reply({
+      await interaction.editReply({
         content: `Hmm, couldn't make sense of that date. Try something like **January 15** or **1/15**! 🌲`,
-        flags: 64,
       });
       return;
     }
@@ -87,9 +95,8 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
       action: 'birthday_set', actorId: interaction.user.id, targetId: interaction.user.id,
       details: `Set birthday to ${formatBirthdayDate(parsed.month, parsed.day)}`,
     });
-    await interaction.reply({
+    await interaction.editReply({
       content: `🎂 Got it! I've written down **${formatBirthdayDate(parsed.month, parsed.day)}** for you. I'll make sure the whole town knows when your big day arrives! 🌲`,
-      flags: 64,
     });
     return;
   }
@@ -97,14 +104,12 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
   if (sub === 'check') {
     const entry = await lookupBirthday(interaction.user.id);
     if (entry) {
-      await interaction.reply({
+      await interaction.editReply({
         content: `🎂 I've got your birthday on file! It's **${formatBirthdayDate(entry.month, entry.day)}**. Avery never forgets! 🌲`,
-        flags: 64,
       });
     } else {
-      await interaction.reply({
+      await interaction.editReply({
         content: `I don't have your birthday yet! Use \`/birthday set\` to register it! 🌲`,
-        flags: 64,
       });
     }
     return;
@@ -117,22 +122,18 @@ export async function handleBirthdayCommand(interaction: ChatInputCommandInterac
         action: 'birthday_delete', actorId: interaction.user.id, targetId: interaction.user.id,
         details: `Removed their birthday from the registry`,
       });
-      await interaction.reply({
+      await interaction.editReply({
         content: `🗑️ Your birthday has been removed from the records. You can always re-register with \`/birthday set\`! 🌲`,
-        flags: 64,
       });
     } else {
-      await interaction.reply({
+      await interaction.editReply({
         content: `I don't have a birthday on file for you! Nothing to delete. 🌲`,
-        flags: 64,
       });
     }
     return;
   }
 
   if (sub === 'upcoming') {
-    await interaction.deferReply({ flags: 64 });
-
     // Build list of next 7 days (month/day pairs) in ET
     const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
     const dates: Array<{ month: number; day: number }> = [];

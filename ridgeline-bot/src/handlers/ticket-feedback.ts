@@ -111,18 +111,23 @@ export async function handleTicketRate(interaction: ButtonInteraction, client: C
     return;
   }
 
+  // ACK before the feedback lookup + save. These buttons arrive by DM, where a slow
+  // round-trip is just as fatal to the 3s window as it is in-guild.
+  try {
+    await interaction.deferUpdate();
+  } catch (err) {
+    console.error('[Avery] Ticket rating — could not defer:', err);
+    return;
+  }
+
   // Check if already rated
   const existing = await storage.getTicketFeedback(ticketId);
   if (existing) {
-    try {
-      await interaction.update({
-        content: "You've already rated this ticket! Thanks for the feedback. \uD83C\uDF32",
-        embeds: [],
-        components: [],
-      });
-    } catch {
-      await interaction.reply({ content: "You've already rated this ticket! \uD83C\uDF32", flags: 64 });
-    }
+    await interaction.editReply({
+      content: "You've already rated this ticket! Thanks for the feedback. \uD83C\uDF32",
+      embeds: [],
+      components: [],
+    }).catch(() => {});
     return;
   }
 
@@ -157,15 +162,12 @@ export async function handleTicketRate(interaction: ButtonInteraction, client: C
   );
 
   try {
-    await interaction.update({
+    await interaction.editReply({
       embeds: [thankYouEmbed],
       components: [commentRow],
     });
   } catch (err) {
-    console.warn('[Avery] Survey rating interaction.update() failed:', err);
-    try {
-      await interaction.reply({ embeds: [thankYouEmbed], components: [commentRow], flags: 64 });
-    } catch { /* both update and reply failed — token likely expired */ }
+    console.warn('[Avery] Survey rating editReply failed:', err);
   }
 
   console.log(`[Avery] Ticket feedback: ticket ${ticketId} rated ${rating}/5`);
@@ -220,24 +222,31 @@ export async function handleTicketFeedbackCommentModal(interaction: ModalSubmitI
     return;
   }
 
+  // ACK before the DB write.
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (err) {
+    console.error('[Avery] Feedback comment modal — could not defer:', err);
+    return;
+  }
+
   const comment = interaction.fields.getTextInputValue('feedback_comment').trim();
 
   // Update the existing feedback with the comment
   try {
     const saved = await pool_updateFeedbackComment(ticketId, comment);
     if (!saved) {
-      await interaction.reply({ content: "Couldn't find the feedback to add your comment to. The rating may not have been saved. 🌲", flags: 64 });
+      await interaction.editReply({ content: "Couldn't find the feedback to add your comment to. The rating may not have been saved. 🌲" });
       return;
     }
   } catch (err) {
     console.error('[Avery] Failed to save feedback comment:', err);
-    await interaction.reply({ content: "Something went wrong saving your comment. Try again! 🌲", flags: 64 });
+    await interaction.editReply({ content: "Something went wrong saving your comment. Try again! 🌲" });
     return;
   }
 
-  await interaction.reply({
+  await interaction.editReply({
     content: "Thanks for the extra feedback! Your words help us do better. \uD83C\uDF32",
-    flags: 64,
   });
 
   console.log(`[Avery] Ticket feedback comment added for ticket ${ticketId}`);
