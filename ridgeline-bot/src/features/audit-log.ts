@@ -59,6 +59,9 @@ export type AuditAction =
   | 'member_join'
   | 'member_leave'
   | 'member_onboard_complete'
+  // Underworld / dark web
+  | 'darkweb_post'
+  | 'darkweb_whois'
   // Messages
   | 'message_delete'
   | 'message_edit'
@@ -147,6 +150,8 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   member_join:        'Member Joined',
   member_leave:       'Member Left',
   member_onboard_complete: 'Onboarding Completed',
+  darkweb_post:       'Dark Web Post',
+  darkweb_whois:      'Dark Web Trace',
   message_delete:     'Message Deleted',
   message_edit:       'Message Edited',
   message_bulk_delete: 'Messages Bulk Deleted',
@@ -212,6 +217,8 @@ const AUDIT_ACTION_COLORS: Record<AuditAction, number> = {
   member_join:        0x57F287,
   member_leave:       0xED4245,
   member_onboard_complete: 0x4A7C59,
+  darkweb_post:       0x8B0000,
+  darkweb_whois:      0x8B0000,
   message_delete:     0xFEE75C,
   message_edit:       0x5865F2,
   message_bulk_delete: 0xED4245,
@@ -277,6 +284,8 @@ const AUDIT_ACTION_EMOJIS: Record<AuditAction, string> = {
   member_join:        '\uD83D\uDCE5',
   member_leave:       '\uD83D\uDCE4',
   member_onboard_complete: '\uD83C\uDFE1',
+  darkweb_post:       '\uD83D\uDD76\uFE0F',
+  darkweb_whois:      '\uD83D\uDD0E',
   message_delete:     '\uD83D\uDDD1\uFE0F',
   message_edit:       '\u270F\uFE0F',
   message_bulk_delete: '\uD83E\uDDF9',
@@ -379,16 +388,33 @@ function logChannelIdFor(action: AuditAction): string {
 
 const BATCH_WINDOW_MS = 60_000;
 const BATCH_THRESHOLD = 5;
+/**
+ * Self-service actions (someone acting on their own account — grabbing roles off the
+ * panel, stamping their passport) get their own, roomier bucket. Picking five roles in
+ * a minute is completely normal behaviour and must never raise "Rapid Actions Detected",
+ * which reads as a moderation alarm. Sharing one counter with real moderation actions
+ * meant a member clicking through the role panel looked identical to a staff member
+ * mass-banning, and the false alarm also masked the next genuine burst.
+ */
+const SELF_SERVICE_THRESHOLD = 12;
 const embedTimestamps = new Map<string, number[]>();
 
-function shouldSuppressEmbed(actorId: string): 'post' | 'summary' | 'suppress' {
+function shouldSuppressEmbed(actorId: string, selfService: boolean): 'post' | 'summary' | 'suppress' {
   const now = Date.now();
-  const timestamps = embedTimestamps.get(actorId) ?? [];
+  // Separate buckets so role churn can't push a moderation burst over the line (or vice versa)
+  const key = `${selfService ? 'self' : 'mod'}:${actorId}`;
+  const timestamps = embedTimestamps.get(key) ?? [];
 
   // Clean old entries
   const recent = timestamps.filter(t => now - t < BATCH_WINDOW_MS);
   recent.push(now);
-  embedTimestamps.set(actorId, recent);
+  embedTimestamps.set(key, recent);
+
+  if (selfService) {
+    // Past the limit we just stop posting embeds — the rows are still in the DB and
+    // searchable via /auditlog. No alert: nobody did anything that warrants one.
+    return recent.length <= SELF_SERVICE_THRESHOLD ? 'post' : 'suppress';
+  }
 
   if (recent.length < BATCH_THRESHOLD) return 'post';
   if (recent.length === BATCH_THRESHOLD) return 'summary';
@@ -469,7 +495,9 @@ export function logAuditEvent(client: Client, guild: Guild, data: AuditEventData
       if (!modLogChannel) return;
 
       const severity = data.severity ?? 'info';
-      const suppressResult = shouldSuppressEmbed(data.actorId);
+      // Acting on yourself = self-service (role panel, passport gate), not moderation.
+      const selfService = !!data.targetId && data.targetId === data.actorId;
+      const suppressResult = shouldSuppressEmbed(data.actorId, selfService);
 
       if (suppressResult === 'suppress') return;
 
