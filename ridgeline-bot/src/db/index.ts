@@ -4,9 +4,18 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./schema.js";
 
 // Railway's private network (*.railway.internal) is IPv6-only — those hostnames
-// publish AAAA records and nothing else. Node's default resolution order can hand
-// back the (nonexistent) IPv4 answer first and throw ENOTFOUND, so ask for IPv6.
-dns.setDefaultResultOrder("ipv6first");
+// publish AAAA records and nothing else, so resolution must not drop the AAAA answer.
+//
+// "ipv6first" only exists on Node >= 20.13; Railway runs Node 18, which throws
+// ERR_INVALID_ARG_VALUE on it and takes the whole process down at import time. Fall
+// back to "verbatim" (the default since Node 17), which returns records in the order
+// DNS gave them and is sufficient here — a host with only AAAA records has exactly
+// one answer to return.
+try {
+  dns.setDefaultResultOrder("ipv6first");
+} catch {
+  dns.setDefaultResultOrder("verbatim");
+}
 
 // Log database URL (masked) for debugging
 const dbUrl = process.env.DATABASE_URL;
