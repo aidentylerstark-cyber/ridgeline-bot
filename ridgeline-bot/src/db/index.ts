@@ -17,31 +17,127 @@ try {
   dns.setDefaultResultOrder("verbatim");
 }
 
-// Log database URL (masked) for debugging
-const dbUrl = process.env.DATABASE_URL;
-if (dbUrl) {
-  const masked = dbUrl.replace(/\/\/[^:]+:[^@]+@/, "//***:***@");
-  console.log("Database URL configured:", masked);
-} else {
-  console.error("DATABASE_URL is not set!");
+const INTERNAL_SUFFIX = ".railway.internal";
+
+/** How long to wait for Railway's private network before giving up on it. */
+const PRIVATE_DNS_TIMEOUT_MS = 20_000;
+
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+function mask(url: string): string {
+  return url.replace(/\/\/[^:]+:[^@]+@/, "//***:***@");
 }
 
-function dbHostname(): string | null {
-  if (!dbUrl) return null;
+function hostnameOf(url: string): string | null {
   try {
-    return new URL(dbUrl).hostname;
+    return new URL(url).hostname;
   } catch {
     return null;
   }
 }
 
-const dbHost = dbHostname();
-const isInternalHost = dbHost !== null && dbHost.endsWith(".railway.internal");
+function isDnsFailure(err: unknown): boolean {
+  const code = (err as { code?: string } | null)?.code;
+  return code === "ENOTFOUND" || code === "EAI_AGAIN";
+}
 
-// Create PostgreSQL connection pool
+function railwayContext(): string {
+  return `project=${process.env.RAILWAY_PROJECT_NAME ?? "(unset)"} ` +
+    `environment=${process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.RAILWAY_ENVIRONMENT ?? "(unset)"} ` +
+    `service=${process.env.RAILWAY_SERVICE_NAME ?? "(unset)"}`;
+}
+
+/** Resolve a hostname, retrying with backoff until the deadline. */
+async function waitForDns(host: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  let attempt = 0;
+
+  while (Date.now() < deadline) {
+    attempt++;
+    try {
+      await dns.promises.lookup(host);
+      if (attempt > 1) console.log(`[Avery] Resolved ${host} after ${attempt} attempts`);
+      return true;
+    } catch (err) {
+      if (!isDnsFailure(err)) throw err;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      const delay = Math.min(5000, 500 * 2 ** (attempt - 1), remaining);
+      console.warn(`[Avery] Private network not up — ${host} not resolving; retrying in ${Math.round(delay / 1000)}s (attempt ${attempt})`);
+      await sleep(delay);
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Pick the connection string to use.
+ *
+ * Prefer DATABASE_URL. When it points at Railway's private network we give that
+ * network a chance to come up first — it is not ready the instant the container
+ * starts. If it never resolves, the private hostname is unreachable from this
+ * service for a reason no retry can fix (different project, different environment,
+ * private networking disabled, or a renamed Postgres service), so fall back to
+ * DATABASE_PUBLIC_URL when one is configured. The public proxy costs egress, so it
+ * is strictly a fallback — never the first choice.
+ */
+async function resolveConnectionString(): Promise<string | undefined> {
+  const primary = process.env.DATABASE_URL;
+  const fallback = process.env.DATABASE_PUBLIC_URL;
+
+  if (!primary) {
+    if (fallback) {
+      console.warn("[Avery] DATABASE_URL is not set — using DATABASE_PUBLIC_URL");
+      return fallback;
+    }
+    console.error("DATABASE_URL is not set!");
+    return undefined;
+  }
+
+  const host = hostnameOf(primary);
+  if (!host || !host.endsWith(INTERNAL_SUFFIX)) return primary;
+
+  if (await waitForDns(host, PRIVATE_DNS_TIMEOUT_MS)) return primary;
+
+  console.error(`[Avery] Railway context — ${railwayContext()}`);
+  console.error(
+    `[Avery] Could not resolve "${host}" after ${Math.round(PRIVATE_DNS_TIMEOUT_MS / 1000)}s. ` +
+    "That hostname only exists on Railway's private network, and no amount of retrying " +
+    "will create it. Check that the bot and Postgres are in the same project AND the same " +
+    "environment, that private networking is enabled on this service, and that DATABASE_URL " +
+    "is a reference variable (${{Postgres.DATABASE_URL}}) rather than a pasted literal."
+  );
+
+  if (fallback) {
+    console.warn("[Avery] Falling back to DATABASE_PUBLIC_URL (public proxy — costs egress, fix private networking when you can)");
+    return fallback;
+  }
+
+  console.error(
+    "[Avery] No DATABASE_PUBLIC_URL is set, so there is nothing to fall back to. " +
+    "Enable the TCP proxy on the Postgres service and add DATABASE_PUBLIC_URL " +
+    "(${{Postgres.DATABASE_PUBLIC_URL}}) to this service to keep the bot online."
+  );
+  return primary;
+}
+
+const connectionString = await resolveConnectionString();
+
+if (connectionString) {
+  console.log("Database URL configured:", mask(connectionString));
+}
+
+const activeHost = connectionString ? hostnameOf(connectionString) : null;
+const isInternalHost = activeHost !== null && activeHost.endsWith(INTERNAL_SUFFIX);
+const isProduction = process.env.RAILWAY_ENVIRONMENT === "production" || process.env.NODE_ENV === "production";
+
+// Create PostgreSQL connection pool. The public proxy always needs TLS; the private
+// network does not, but Railway's Postgres accepts it, so keep the existing behaviour
+// of enabling it in production either way.
 const pool = new Pool({
-  connectionString: dbUrl,
-  ssl: (process.env.RAILWAY_ENVIRONMENT === "production" || process.env.NODE_ENV === "production") ? { rejectUnauthorized: false } : undefined,
+  connectionString,
+  ssl: (isProduction || !isInternalHost) ? { rejectUnauthorized: false } : undefined,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
@@ -59,23 +155,11 @@ export const db = drizzle(pool, { schema });
 // Export pool for direct queries
 export { pool };
 
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
-
-function isDnsFailure(err: unknown): boolean {
-  const code = (err as { code?: string } | null)?.code;
-  return code === "ENOTFOUND" || code === "EAI_AGAIN";
-}
-
 /**
- * Wait until the database is actually reachable.
+ * Wait until the database actually answers a query.
  *
- * Railway's private network is not up the instant the container starts — DNS for
- * `postgres.railway.internal` fails for the first few seconds. The migration ran as
- * the very first thing on boot, hit that window, and exited 1; the restart policy
- * then burned its retries on fresh containers that raced the same gap, so the deploy
- * stayed down. Blocking here until a real query succeeds closes that window.
- *
- * Returns once `SELECT 1` succeeds. Throws the last error if the deadline passes.
+ * DNS resolving is not the same as Postgres being ready to serve — the server may
+ * still be starting. Both startup paths await this before running migrations.
  */
 export async function waitForDatabase(timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -86,42 +170,19 @@ export async function waitForDatabase(timeoutMs = 60_000): Promise<void> {
     attempt++;
     try {
       await pool.query("SELECT 1");
-      if (attempt > 1) {
-        console.log(`[Avery] Database reachable after ${attempt} attempts`);
-      }
+      if (attempt > 1) console.log(`[Avery] Database reachable after ${attempt} attempts`);
       return;
     } catch (err) {
       lastError = err;
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
       const delay = Math.min(5000, 500 * 2 ** (attempt - 1), remaining);
-      const reason = isDnsFailure(err) ? `DNS not resolving (${dbHost})` : String((err as Error)?.message ?? err);
+      const reason = isDnsFailure(err) ? `DNS not resolving (${activeHost})` : String((err as Error)?.message ?? err);
       console.warn(`[Avery] Database not ready — ${reason}; retrying in ${Math.round(delay / 1000)}s (attempt ${attempt})`);
       await sleep(delay);
     }
   }
 
-  if (isDnsFailure(lastError)) {
-    // Print where Railway thinks this container lives. Private DNS only works between
-    // services in the SAME project and the SAME environment, so these three values are
-    // what you compare against the Postgres service to find a mismatch.
-    console.error(
-      "[Avery] Railway context — project=%s environment=%s service=%s",
-      process.env.RAILWAY_PROJECT_NAME ?? "(unset)",
-      process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.RAILWAY_ENVIRONMENT ?? "(unset)",
-      process.env.RAILWAY_SERVICE_NAME ?? "(unset)"
-    );
-    console.error(
-      `[Avery] Could not resolve "${dbHost}" after ${Math.round(timeoutMs / 1000)}s. ` +
-      (isInternalHost
-        ? "That hostname only exists on Railway's private network. Check that: " +
-          "(1) the Postgres service still exists and is named so its host matches, " +
-          "(2) DATABASE_URL is a reference variable (${{Postgres.DATABASE_URL}}) and not a pasted literal, " +
-          "(3) the bot and Postgres are in the same project AND environment. " +
-          "As a workaround, set DATABASE_URL to the value of DATABASE_PUBLIC_URL."
-        : "Check that the database host is correct and reachable from this network.")
-    );
-  }
-
+  console.error(`[Avery] Railway context — ${railwayContext()}`);
   throw lastError;
 }
