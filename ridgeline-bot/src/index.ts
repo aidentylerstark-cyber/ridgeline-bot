@@ -31,7 +31,7 @@ import { destroyRegionCooldowns } from './features/region-monitoring.js';
 import { destroySuggestCooldowns } from './features/suggestions.js';
 import { destroyAnnounceCooldowns } from './features/announce.js';
 import { destroyDarkwebCooldowns } from './features/underworld.js';
-import { pool } from './db/index.js';
+import { pool, waitForDatabase } from './db/index.js';
 
 // Single-instance guard: the live bot runs ONLY on Railway. A second process on the
 // same token fights Railway over the DB instance-lock — each one claims it, the loser
@@ -72,6 +72,15 @@ let shutdown: (() => Promise<void>) | null = null;
 let isShuttingDown = false;
 
 async function main() {
+  // Wait for the database before touching it. On Railway the private network is not
+  // up the instant the container starts, so an immediate query dies with ENOTFOUND.
+  try {
+    await waitForDatabase();
+  } catch (err) {
+    console.error('[Avery] Database unreachable — cannot start:', err);
+    process.exit(1);
+  }
+
   // Run database migrations
   try {
     await runMigrations();
