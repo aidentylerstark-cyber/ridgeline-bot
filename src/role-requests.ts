@@ -26,7 +26,7 @@ import { brand } from './config.js';
 import { ICON_URL, iconFile } from './assets.js';
 import { buildCard } from './cards.js';
 import { findRoom } from './rooms.js';
-import { PARTNER_ROLE, openPartnerRoom, showcasePartner, type Logo } from './partners.js';
+import { PARTNER_ROLE, findPartner, joinPartner, listPartners, openPartnerRoom, showcasePartner, type Logo, type Partner } from './partners.js';
 
 export const ROLE_ROOM = 'role-request';
 export const REVIEW_ROOM = 'role-requests';
@@ -47,6 +47,8 @@ export const GENRES = [
 type Approver = 'moderators' | 'leadership';
 interface Requestable {
   role: string;
+  /** Shown in the menu and on the card when it differs from the role name. */
+  title?: string;
   emoji: string;
   blurb: string;
   approver: Approver;
@@ -57,7 +59,12 @@ interface Requestable {
   lead?: { label: string; placeholder: string };
   /** Ask for an optional logo, shown on the review card and in the partner gallery. */
   logo?: boolean;
+  /** Ask which existing partner business they work for; approval adds them to that business's room. */
+  pickBusiness?: boolean;
 }
+
+const titleOf = (r: Requestable) => r.title ?? r.role;
+const PARTNER_ROOM_FIELD = 'Partner room';
 
 /** Roles members can ask for. Approval rules: moderators (or leadership) for Artist; CEO/COO only for the rest. */
 const REQUESTABLE: Record<string, Requestable> = {
@@ -86,6 +93,16 @@ const REQUESTABLE: Record<string, Requestable> = {
     logo: true,
     question: 'What it does, and your position there',
     placeholder: 'e.g. Strip club on Strawberry Ave. I am the owner and want to run ads on the Pulsify stream.',
+  },
+  partnerstaff: {
+    role: PARTNER_ROLE,
+    title: 'Partner Employee',
+    emoji: '🪪',
+    blurb: 'You work for a business that is already a Verified Partner',
+    approver: 'leadership',
+    pickBusiness: true,
+    question: 'Your position at the business',
+    placeholder: 'e.g. Manager, brought on by the owner',
   },
   gtaw: {
     role: 'GTA:W Staff',
@@ -136,7 +153,7 @@ export function rolePanelMessage(): MessageCreateOptions {
       t.setContent(
         '### 📝 Request a role\n' +
           Object.values(REQUESTABLE)
-            .map((r) => `${r.emoji} **${r.role}**: ${r.blurb}. Approved by ${APPROVER_LABEL[r.approver]}.`)
+            .map((r) => `${r.emoji} **${titleOf(r)}**: ${r.blurb}. Approved by ${APPROVER_LABEL[r.approver]}.`)
             .join('\n') +
           '\n\nPick one, answer one question, and the staff will look at it. You will get a DM with the answer.',
       ),
@@ -146,7 +163,7 @@ export function rolePanelMessage(): MessageCreateOptions {
         new StringSelectMenuBuilder()
           .setCustomId(REQUEST_SELECT)
           .setPlaceholder('Choose a role to request')
-          .addOptions(Object.entries(REQUESTABLE).map(([key, r]) => ({ label: r.role, value: key, description: r.blurb, emoji: r.emoji }))),
+          .addOptions(Object.entries(REQUESTABLE).map(([key, r]) => ({ label: titleOf(r), value: key, description: r.blurb, emoji: r.emoji }))),
       ),
     )
     .addTextDisplayComponents((t) => t.setContent(`-# ${brand.footer}`));
@@ -181,13 +198,33 @@ export async function handleRequestSelect(interaction: StringSelectMenuInteracti
   }
   const pending = await findPending(member, key);
   if (pending) {
-    return void (await interaction.reply({ content: `Your **${req.role}** request is already with the staff. Hang tight.`, flags: MessageFlags.Ephemeral }));
+    return void (await interaction.reply({ content: `Your **${titleOf(req)}** request is already with the staff. Hang tight.`, flags: MessageFlags.Ephemeral }));
+  }
+  const partners = req.pickBusiness ? listPartners(member.guild) : [];
+  if (req.pickBusiness && !partners.length) {
+    return void (await interaction.reply({
+      content: `There are no verified partners yet. If your business wants to partner with ${brand.name}, request **${PARTNER_ROLE}** instead.`,
+      flags: MessageFlags.Ephemeral,
+    }));
   }
   await interaction.showModal(
     new ModalBuilder()
       .setCustomId(`${REQUEST_MODAL_PREFIX}${key}`)
-      .setTitle(`Request ${req.role}`)
+      .setTitle(`Request ${titleOf(req)}`)
       .addLabelComponents(
+        ...(req.pickBusiness
+          ? [
+              new LabelBuilder()
+                .setLabel('The business you work for')
+                .setDescription(`Not listed? It isn't a partner yet: request ${PARTNER_ROLE} instead.`)
+                .setStringSelectMenuComponent(
+                  new StringSelectMenuBuilder()
+                    .setCustomId('business')
+                    .setPlaceholder('Choose the business')
+                    .addOptions(partners.slice(0, 25).map((p) => ({ label: p.business.slice(0, 100), value: p.room.id }))),
+                ),
+            ]
+          : []),
         ...(req.lead
           ? [
               new LabelBuilder()
@@ -244,6 +281,10 @@ export async function handleRequestSubmit(interaction: ModalSubmitInteraction): 
 
   const answer = interaction.fields.getTextInputValue('answer').trim();
   const lead = req.lead ? interaction.fields.getTextInputValue('lead').trim() : undefined;
+  // Joining a partner: the business they picked. Verifying a new one: whether that business is already a partner.
+  const picked = req.pickBusiness ? listPartners(member.guild).find((p) => p.room.id === interaction.fields.getStringSelectValues('business')[0]) : undefined;
+  if (req.pickBusiness && !picked) return void (await interaction.editReply('That business is no longer a verified partner.'));
+  const known = picked ?? (lead ? findPartner(member.guild, lead) : undefined);
   // The upload link expires, so the logo is re-attached to the review card where approval can pick it up.
   const upload = req.logo ? interaction.fields.getUploadedFiles('logo', false)?.first() : undefined;
   let logo: AttachmentBuilder | undefined;
@@ -259,12 +300,14 @@ export async function handleRequestSubmit(interaction: ModalSubmitInteraction): 
   }
   const card = buildCard({
     color: PENDING_COLOR,
-    eyebrow: `${req.emoji} Role request · ${req.role}`,
+    eyebrow: `${req.emoji} Role request · ${titleOf(req)}`,
     title: member.displayName,
-    description: `${member} (${member.user.username}) asks for **${req.role}**.`,
+    description: `${member} (${member.user.username}) asks for **${req.role}**${picked ? ` as part of **${picked.business}**` : ''}.`,
     thumbnail: member.displayAvatarURL({ size: 256 }),
     fields: [
       ...(req.lead && lead ? [{ name: req.lead.label, value: lead }] : []),
+      ...(picked ? [{ name: 'Business', value: picked.business, inline: true }] : []),
+      ...(known ? [{ name: PARTNER_ROOM_FIELD, value: `<#${known.room.id}>${picked ? '' : ' · already a partner: approving adds them to this room'}` }] : []),
       { name: req.question, value: answer },
       { name: 'Who can approve', value: req.approver === 'leadership' ? 'CEO or COO' : 'Moderators, CEO or COO', inline: true },
       { name: 'In the server since', value: member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:D>` : 'unknown', inline: true },
@@ -276,7 +319,7 @@ export async function handleRequestSubmit(interaction: ModalSubmitInteraction): 
     .addTextDisplayComponents((t) => t.setContent(`${PENDING_LINE} · requested <t:${Math.floor(Date.now() / 1000)}:f>`));
   try {
     await room.send({ components: [card], files: logo ? [logo] : [], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
-    await interaction.editReply(`Your **${req.role}** request is with ${APPROVER_LABEL[req.approver]}. You will get a DM with the answer.`);
+    await interaction.editReply(`Your **${titleOf(req)}** request is with ${APPROVER_LABEL[req.approver]}. You will get a DM with the answer.`);
   } catch (err) {
     console.error('[Discord Bot] Role request failed:', err);
     await interaction.editReply("Couldn't send your request just now. Try again in a moment.");
@@ -299,37 +342,54 @@ export async function handleReviewButton(interaction: ButtonInteraction): Promis
     return void (await interaction.reply({ content: `Only ${APPROVER_LABEL[req.approver]} can decide **${req.role}** requests.`, flags: MessageFlags.Ephemeral }));
   }
 
+  // Claim the click first. Discord accepts one acknowledgement per click, so if two copies of the bot are ever
+  // online at once, only one gets past here: no second partner room, gallery card or DM.
+  try {
+    await interaction.deferUpdate();
+  } catch {
+    return;
+  }
+  const failed = (content: string) => interaction.followUp({ content, flags: MessageFlags.Ephemeral }).then(() => undefined);
+
   const approved = action === 'approve';
   const member = await interaction.guild.members.fetch(userId).catch(() => undefined);
+  const json = interaction.message.components[0]?.toJSON() as unknown as Record<string, unknown> | undefined;
+  // Partner Employee: the business they picked, read back off the card. It must still be a partner to join it.
+  const pickedRoomId = req.pickBusiness && json ? answerOnCard(json, PARTNER_ROOM_FIELD)?.match(/<#(\d+)>/)?.[1] : undefined;
+  const picked: Partner | undefined = pickedRoomId ? listPartners(interaction.guild).find((p) => p.room.id === pickedRoomId) : undefined;
+  if (approved && req.pickBusiness && !picked) {
+    return failed('That business is no longer a verified partner, so there is no room to add them to.');
+  }
   if (approved) {
     const role = interaction.guild.roles.cache.find((r) => r.name === req.role);
     if (!member || !role) {
-      return void (await interaction.reply({ content: member ? `The **${req.role}** role doesn't exist any more.` : 'That member has left the server.', flags: MessageFlags.Ephemeral }));
+      return failed(member ? `The **${req.role}** role doesn't exist any more.` : 'That member has left the server.');
     }
     try {
       await member.roles.add(role, `Role request approved by ${reviewer.user.username}`);
     } catch (err) {
       console.error('[Discord Bot] Role grant failed:', err);
-      return void (await interaction.reply({ content: `Couldn't give **${req.role}**. Is the bot's role above it?`, flags: MessageFlags.Ephemeral }));
+      return failed(`Couldn't give **${req.role}**. Is the bot's role above it?`);
     }
   }
-
-  const json = interaction.message.components[0]?.toJSON() as unknown as Record<string, unknown> | undefined;
-
-  // Approved partners get their own private room with the CEO and COO; the business name is read back off the card.
+  // Partners: a new business gets its own private room with the CEO and COO plus a gallery card;
+  // someone from a business that is already a partner joins its room and its card.
   let partnerRoom: TextChannel | undefined;
-  if (approved && member && req.lead && json) {
-    const business = answerOnCard(json, req.lead.label) ?? member.displayName;
+  if (approved && member && json && (picked || req.lead)) {
     const details = answerOnCard(json, req.question) ?? '';
     try {
-      partnerRoom = await openPartnerRoom(member, business, details, reviewer);
+      if (picked) {
+        await joinPartner(picked, member, reviewer, details);
+        partnerRoom = picked.room;
+      } else if (req.lead) {
+        const business = answerOnCard(json, req.lead.label) ?? member.displayName;
+        const { partner, created } = await openPartnerRoom(member, business, details, reviewer);
+        partnerRoom = partner.room;
+        if (created) await showcasePartner(partner, details, await logoOnCard(interaction));
+      }
     } catch (err) {
       console.error('[Discord Bot] Partner room failed:', err);
-    }
-    try {
-      await showcasePartner(member, business, details, await logoOnCard(interaction));
-    } catch (err) {
-      console.error('[Discord Bot] Partner gallery post failed:', err);
+      await interaction.followUp({ content: "The role was given, but the partner room couldn't be set up. Check the bot's permissions.", flags: MessageFlags.Ephemeral }).catch(() => {});
     }
   }
 
@@ -347,18 +407,18 @@ export async function handleReviewButton(interaction: ButtonInteraction): Promis
     walk(json);
   }
   try {
-    await interaction.update({ components: json ? [new ContainerBuilder(json as never)] : [] });
+    await interaction.editReply({ components: json ? [new ContainerBuilder(json as never)] : [] });
   } catch (err) {
     console.error('[Discord Bot] Could not update role request card:', err);
-    await interaction.reply({ content: `${approved ? 'Approved' : 'Denied'}, but the card could not be updated.`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await interaction.followUp({ content: `${approved ? 'Approved' : 'Denied'}, but the card could not be updated.`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 
   await member
     ?.send(
       approved
-        ? `Your **${req.role}** request in the ${brand.name} server was approved. Welcome aboard.` +
-            (partnerRoom ? ` Your private room with the CEO and COO is open: ${partnerRoom}` : '')
-        : `Your **${req.role}** request in the ${brand.name} server wasn't approved this time. Questions? Ask a moderator.`,
+        ? `Your **${titleOf(req)}** request in the ${brand.name} server was approved. Welcome aboard.` +
+            (partnerRoom ? ` Your business's private room with the CEO and COO: ${partnerRoom}` : '')
+        : `Your **${titleOf(req)}** request in the ${brand.name} server wasn't approved this time. Questions? Ask a moderator.`,
     )
     .catch(() => {}); // DMs closed; the decision still stands
   console.log(`[Pulsify] ${req.role} request for ${member?.user.username ?? userId} ${approved ? 'approved' : 'denied'} by ${reviewer.user.username}`);
