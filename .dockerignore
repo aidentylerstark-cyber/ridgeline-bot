@@ -1,0 +1,15 @@
+node_modules
+dist
+.env
+.env.*
+.git
+.claude
+.replit
+.config
+.local
+.cache
+.upm
+.agents
+# Original brand files; the bot uses the prepared copies in assets/
+*.png
+!assets/**/*.png
