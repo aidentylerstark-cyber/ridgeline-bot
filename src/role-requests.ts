@@ -50,6 +50,7 @@ interface Requestable {
   emoji: string;
   blurb: string;
   approver: Approver;
+  /** The form label: Discord allows at most 45 characters. */
   question: string;
   placeholder: string;
   /** A short first question asked before the main one (e.g. the business name). */
@@ -73,7 +74,7 @@ const REQUESTABLE: Record<string, Requestable> = {
     emoji: '💼',
     blurb: 'You work for Pulsify',
     approver: 'leadership',
-    question: 'Your position at Pulsify, and who brought you on',
+    question: 'Your position, and who brought you on',
     placeholder: 'e.g. Merch coordinator, brought on by Chaylen Young',
   },
   partner: {
@@ -83,7 +84,7 @@ const REQUESTABLE: Record<string, Requestable> = {
     approver: 'leadership',
     lead: { label: 'The business you represent', placeholder: 'e.g. Vanilla Unicorn' },
     logo: true,
-    question: 'What the business does, and your position there',
+    question: 'What it does, and your position there',
     placeholder: 'e.g. Strip club on Strawberry Ave. I am the owner and want to run ads on the Pulsify stream.',
   },
   gtaw: {
