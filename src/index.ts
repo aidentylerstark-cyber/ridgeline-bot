@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { Client, Events, GatewayIntentBits, MessageFlags, Partials } from 'discord.js';
+import { Client, Events, GatewayIntentBits, MessageFlags, Partials, type Guild } from 'discord.js';
 import { config } from './config.js';
 import { commandDefinitions, handleCommand } from './commands.js';
 import { catchUpWelcomes, handleMemberJoin } from './welcome.js';
@@ -39,6 +39,23 @@ const client = new Client({
 
 registerLogging(client);
 
+async function loadMembers(guild: Guild): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await guild.members.fetch();
+      return;
+    } catch (err) {
+      const wait = (err as { data?: { retry_after?: number } }).data?.retry_after;
+      if (!wait || attempt >= 3) {
+        console.error('[Discord Bot] Could not load the member list:', err);
+        return;
+      }
+      console.warn(`[Discord Bot] Member list rate limited; trying again in ${Math.ceil(wait)}s`);
+      await new Promise((resolve) => setTimeout(resolve, wait * 1000 + 500));
+    }
+  }
+}
+
 client.once(Events.ClientReady, async (c) => {
   console.log(`[Discord Bot] Logged in as ${c.user.tag}`);
   const guild = c.guilds.cache.get(config.guildId);
@@ -47,8 +64,9 @@ client.once(Events.ClientReady, async (c) => {
     console.warn(`[Discord Bot] Not in guild ${config.guildId} — invite the bot first, or check GUILD_ID. ${c.user.tag} is in: ${servers}`);
     return;
   }
-  // The whole member list, once: partner cards, role sections and merch tags read roles from the cache.
-  await guild.members.fetch().catch((err) => console.error('[Discord Bot] Could not load the member list:', err));
+  // The whole member list, once: welcome catch-up, partner cards, role sections and merch tags read it from the cache.
+  // Discord allows one full fetch every 30 seconds, so a quick restart may have to wait for it.
+  await loadMembers(guild);
   try {
     await guild.commands.set(commandDefinitions);
     console.log(`[Discord Bot] Registered ${commandDefinitions.length} slash commands in ${guild.name}`);

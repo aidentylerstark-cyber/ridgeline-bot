@@ -269,7 +269,8 @@ export async function catchUpWelcomes(guild: Guild): Promise<void> {
     return;
   }
 
-  const members = await guild.members.fetch();
+  // The full member list was loaded at start-up (and is kept current); Discord allows one full fetch every 30 seconds.
+  const members = guild.members.cache;
   const since = Math.max(oldestCard, Date.now() - CATCH_UP_DAYS * 86_400_000);
   const byJoin = [...members.values()].sort((a, b) => (a.joinedTimestamp ?? 0) - (b.joinedTimestamp ?? 0));
   const missed = byJoin
