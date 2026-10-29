@@ -6,8 +6,11 @@ import {
   OverwriteType,
   PermissionFlagsBits,
   type Guild,
+  ThreadAutoArchiveDuration,
+  type ForumChannel,
   type GuildMember,
   type OverwriteResolvable,
+  type ThreadChannel,
   type Role,
   type TextChannel,
 } from 'discord.js';
@@ -20,7 +23,7 @@ import { ARROW, categoryLabel, findCategory, findRoom } from './rooms.js';
  * Verified Business Partners: businesses that work with Pulsify. Each business has:
  *  - a role named after it (e.g. "Skybound Aviation"), listed in the PARTNERS role section;
  *  - one private room under PARTNERS that only that role, the CEO and the COO can see;
- *  - one card in #verified-partners (with its logo when one was sent) listing the people who hold its role.
+ *  - one post in the #verified-partners forum (its logo is the gallery tile) listing the people who hold its role.
  * Everyone from a business also holds the Verified Business Partner tag. The room's topic names the business;
  * the business role is found by that name. Giving someone a business role by hand works too: the bot adds the tag.
  */
@@ -273,26 +276,38 @@ export async function logoFromComponents(components: unknown): Promise<Logo | un
   return res?.ok ? { data: Buffer.from(await res.arrayBuffer()), name: url[2] } : undefined;
 }
 
-const galleryOf = (guild: Guild) => findRoom(guild, GALLERY_ROOM) as TextChannel | undefined;
+const galleryOf = (guild: Guild) => {
+  const room = findRoom(guild, GALLERY_ROOM);
+  return room?.type === ChannelType.GuildForum ? room : undefined;
+};
 const REPS_LABEL = '**Represented by:** ';
 const repsLine = (ids: string[]) => `${REPS_LABEL}${ids.map((id) => `<@${id}>`).join(', ')}`;
+export const GALLERY_INTRO_TITLE = 'About our verified partners';
 
-/** The business's card in the gallery, found by its title. */
-export async function findShowcase(gallery: TextChannel, business: string) {
-  const title = JSON.stringify(`### ${business}`).slice(1, -1);
-  const recent = await gallery.messages.fetch({ limit: 100 }).catch(() => undefined);
-  return recent?.find((m) => m.author.id === gallery.client.user.id && JSON.stringify(m.components.map((c) => c.toJSON())).includes(title));
+/** Every post in the gallery forum, open or archived (quiet posts archive themselves but stay listed). */
+export async function galleryPosts(gallery: ForumChannel): Promise<ThreadChannel[]> {
+  const [active, archived] = await Promise.all([gallery.threads.fetchActive(), gallery.threads.fetchArchived({ limit: 100 })]);
+  return [...active.threads.values(), ...archived.threads.values()].filter((t) => t.parentId === gallery.id);
 }
 
-/** Post (or replace) the business's card in #verified-partners. */
+/** The business's post in the gallery forum and its card (the post's first message). */
+export async function findShowcase(gallery: ForumChannel, business: string) {
+  const thread = (await galleryPosts(gallery)).find((t) => t.name === business.slice(0, 100));
+  const card = thread && (await thread.fetchStarterMessage().catch(() => null));
+  return thread ? { thread, card } : undefined;
+}
+
+/** Post (or replace) the business's post in the #verified-partners forum: its logo is the gallery tile. */
 export async function showcasePartner(partner: Partner, details: string, logo?: Logo, since = new Date()): Promise<void> {
   const gallery = galleryOf(partner.room.guild);
-  if (!gallery) return console.warn('[Pulsify] No #verified-partners room; run setup:partners');
+  if (!gallery) return console.warn('[Pulsify] No #verified-partners forum; run setup:partners');
   const business = partner.business;
-  await (await findShowcase(gallery, business))?.delete().catch(() => {});
+  await (await findShowcase(gallery, business))?.thread.delete('Replaced with a new card').catch(() => {});
   const files = logo ? [new AttachmentBuilder(logo.data, { name: logo.name })] : [iconFile()];
-  await gallery.send(
-    cardMessage(
+  const thread = await gallery.threads.create({
+    name: business.slice(0, 100),
+    autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
+    message: cardMessage(
       {
         color: PARTNER_COLOR,
         eyebrow: `🤝 ${PARTNER_ROLE}`,
@@ -308,22 +323,25 @@ export async function showcasePartner(partner: Partner, details: string, logo?: 
       },
       files,
     ),
-  );
+  });
+  // A showcase, not a conversation: only staff can write in it.
+  await thread.setLocked(true, 'Partner showcase').catch(() => {});
+  console.log(`[Pulsify] Posted ${business} in the partner gallery`);
 }
 
-/** Bring the card's "Represented by" line in line with the business role; with nobody left, the card comes down. */
+/** Bring the card's "Represented by" line in line with the business role; with nobody left, the post comes down. */
 export async function refreshShowcase(partner: Partner): Promise<void> {
   const gallery = galleryOf(partner.room.guild);
-  const card = gallery && (await findShowcase(gallery, partner.business));
-  if (!card) return;
+  const found = gallery && (await findShowcase(gallery, partner.business));
+  if (!found) return;
   const reps = representatives(partner);
   if (!reps.length) {
-    await card.delete().catch(() => {});
+    await found.thread.delete(`Nobody represents ${partner.business} any more`).catch(() => {});
     console.log(`[Pulsify] Took ${partner.business} out of the gallery`);
     return;
   }
-  const json = card.components[0]?.toJSON() as unknown as Record<string, unknown> | undefined;
-  if (!json) return;
+  const json = found.card?.components[0]?.toJSON() as unknown as Record<string, unknown> | undefined;
+  if (!found.card || !json) return;
   let changed = false;
   const walk = (node: Record<string, unknown>) => {
     if (node.type === ComponentType.TextDisplay && typeof node.content === 'string' && node.content.includes(REPS_LABEL)) {
@@ -335,7 +353,10 @@ export async function refreshShowcase(partner: Partner): Promise<void> {
     if (node.accessory) walk(node.accessory as Record<string, unknown>);
   };
   walk(json);
-  if (changed) await card.edit({ components: [new ContainerBuilder(json as never)], allowedMentions: { parse: [] } });
+  if (!changed) return;
+  // An archived post can't be edited; waking it keeps its place in the forum.
+  if (found.thread.archived) await found.thread.setArchived(false, 'Updating the partner card');
+  await found.card.edit({ components: [new ContainerBuilder(json as never)], allowedMentions: { parse: [] } });
 }
 
 /** The pinned intro at the top of the gallery. */
