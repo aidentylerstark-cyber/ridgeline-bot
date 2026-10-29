@@ -1,165 +1,143 @@
-import 'dotenv/config';
-import { Client, GatewayIntentBits, Options, Partials } from 'discord.js';
-import { runMigrations } from './db/migrate.js';
-import { TICKET_COOLDOWN_MS } from './config.js';
-import { CooldownManager } from './utilities/cooldowns.js';
-import { setupReadyHandler, destroyStatsInterval } from './events/ready.js';
-import { setupMemberJoinHandler } from './events/member-join.js';
-import { setupInteractionHandler } from './events/interaction.js';
-import { setupMessageHandler, destroyMessageCooldowns } from './events/message.js';
-import { stopInstanceHeartbeat } from './utilities/instance-lock.js';
-import { scheduleBirthdayCheck } from './scheduled/birthday-check.js';
-import { scheduleMilestoneCheck } from './scheduled/milestone-check.js';
-import { scheduleCleanup } from './scheduled/cleanup.js';
-import { scheduleStaffReport } from './scheduled/staff-report.js';
-import { scheduleTicketInactivityCheck } from './scheduled/ticket-inactivity.js';
-import { postRoleButtons } from './panels/role-panel.js';
-import { postTicketPanel } from './panels/ticket-panel.js';
-import { postCommunityPoll } from './panels/polls.js';
-import { postTriggerReference } from './panels/trigger-reference.js';
-import { destroyMemory } from './chatbot/memory.js';
-import { reorganizeCategoryByKey, setChannelPermissions } from './utilities/channel-reorg.js';
-import { postSuggestionPanel } from './panels/suggestion-panel.js';
-import { setupModLog, clearRaidModeTimer } from './features/modlog.js';
-import { destroyAuditLogInterval } from './features/audit-log.js';
-import { startRegionWebhookServer } from './api/region-webhook.js';
-import { scheduleRegionDailySummary } from './scheduled/region-daily-summary.js';
-import { scheduleBirthdayMonthlySummary } from './scheduled/birthday-monthly-summary.js';
-import { destroyRegionCooldowns } from './features/region-monitoring.js';
-import { destroySuggestCooldowns } from './features/suggestions.js';
-import { destroyAnnounceCooldowns } from './features/announce.js';
-import { pool } from './db/index.js';
+import { createServer } from 'node:http';
+import { Client, Events, GatewayIntentBits, MessageFlags, Partials } from 'discord.js';
+import { config } from './config.js';
+import { commandDefinitions, handleCommand } from './commands.js';
+import { handleMemberJoin } from './welcome.js';
+import { faqIndexReply, faqReply, matchFaq } from './faq.js';
+import { registerLogging } from './logs.js';
+import { syncDividers } from './role-sections.js';
+import { MAIL_PREFIX, handleMailButton, handleMailModal } from './mail.js';
+import { OPEN_SHEET_BUTTON, SHEET_MODAL, UPDATE_SHEET_BUTTON, handleOpenSheet, handleSheetSubmit } from './employees.js';
+import {
+  GENRE_SELECT,
+  REQUEST_MODAL_PREFIX,
+  REQUEST_SELECT,
+  REVIEW_PREFIX,
+  handleGenreSelect,
+  handleRequestSelect,
+  handleRequestSubmit,
+  handleReviewButton,
+} from './role-requests.js';
 
-const token = process.env.DISCORD_BOT_TOKEN;
-if (!token) {
-  console.error('[Peaches] No DISCORD_BOT_TOKEN found — cannot start bot');
-  process.exit(1);
-}
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers, // privileged: enable "Server Members Intent" in the Developer Portal
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent, // privileged: enable "Message Content Intent"
+    GatewayIntentBits.GuildModeration, // bans, for #mod-log
+    GatewayIntentBits.GuildInvites, // which invite a member joined with
+    GatewayIntentBits.GuildVoiceStates, // #voice-log
+    GatewayIntentBits.GuildExpressions, // emoji and sticker changes
+    GatewayIntentBits.GuildWebhooks, // webhook changes
+  ],
+  // Partials let the logs see deletes/edits of messages sent before the bot started.
+  partials: [Partials.GuildMember, Partials.Message, Partials.Channel],
+});
 
-if (!process.env.DATABASE_URL) {
-  console.error('[Peaches] No DATABASE_URL found — cannot connect to database');
-  process.exit(1);
-}
+registerLogging(client);
 
-// Module-level shutdown function — set by main() so the uncaughtException handler can call it
-let shutdown: (() => Promise<void>) | null = null;
-let isShuttingDown = false;
-
-async function main() {
-  // Run database migrations
+client.once(Events.ClientReady, async (c) => {
+  console.log(`[Discord Bot] Logged in as ${c.user.tag}`);
+  const guild = c.guilds.cache.get(config.guildId);
+  if (!guild) {
+    console.warn(`[Discord Bot] Not in guild ${config.guildId} — invite the bot first`);
+    return;
+  }
   try {
-    await runMigrations();
-    console.log('[Peaches] Database migrations complete');
+    await guild.commands.set(commandDefinitions);
+    console.log(`[Discord Bot] Registered ${commandDefinitions.length} slash commands in ${guild.name}`);
   } catch (err) {
-    console.error('[Peaches] Migration error (non-fatal):', err);
-  }
-
-  const client = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMembers,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent,
-      GatewayIntentBits.GuildPresences,        // Required for online count in stats VCs (privileged — enable in Dev Portal)
-      GatewayIntentBits.GuildModeration,       // Required for guildBanAdd/guildBanRemove events (mod log)
-    ],
-    partials: [
-      Partials.Message,  // Required so messageDelete fires for uncached messages (mod log)
-    ],
-    makeCache: Options.cacheWithLimits({
-      MessageManager: 50,
-      GuildEmojiManager: 0,
-      GuildStickerManager: 0,
-      VoiceStateManager: 0,
-      ThreadManager: 25,
-    }),
-    sweepers: {
-      messages: { interval: 300, lifetime: 600 },
-    },
-  });
-
-  // Global error handler
-  client.on('error', (err) => {
-    console.error('[Peaches] Client error:', err.message);
-  });
-
-  // Ticket cooldown manager with auto-cleanup
-  const ticketCooldowns = new CooldownManager(TICKET_COOLDOWN_MS);
-
-  // Wire event handlers
-  setupReadyHandler(client);
-  setupMemberJoinHandler(client);
-  setupInteractionHandler(client, ticketCooldowns);
-  setupMessageHandler(client);
-  setupModLog(client);
-
-  // Attach admin utility methods to client for console/external access
-  client.postRoleButtons = () => postRoleButtons(client);
-  client.reorganizeCategory = (key: string) => reorganizeCategoryByKey(client, key);
-  client.setChannelPermissions = (key: string) => setChannelPermissions(client, key);
-  client.postTicketPanel = () => postTicketPanel(client);
-  client.postSuggestionPanel = () => postSuggestionPanel(client);
-  client.postCommunityPoll = (q: string, opts: string[], dur?: number) => postCommunityPoll(client, q, opts, dur);
-  client.postTriggerReference = () => postTriggerReference(client);
-  // Login
-  await client.login(token);
-
-  // Start HTTP server for region monitoring webhook
-  const regionServer = startRegionWebhookServer(client);
-
-  // Register cron-based scheduled tasks (they wait for their scheduled time — no delay needed)
-  const cronTasks = [
-    scheduleBirthdayCheck(client),
-    scheduleMilestoneCheck(client),
-    scheduleCleanup(client),
-    scheduleStaffReport(client),
-    scheduleTicketInactivityCheck(client),
-    scheduleRegionDailySummary(client),
-    scheduleBirthdayMonthlySummary(client),
-  ];
-
-  // Graceful shutdown
-  shutdown = async () => {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-    console.log('[Peaches] Shutting down...');
-    stopInstanceHeartbeat();
-    cronTasks.forEach(t => t.stop());
-    destroyMemory();
-    ticketCooldowns.destroy();
-    destroyMessageCooldowns();
-    destroyRegionCooldowns();
-    destroySuggestCooldowns();
-    destroyAnnounceCooldowns();
-    destroyStatsInterval();
-    destroyAuditLogInterval();
-    clearRaidModeTimer();
-    regionServer.close();
-    client.destroy();
-    await pool.end().catch(err => console.error('[Peaches] Failed to close DB pool:', err));
-    process.exit(0);
-  };
-
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
-}
-
-// Global error handlers — prevent silent crashes without cleanup
-process.on('unhandledRejection', (reason) => {
-  console.error('[Peaches] Unhandled promise rejection:', reason);
-});
-
-process.on('uncaughtException', async (err) => {
-  console.error('[Peaches] Uncaught exception — shutting down:', err);
-  if (shutdown) {
-    await shutdown().catch(() => {});
-  } else {
-    stopInstanceHeartbeat();
-    process.exit(1);
+    console.error('[Discord Bot] Failed to register commands:', err);
   }
 });
 
-main().catch((err) => {
-  console.error('[Peaches] Fatal startup error:', err);
+client.on(Events.GuildMemberAdd, (member) => {
+  handleMemberJoin(member).catch((err) => console.error('[Discord Bot] Member join error:', err));
+});
+
+// Keep each member's section dividers in step with their roles.
+client.on(Events.GuildMemberUpdate, (before, after) => {
+  if (after.guild.id !== config.guildId || before.roles.cache.equals(after.roles.cache)) return;
+  syncDividers(after).catch((err) => console.error('[Discord Bot] Role section sync failed:', err));
+});
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  try {
+    if (interaction.isButton()) {
+      if (interaction.customId === OPEN_SHEET_BUTTON || interaction.customId === UPDATE_SHEET_BUTTON) return await handleOpenSheet(interaction);
+      if (interaction.customId.startsWith(REVIEW_PREFIX)) return await handleReviewButton(interaction);
+      if (interaction.customId.startsWith(MAIL_PREFIX)) return await handleMailButton(interaction);
+      return await interaction.reply({ content: "That button isn't active any more.", flags: MessageFlags.Ephemeral });
+    }
+    if (interaction.isStringSelectMenu()) {
+      if (interaction.customId === GENRE_SELECT) return await handleGenreSelect(interaction);
+      if (interaction.customId === REQUEST_SELECT) return await handleRequestSelect(interaction);
+      return await interaction.reply({ content: "That menu isn't active any more.", flags: MessageFlags.Ephemeral });
+    }
+    if (interaction.isModalSubmit()) {
+      if (interaction.customId === SHEET_MODAL) return await handleSheetSubmit(interaction);
+      if (interaction.customId.startsWith(REQUEST_MODAL_PREFIX)) return await handleRequestSubmit(interaction);
+      if (interaction.customId.startsWith(MAIL_PREFIX)) return await handleMailModal(interaction);
+      return await interaction.reply({ content: "That form isn't active any more.", flags: MessageFlags.Ephemeral });
+    }
+  } catch (err) {
+    console.error('[Discord Bot] Interaction failed:', err);
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: 'Something went wrong. Please try again in a moment.', flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+    return;
+  }
+  if (!interaction.isChatInputCommand()) return;
+  try {
+    await handleCommand(interaction);
+  } catch (err) {
+    console.error(`[Discord Bot] /${interaction.commandName} failed:`, err);
+    const content = 'Something went wrong — please try again in a moment.';
+    try {
+      if (interaction.deferred || interaction.replied) await interaction.editReply(content);
+      else await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+    } catch {
+      // interaction token expired; nothing more we can do
+    }
+  }
+});
+
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot || message.guildId !== config.guildId || !client.user) return;
+
+  const mentioned = message.mentions.users.has(client.user.id);
+  const inSupportChannel = config.supportChannelId === message.channelId;
+  if (!mentioned && !inSupportChannel) return;
+
+  const question = message.content.replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '').trim();
+  if (!question) {
+    await message.reply({ ...faqIndexReply(message.guild), allowedMentions: { repliedUser: false } }).catch(() => {});
+    return;
+  }
+
+  const entry = matchFaq(question);
+  // In the support channel, stay quiet on unmatched chatter; only an @mention gets the topic list.
+  if (!entry && !mentioned) return;
+
+  try {
+    await message.reply({ ...(entry ? faqReply(entry, message.guild) : faqIndexReply(message.guild)), allowedMentions: { repliedUser: false } });
+  } catch (err) {
+    console.error('[Discord Bot] Support reply failed:', err);
+  }
+});
+
+process.on('unhandledRejection', (err) => console.error('[Discord Bot] Unhandled rejection:', err));
+
+// Health check so the host (Railway/Replit) sees the process as alive.
+createServer((_req, res) => res.writeHead(200).end('ok')).listen(config.port, () =>
+  console.log(`[Discord Bot] Health check on :${config.port}`),
+);
+
+client.login(config.token).catch((err) => {
+  const hint = /disallowed intents/i.test(err.message)
+    ? 'enable Server Members Intent and Message Content Intent in the Developer Portal (Bot page)'
+    : 'check DISCORD_TOKEN';
+  console.error(`[Discord Bot] Login failed — ${hint}:`, err.message);
   process.exit(1);
 });
