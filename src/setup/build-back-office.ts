@@ -1,6 +1,6 @@
 /**
  * BACK OFFICE: the staff-only category — staff chat, reports, and the bot's log rooms.
- * Visible to the Moderator role (created here, below GTA:W Staff) and to the CEO/COO via Administrator.
+ * Visible to the Moderator role (created here, below GTA:W Staff) and to the CEO, COO and GTA:W Staff via Administrator.
  * Also moves Discord's community moderator channel to #mod-chat and removes the old #moderator-only.
  * (#staff-announcements lives in BUSINESS; see setup:business.)
  * Safe to re-run — reuses roles and rooms by name.
@@ -9,6 +9,7 @@
  */
 import { PermissionFlagsBits, type Guild, type Role, type TextChannel } from 'discord.js';
 import { withGuild } from './connect.js';
+import { MODERATOR_PERMISSIONS } from './permissions.js';
 import { ensureCategory, ensureRoom } from './channels.js';
 import { LOG_ROOMS } from '../logs.js';
 import { REVIEW_ROOM } from '../role-requests.js';
@@ -21,7 +22,7 @@ const ROOMS: { name: string; topic: string; botPosts: boolean }[] = [
   {
     name: 'mod-chat',
     topic:
-      'The moderation room: CEO, COO and moderators. Plan, hand off shifts and talk through reports, members and anything that should not be public. ' +
+      'The moderation room: CEO, COO, GTA:W Staff and moderators. Plan, hand off shifts and talk through reports, members and anything that should not be public. ' +
       "Discord's community and safety notices land here too.",
     botPosts: false,
   },
@@ -36,7 +37,7 @@ const ROOMS: { name: string; topic: string; botPosts: boolean }[] = [
     name: REVIEW_ROOM,
     topic:
       'Role requests from #role-request, one card each with the member\'s answer. Moderators decide Artist; only the CEO or COO can decide ' +
-      'Pulsify Employee and GTA:W Staff. Press Approve or Deny; the member gets a DM and the role change shows in mod-log.',
+      'Pulsify Employee, Verified Business Partner and GTA:W Staff. Press Approve or Deny; the member gets a DM and the role change shows in mod-log.',
     botPosts: false,
   },
   {
@@ -82,14 +83,7 @@ async function ensureModerator(guild: Guild): Promise<Role> {
     name: 'Moderator',
     colors: { primaryColor: 0x119a4a },
     hoist: true,
-    // Per the brief: kick, timeout, manage messages and threads. No Manage Roles, so GTA:W Staff stays leadership-only.
-    permissions: [
-      PermissionFlagsBits.KickMembers,
-      PermissionFlagsBits.ModerateMembers,
-      PermissionFlagsBits.ManageMessages,
-      PermissionFlagsBits.ManageThreads,
-      PermissionFlagsBits.ViewAuditLog,
-    ],
+    permissions: MODERATOR_PERMISSIONS,
     position: staffRole ? staffRole.position : undefined,
     reason: 'Pulsify moderators',
   });
@@ -102,10 +96,13 @@ await withGuild(async (guild) => {
   const moderator = await ensureModerator(guild);
   const bot = guild.client.user.id;
 
+  const V = PermissionFlagsBits;
+  // Log rooms are the bot's record: staff read them, nobody posts, reacts or opens threads in them.
+  const readOnly = [V.SendMessages, V.AddReactions, V.CreatePublicThreads, V.CreatePrivateThreads];
   const staffOnly = (botPosts: boolean) => [
-    { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-    { id: moderator.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: botPosts ? [PermissionFlagsBits.SendMessages] : [] },
-    { id: bot, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks] },
+    { id: guild.id, deny: [V.ViewChannel] },
+    { id: moderator.id, allow: [V.ViewChannel, V.ReadMessageHistory], deny: botPosts ? readOnly : [] },
+    { id: bot, allow: [V.ViewChannel, V.ReadMessageHistory, V.SendMessages, V.EmbedLinks, V.AttachFiles] },
   ];
 
   const category = await ensureCategory(guild, CATEGORY, staffOnly(false));

@@ -7,6 +7,8 @@ const H = 440;
 const GREEN = '#00FF66';
 const INK = '#0B0D0C';
 const MUTED = '#8A9A90';
+/** Discord's CDN normally answers in well under a second; past this the card goes out without the photo. */
+const AVATAR_TIMEOUT_MS = 8_000;
 
 export interface JoinCardInfo {
   name: string;
@@ -80,7 +82,11 @@ export async function renderJoinCard({ name, avatarUrl, ordinal }: JoinCardInfo)
   ctx.fillStyle = INK;
   ctx.fill();
   try {
-    const avatar = await loadImage(avatarUrl);
+    // Fetched here rather than by loadImage, whose download has no timeout: one stalled request
+    // would hold the welcome forever without an error.
+    const res = await fetch(avatarUrl, { signal: AbortSignal.timeout(AVATAR_TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`avatar request returned ${res.status}`);
+    const avatar = await loadImage(Buffer.from(await res.arrayBuffer()));
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);

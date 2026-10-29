@@ -21,7 +21,10 @@ const readOnly = (guild: Guild) => [
     allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
     deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads, PermissionFlagsBits.CreatePrivateThreads],
   },
-  { id: guild.client.user.id, allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ManageMessages] },
+  {
+    id: guild.client.user.id,
+    allow: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.PinMessages],
+  },
 ];
 
 const ROOMS = {
@@ -43,7 +46,7 @@ const ROOMS = {
     name: ROLE_ROOM,
     topic:
       'Pick your sound: choose the genres you listen to and get their roles instantly. Request a role: Artist (approved by a moderator), ' +
-      'Pulsify Employee or GTA:W Staff (approved by the CEO or COO). Use the menus in the pinned panel; you get a DM with the answer.',
+      'Pulsify Employee, Verified Business Partner or GTA:W Staff (approved by the CEO or COO). Use the menus in the pinned panel; you get a DM with the answer.',
   },
   facebrowser: {
     name: 'facebrowser',
@@ -74,7 +77,7 @@ await withGuild(async (guild) => {
   const rules = await ensureRoom(guild, category, { ...ROOMS.rules, overwrites: readOnly(guild) });
   const arrivals = await ensureRoom(guild, category, { ...ROOMS.arrivals, overwrites: readOnly(guild) });
   const roles = await ensureRoom(guild, category, { ...ROOMS.roles, overwrites: readOnly(guild) });
-  // Members read; leadership (Administrator) and Pulsify Employees share the Facebrowser posts.
+  // Members read; leadership and GTA:W Staff (Administrator) and Pulsify Employees share the Facebrowser posts.
   const employee = guild.roles.cache.find((r) => r.name === 'Pulsify Employee');
   const facebrowser = await ensureRoom(guild, category, {
     ...ROOMS.facebrowser,

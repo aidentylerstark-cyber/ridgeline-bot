@@ -32,7 +32,7 @@ await withGuild(async (guild) => {
       `Press Compose in the pinned panel; your conversation opens privately with that desk. Or call ${brand.phone}.`,
     overwrites: [
       { id: guild.id, allow: [V.ViewChannel, V.ReadMessageHistory], deny: [V.SendMessages, V.AddReactions, V.CreatePublicThreads] },
-      { id: bot, allow: [V.SendMessages, V.EmbedLinks, V.AttachFiles, V.ManageMessages] },
+      { id: bot, allow: [V.SendMessages, V.EmbedLinks, V.AttachFiles, V.ManageMessages, V.PinMessages] },
     ],
   });
   const pins = await inbox.messages.fetchPins();
@@ -56,7 +56,7 @@ await withGuild(async (guild) => {
       topic: 'Automatic. Every closed Pulsify Mail conversation: who wrote to which desk, who closed it, the closing note, and the full email-style transcript. Read-only.',
       overwrites: [
         { id: guild.id, deny: [V.ViewChannel] },
-        ...(moderator ? [{ id: moderator.id, allow: [V.ViewChannel, V.ReadMessageHistory], deny: [V.SendMessages] }] : []),
+        ...(moderator ? [{ id: moderator.id, allow: [V.ViewChannel, V.ReadMessageHistory], deny: [V.SendMessages, V.AddReactions, V.CreatePublicThreads, V.CreatePrivateThreads] }] : []),
         { id: bot, allow: [V.ViewChannel, V.SendMessages, V.EmbedLinks, V.AttachFiles, V.ReadMessageHistory] },
       ],
     });

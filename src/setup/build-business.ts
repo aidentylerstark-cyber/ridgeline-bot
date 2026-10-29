@@ -81,12 +81,12 @@ await withGuild(async (guild) => {
 
   const employeesOnly = [
     { id: guild.id, deny: [V.ViewChannel] },
-    { id: team.id, allow: [V.ViewChannel, V.ReadMessageHistory, V.SendMessages, V.CreatePublicThreads, V.SendMessagesInThreads] },
+    { id: team.id, allow: [V.ViewChannel, V.ReadMessageHistory, V.SendMessages, V.EmbedLinks, V.AttachFiles, V.AddReactions, V.CreatePublicThreads, V.SendMessagesInThreads] },
     { id: bot, allow: [V.ViewChannel, V.SendMessages, V.EmbedLinks, V.AttachFiles] },
   ];
   const category = await ensureCategory(guild, CATEGORY, employeesOnly);
 
-  // Company announcements from the CEO and COO: employees and moderators read, only leadership (Administrator) posts.
+  // Company announcements from the CEO and COO: employees and moderators read, only admins (CEO, COO, GTA:W Staff) post.
   const moderator = guild.roles.cache.find((r) => r.name === 'Moderator');
   const announcements = await ensureRoom(guild, category, {
     name: 'staff-announcements',
@@ -95,8 +95,8 @@ await withGuild(async (guild) => {
       'every employee and moderator needs to know. Read-only; questions go in business-desk or mod-chat.',
     overwrites: [
       { id: guild.id, deny: [V.ViewChannel] },
-      { id: team.id, allow: [V.ViewChannel, V.ReadMessageHistory], deny: [V.SendMessages, V.CreatePublicThreads] },
-      ...(moderator ? [{ id: moderator.id, allow: [V.ViewChannel, V.ReadMessageHistory], deny: [V.SendMessages, V.CreatePublicThreads] }] : []),
+      { id: team.id, allow: [V.ViewChannel, V.ReadMessageHistory], deny: [V.SendMessages, V.CreatePublicThreads, V.CreatePrivateThreads] },
+      ...(moderator ? [{ id: moderator.id, allow: [V.ViewChannel, V.ReadMessageHistory], deny: [V.SendMessages, V.CreatePublicThreads, V.CreatePrivateThreads] }] : []),
       { id: bot, allow: [V.ViewChannel, V.SendMessages, V.EmbedLinks] },
     ],
   });
@@ -109,7 +109,7 @@ await withGuild(async (guild) => {
     overwrites: [
       { id: guild.id, deny: [V.ViewChannel] },
       { id: team.id, allow: [V.ViewChannel, V.ReadMessageHistory], deny: [V.SendMessages, V.AddReactions, V.CreatePublicThreads] },
-      { id: bot, allow: [V.ViewChannel, V.SendMessages, V.EmbedLinks, V.AttachFiles, V.ManageMessages] },
+      { id: bot, allow: [V.ViewChannel, V.SendMessages, V.EmbedLinks, V.AttachFiles, V.ManageMessages, V.PinMessages] },
     ],
   });
   // CEO and COO see this through Administrator; nobody else, employees included.

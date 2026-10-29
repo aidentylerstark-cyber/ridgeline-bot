@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { Client, Events, GatewayIntentBits, MessageFlags, Partials } from 'discord.js';
 import { config } from './config.js';
 import { commandDefinitions, handleCommand } from './commands.js';
-import { handleMemberJoin } from './welcome.js';
+import { catchUpWelcomes, handleMemberJoin } from './welcome.js';
 import { faqIndexReply, faqReply, matchFaq } from './faq.js';
 import { registerLogging } from './logs.js';
 import { syncDividers } from './role-sections.js';
@@ -19,6 +19,7 @@ import {
   handleReviewButton,
 } from './role-requests.js';
 import { onPartnerRolesChanged } from './partners.js';
+import { startMerchSync } from './merch.js';
 
 const client = new Client({
   intents: [
@@ -51,6 +52,10 @@ client.once(Events.ClientReady, async (c) => {
   } catch (err) {
     console.error('[Discord Bot] Failed to register commands:', err);
   }
+  // Artist shops on merch.pulsify.world, mirrored into #merch-shops.
+  startMerchSync(c);
+  // Greet anyone who joined while the bot was offline.
+  await catchUpWelcomes(guild).catch((err) => console.error('[Discord Bot] Welcome catch-up failed:', err));
 });
 
 client.on(Events.GuildMemberAdd, (member) => {

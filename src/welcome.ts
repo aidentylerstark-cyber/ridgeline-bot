@@ -99,6 +99,7 @@ export function rulesMessage(): V2Message {
     ["Follow Discord's Terms of Service", 'and Community Guidelines.'],
     ["Follow GTA World's rules", "Reports about a record go through the site's Report button, so there is a record of it; the moderators' word is final."],
     ['Set your IC name', 'Please set your IC name when you join.'],
+    ['Out of character goes in (( ))', 'Every room here is in character. Anything out of character goes inside double brackets: (( like this )). Keep it short, and keep it rare.'],
   ];
   const container = new ContainerBuilder()
     .setAccentColor(brand.color)
@@ -145,21 +146,30 @@ function step(container: ContainerBuilder, guild: Guild, text: string, roomName?
 
 export type JoinCardPayload = MessageCreateOptions & { flags: MessageFlags.IsComponentsV2 };
 
-/** The Pulsify "now playing" welcome posted in #tuning-in: a rendered card plus getting-started steps. */
-export async function joinCardMessage(member: GuildMember): Promise<JoinCardPayload> {
+/**
+ * The Pulsify "now playing" welcome posted in #tuning-in: a rendered card plus getting-started steps.
+ * `position` overrides the member number (catch-up welcomes are posted after others have joined).
+ * If the card image can't be rendered the welcome still goes out, just without it.
+ */
+export async function joinCardMessage(member: GuildMember, position = member.guild.memberCount): Promise<JoinCardPayload> {
   const guild = member.guild;
-  const ord = ordinal(guild.memberCount);
+  const ord = ordinal(position);
   const image = await renderJoinCard({
     name: member.displayName,
     avatarUrl: member.displayAvatarURL({ extension: 'png', size: 512 }),
     ordinal: ord,
+  }).catch((err: unknown) => {
+    console.error(`[Discord Bot] Join card image failed for ${member.user.tag}, welcoming without it:`, err);
+    return null;
   });
 
-  const container = new ContainerBuilder()
-    .setAccentColor(brand.color)
-    .addMediaGalleryComponents((g) =>
+  const container = new ContainerBuilder().setAccentColor(brand.color);
+  if (image) {
+    container.addMediaGalleryComponents((g) =>
       g.addItems((item) => item.setURL('attachment://join-card.png').setDescription(`${member.displayName} joined ${brand.name}`)),
-    )
+    );
+  }
+  container
     .addTextDisplayComponents((t) =>
       t.setContent(`## Welcome to the floor, ${member}\nYou're the **${ord}** through the door at ${brand.name}. Four things and you're set:`),
     )
@@ -184,28 +194,92 @@ export async function joinCardMessage(member: GuildMember): Promise<JoinCardPayl
 
   return {
     components: [container],
-    files: [new AttachmentBuilder(image, { name: 'join-card.png' })],
+    files: image ? [new AttachmentBuilder(image, { name: 'join-card.png' })] : [],
     flags: MessageFlags.IsComponentsV2,
     allowedMentions: { users: [member.id] },
   };
 }
 
-export async function handleMemberJoin(member: GuildMember): Promise<void> {
-  if (member.guild.id !== config.guildId || member.user.bot) return;
+function welcomeChannel(guild: Guild) {
+  const channel = config.welcomeChannelId ? guild.channels.cache.get(config.welcomeChannelId) : guild.systemChannel;
+  return channel?.isSendable() && channel.isTextBased() ? channel : null;
+}
 
-  const channel = config.welcomeChannelId
-    ? member.guild.channels.cache.get(config.welcomeChannelId)
-    : member.guild.systemChannel;
+/** Members greeted (or being greeted) since start-up, so a live join and the catch-up never both post. */
+const welcomed = new Set<string>();
 
-  if (!channel?.isSendable()) {
+async function welcome(member: GuildMember, position?: number): Promise<void> {
+  const channel = welcomeChannel(member.guild);
+  if (!channel) {
     console.warn('[Discord Bot] No welcome channel found — run setup:welcome or set WELCOME_CHANNEL_ID');
     return;
   }
-
+  if (welcomed.has(member.id)) return;
+  welcomed.add(member.id);
   try {
-    await channel.send(await joinCardMessage(member));
+    await channel.send(await joinCardMessage(member, position));
     console.log(`[Pulsify] Welcomed ${member.user.tag}`);
   } catch (err) {
-    console.error('[Discord Bot] Failed to send welcome message:', err);
+    welcomed.delete(member.id);
+    console.error(`[Discord Bot] Failed to send welcome message for ${member.user.tag}:`, err);
   }
+}
+
+export async function handleMemberJoin(member: GuildMember): Promise<void> {
+  if (member.guild.id !== config.guildId || member.user.bot) return;
+  console.log(`[Pulsify] ${member.user.tag} joined`);
+  await welcome(member);
+}
+
+/** How far back the start-up catch-up looks for members who joined while the bot was offline. */
+const CATCH_UP_DAYS = 7;
+const CATCH_UP_SCAN = 500;
+
+/**
+ * Discord doesn't replay joins that happened while the bot was down (a deploy, a crash, a restart),
+ * so on start-up: read the recent join cards in the welcome room and greet, in join order, every
+ * member who joined since then without one. Only members who joined after the oldest card read are
+ * considered, so people from before the bot posted cards are never greeted out of the blue.
+ */
+export async function catchUpWelcomes(guild: Guild): Promise<void> {
+  const channel = welcomeChannel(guild);
+  const me = guild.client.user;
+  if (!channel || !channel.isTextBased()) return;
+
+  const greeted = new Set<string>();
+  let oldestCard: number | undefined;
+  let before: string | undefined;
+  for (let scanned = 0; scanned < CATCH_UP_SCAN; ) {
+    const batch = await channel.messages.fetch({ limit: 100, before });
+    if (!batch.size) break;
+    scanned += batch.size;
+    for (const message of batch.values()) {
+      if (message.author.id !== me.id) continue;
+      const text = JSON.stringify(message.components.map((c) => c.toJSON())) + message.content;
+      const ids = [...message.mentions.users.keys(), ...[...text.matchAll(/<@!?(\d+)>/g)].map((m) => m[1])];
+      if (!ids.length) continue;
+      ids.forEach((id) => greeted.add(id));
+      oldestCard = Math.min(oldestCard ?? Infinity, message.createdTimestamp);
+    }
+    before = batch.lastKey();
+    if (batch.size < 100) break;
+  }
+  if (oldestCard === undefined) {
+    console.log('[Pulsify] Welcome catch-up: no join cards in the welcome room yet, nothing to compare against');
+    return;
+  }
+
+  const members = await guild.members.fetch();
+  const since = Math.max(oldestCard, Date.now() - CATCH_UP_DAYS * 86_400_000);
+  const byJoin = [...members.values()].sort((a, b) => (a.joinedTimestamp ?? 0) - (b.joinedTimestamp ?? 0));
+  const missed = byJoin
+    .map((member, i) => ({ member, position: i + 1 }))
+    .filter(({ member }) => !member.user.bot && (member.joinedTimestamp ?? 0) > since && !greeted.has(member.id));
+
+  if (!missed.length) {
+    console.log('[Pulsify] Welcome catch-up: everyone who joined recently has a join card');
+    return;
+  }
+  console.log(`[Pulsify] Welcome catch-up: ${missed.length} member(s) joined while the bot was offline: ${missed.map(({ member }) => member.user.tag).join(', ')}`);
+  for (const { member, position } of missed) await welcome(member, position);
 }

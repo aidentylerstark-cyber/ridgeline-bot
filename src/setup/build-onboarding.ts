@@ -1,12 +1,12 @@
 /**
- * THE FLOOR and the joining flow: Listener, Artist and genre roles; #the-lobby and #merch-shops;
+ * THE FLOOR and the joining flow: Listener, Artist and genre roles; #the-lobby (#merch-shops is setup:merch);
  * Discord's welcome screen; and onboarding ("What do you listen to?" / "What brings you here?").
  * Every role here is created below GTA:W Staff, so only leadership can hand that one out.
  * Safe to re-run — reuses roles and rooms by name and refreshes their descriptions.
  *
  *   npm run setup:onboarding
  */
-import { ChannelType, GuildOnboardingMode, GuildOnboardingPromptType, type Guild, type Role } from 'discord.js';
+import { GuildOnboardingMode, GuildOnboardingPromptType, type Guild, type Role } from 'discord.js';
 import { withGuild } from './connect.js';
 import { ensureCategory, ensureRoom } from './channels.js';
 import { brand } from '../config.js';
@@ -28,17 +28,9 @@ const ROOMS = {
   lobby: {
     name: 'the-lobby',
     topic:
-      'The main hangout: general chat about anything, and Los Santos talking music. Say hello, catch up, share a playlist, a sleeve, the record you ' +
-      'can\'t stop playing, or your take on this week\'s Pulsify 10. Any pulsify.world link unfurls as its own card. Keep it friendly and in character; 5-second slow mode.',
+      'The main hangout, in character: Los Santos talking music. Say hello, catch up, share a playlist, a sleeve, the record you ' +
+      'can\'t stop playing, or your take on this week\'s Pulsify 10. Any pulsify.world link unfurls as its own card. Anything out of character goes in (( )). 5-second slow mode.',
     slowmode: 5,
-  },
-  merch: {
-    name: 'merch-shops',
-    topic:
-      'Artist merch, made custom. Every artist on Pulsify can open their own shop on merch.pulsify.world with their own designs, ' +
-      'listed on the marketplace and paid in $ through Fleeca. Artists: post your shop link and new drops here. ' +
-      `Want a shop set up? Call Pulsify on ${brand.phone}. 30-second slow mode.`,
-    slowmode: 30,
   },
 };
 
@@ -72,7 +64,8 @@ await withGuild(async (guild) => {
 
   const floor = await ensureCategory(guild, FLOOR);
   const lobby = await ensureRoom(guild, floor, ROOMS.lobby);
-  const merch = await ensureRoom(guild, floor, ROOMS.merch);
+  // #merch-shops is the artist storefront forum, built and kept up to date by setup:merch and the bot.
+  const merch = room(guild, 'merch-shops');
   for (const name of RETIRED_ROOMS) {
     const old = findRoom(guild, name);
     if (old) {
@@ -80,7 +73,7 @@ await withGuild(async (guild) => {
       console.log(`[Pulsify] Removed #${name}`);
     }
   }
-  await guild.channels.setPositions([lobby, merch].map((c, i) => ({ channel: c.id, position: i })));
+  await guild.channels.setPositions([lobby, merch].filter((c) => c !== undefined).map((c, i) => ({ channel: c.id, position: i })));
 
   const welcome = room(guild, 'welcome');
   const roleRequest = room(guild, 'role-request');
@@ -95,7 +88,7 @@ await withGuild(async (guild) => {
       rules && { channel: rules.id, description: 'The house rules. Read them once', emoji: '📜' },
       { channel: lobby.id, description: 'General chat and music talk', emoji: '💬' },
       roleRequest && { channel: roleRequest.id, description: 'Pick genres, request the Artist role', emoji: '🏷️' },
-      { channel: merch.id, description: 'Custom artist merch shops', emoji: '🛍️' },
+      merch && { channel: merch.id, description: 'Custom artist merch shops', emoji: '🛍️' },
     ].filter((c): c is NonNullable<typeof c> => Boolean(c)),
   });
   console.log('[Pulsify] Welcome screen on');
@@ -121,26 +114,26 @@ await withGuild(async (guild) => {
           description: 'Playlists, the Pulsify 10, what the city is putting out, and artist merch',
           emoji: '🎧',
           roles: [listener.id],
-          channels: [lobby.id, merch.id],
+          channels: [lobby.id, merch?.id].filter((id): id is string => Boolean(id)),
         },
         {
           title: 'I put records out',
           description: 'Request the Artist role with your Pulsify page, then open a custom merch shop',
           emoji: '🎤',
           roles: [listener.id],
-          channels: [roleRequest?.id, merch.id, lobby.id].filter((id): id is string => Boolean(id)),
+          channels: [roleRequest?.id, merch?.id, lobby.id].filter((id): id is string => Boolean(id)),
         },
         {
           title: "I'm here on business",
           description: `Book an artist, a placement, a stream ad or a merch shop: call ${brand.phone}`,
           emoji: '💼',
           roles: [listener.id],
-          channels: [lobby.id, merch.id],
+          channels: [lobby.id, merch?.id].filter((id): id is string => Boolean(id)),
         },
       ],
     },
   ];
-  const defaultChannels = [welcome?.id, rules?.id, room(guild, 'tuning-in')?.id, roleRequest?.id, lobby.id, merch.id].filter(
+  const defaultChannels = [welcome?.id, rules?.id, room(guild, 'tuning-in')?.id, roleRequest?.id, lobby.id, merch?.id].filter(
     (id): id is string => Boolean(id),
   );
 

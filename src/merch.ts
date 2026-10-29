@@ -1,0 +1,379 @@
+import { createHash } from 'node:crypto';
+import {
+  AttachmentBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ChannelType,
+  ContainerBuilder,
+  MessageFlags,
+  SeparatorSpacingSize,
+  ThreadAutoArchiveDuration,
+  type ActionRowBuilder,
+  type Client,
+  type ForumChannel,
+  type Guild,
+  type MediaGalleryItemBuilder,
+  type Message,
+  type MessageCreateOptions,
+  type TextChannel,
+  type ThreadChannel,
+} from 'discord.js';
+import { brand, config } from './config.js';
+import { ICON_URL, iconFile } from './assets.js';
+import { findRoom } from './rooms.js';
+
+/**
+ * #merch-shops: a read-only forum in gallery layout, one locked post per artist with a shop on merch.pulsify.world.
+ * The bot keeps it in step with the site. Each post's starter card is the shop: its card image as the tile, every
+ * item with its price, stock and sale dates, and a button to the shop. New items, last-day sales and sell-outs are
+ * posted into the artist's post, so anyone following it hears about them, and the post rises to the top.
+ * Nothing is stored: the forum is the record. A post is found by its shop button, its content version is in its
+ * image's file name, and each announcement carries a marker in its button link so it is never posted twice.
+ */
+export const MERCH_ROOM = 'merch-shops';
+export const MERCH_INTRO_TITLE = 'About artist merch';
+const MERCH_HOST = 'https://merch.pulsify.world';
+const CARD_HOST = 'https://pulsify.world/api/cards/page';
+const SYNC_EVERY_MS = 20 * 60_000;
+const REQUEST_TIMEOUT_MS = 10_000;
+const LAST_CALL_MS = 24 * 3_600_000;
+const MAX_ITEMS_ON_CARD = 15;
+// Where Artist requests are reviewed, and the question their page link is asked under (see role-requests.ts).
+const REVIEW_ROOM = 'role-requests';
+const ARTIST_PAGE_LABEL = '**Your artist page on Pulsify**';
+
+interface Artist {
+  slug: string;
+  name: string;
+  bio: string | null;
+  genre: string | null;
+  label: string | null;
+}
+
+interface ShopItem {
+  id: number;
+  slug: string;
+  name: string;
+  kind: string;
+  price: number;
+  description: string | null;
+  images: string[];
+  stock: number | null;
+  listed: boolean;
+  hidden: boolean;
+  available: boolean;
+  sensitive: boolean;
+  editionSize: number | null;
+  saleEndsAt: string | null;
+  saleEnded: boolean;
+  release: { kind: string; title: string; out: boolean } | null;
+  coming: { dropsAt: string | null; onSale: boolean } | null;
+  position: number;
+  createdAt: string;
+}
+
+interface Shop {
+  artist: Artist;
+  open: boolean;
+  note: string | null;
+  items: ShopItem[];
+}
+
+const shopUrl = (slug: string) => `${MERCH_HOST}/artists/${slug}/shop`;
+const itemUrl = (slug: string, item: ShopItem) => `${shopUrl(slug)}/${item.slug}`;
+const fileUrl = (path: string) => (path.startsWith('http') ? path : `${MERCH_HOST}${path}`);
+const unix = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+const money = (n: number) => `$${n.toLocaleString('en-US')}`;
+const titleCase = (s: string) => s.replace(/(^|[\s-])\w/g, (c) => c.toUpperCase());
+
+async function getJson<T>(path: string): Promise<T | undefined> {
+  const res = await fetch(`${MERCH_HOST}${path}`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  if (res.status === 404) return undefined;
+  if (!res.ok) throw new Error(`${path} returned ${res.status}`);
+  return (await res.json()) as T;
+}
+
+async function getImage(url: string): Promise<Buffer | undefined> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }).catch(() => undefined);
+  return res?.ok ? Buffer.from(await res.arrayBuffer()) : undefined;
+}
+
+/** Every artist on the site; the list comes in pages. */
+async function allArtists(): Promise<Artist[]> {
+  const artists: Artist[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const page = (await getJson<Artist[]>(`/api/artists?limit=100&offset=${offset}`)) ?? [];
+    artists.push(...page);
+    if (page.length < 100) return artists;
+  }
+}
+
+/** What's on the shelf: listed, not hidden, in the shop's own order. */
+const shelfOf = (shop: Shop) => shop.items.filter((i) => i.listed && !i.hidden).sort((a, b) => a.position - b.position);
+
+function itemDetails(item: ShopItem): string {
+  const bits = [titleCase(item.kind)];
+  if (item.stock === 0 || !item.available) bits.push('**Sold out**');
+  else if (item.stock !== null) bits.push(`${item.stock} left`);
+  if (item.editionSize) bits.push(`edition of ${item.editionSize}`);
+  if (item.release) {
+    const drops = item.coming?.dropsAt && !item.release.out ? ` <t:${unix(item.coming.dropsAt)}:D>` : '';
+    bits.push(`${item.release.out ? 'from' : 'drops with'} *${item.release.title}*${drops}`);
+  }
+  if (item.saleEnded) bits.push('sale over');
+  else if (item.saleEndsAt) bits.push(`sale ends <t:${unix(item.saleEndsAt)}:R>`);
+  return bits.join(' · ');
+}
+
+const linkRow = (row: ActionRowBuilder<ButtonBuilder>, buttons: [string, string][]) =>
+  row.addComponents(buttons.map(([label, url]) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(url)));
+
+/** The post's starter card: the shop itself. */
+function shopCard(shop: Shop, memberId: string | undefined, image: string | undefined): ContainerBuilder {
+  const { artist } = shop;
+  const shelf = shelfOf(shop);
+  const container = new ContainerBuilder().setAccentColor(brand.color);
+  if (image) container.addMediaGalleryComponents((g) => g.addItems((i) => i.setURL(`attachment://${image}`).setDescription(`Merch by ${artist.name}`)));
+  const about = [
+    memberId && `**On Discord:** <@${memberId}>`,
+    [artist.genre && `**Genre:** ${artist.genre}`, artist.label && `**Label:** ${artist.label}`].filter(Boolean).join(' · '),
+  ].filter(Boolean);
+  container.addTextDisplayComponents((t) =>
+    t.setContent(
+      `-# 🛍️ Artist merch\n### Merch by ${artist.name}\n` +
+        (shop.note || `Custom ${artist.name} merch, made for ${brand.name}. Paid in $ through Fleeca.`) +
+        (about.length ? `\n\n${about.join('\n')}` : ''),
+    ),
+  );
+  container.addSeparatorComponents((s) => s.setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  const lines = shelf.slice(0, MAX_ITEMS_ON_CARD).map((item) => `**${item.name}** · **${money(item.price)}**\n-# ${itemDetails(item)}`);
+  if (shelf.length > MAX_ITEMS_ON_CARD) lines.push(`-# …and ${shelf.length - MAX_ITEMS_ON_CARD} more in the shop.`);
+  container.addTextDisplayComponents((t) =>
+    t.setContent(shop.open && lines.length ? lines.join('\n') : '*Nothing on the shelf right now. Follow this post to hear about the next drop.*'),
+  );
+  container.addActionRowComponents((row: ActionRowBuilder<ButtonBuilder>) =>
+    linkRow(row, [
+      ['Open the shop', shopUrl(artist.slug)],
+      ['Artist page', `${brand.links.website}/artists/${artist.slug}`],
+    ]),
+  );
+  container.addTextDisplayComponents((t) => t.setContent(`-# Every $ is in-game · ${brand.name} merch`));
+  return container;
+}
+
+/** A short version of everything the card shows, so a card is only re-sent when something on it changed. */
+function versionOf(shop: Shop, memberId: string | undefined): string {
+  const shelf = shelfOf(shop).map((i) => [i.id, i.name, i.price, i.stock, i.available, i.saleEnded, i.saleEndsAt, i.release?.out, i.coming?.dropsAt]);
+  const data = JSON.stringify([shop.artist.name, shop.artist.genre, shop.artist.label, shop.open, shop.note, memberId, shelf]);
+  return createHash('sha1').update(data).digest('hex').slice(0, 10);
+}
+
+type Announcement = 'new' | 'last-call' | 'sold-out';
+
+/** A drop, last-call or sold-out note posted into the artist's post. */
+function announcement(kind: Announcement, shop: Shop, item: ShopItem): MessageCreateOptions & { flags: MessageFlags.IsComponentsV2 } {
+  const head = {
+    new: `-# 🆕 New drop · ${shop.artist.name}\n### ${item.name}\n**${money(item.price)}** · ${itemDetails(item)}`,
+    'last-call': `-# ⏳ Last call · ${shop.artist.name}\n### ${item.name}\nThe sale ends <t:${unix(item.saleEndsAt!)}:R>.${item.stock ? ` ${item.stock} left at **${money(item.price)}**.` : ''}`,
+    'sold-out': `-# ✖️ Sold out · ${shop.artist.name}\n### ${item.name}\nEvery one is gone. Follow this post to hear about the next drop.`,
+  }[kind];
+  const container = new ContainerBuilder().setAccentColor(kind === 'sold-out' ? 0x8a8f98 : brand.color);
+  const images = kind === 'new' ? item.images.slice(0, 4) : item.images.slice(0, 1);
+  if (images.length) {
+    container.addMediaGalleryComponents((g) =>
+      g.addItems(...images.map((src) => (i: MediaGalleryItemBuilder) => i.setURL(fileUrl(src)).setDescription(item.name).setSpoiler(item.sensitive))),
+    );
+  }
+  const description = kind === 'new' && item.description ? `\n\n${item.description.length > 500 ? `${item.description.slice(0, 499)}…` : item.description}` : '';
+  container.addTextDisplayComponents((t) => t.setContent(head + description));
+  container.addActionRowComponents((row: ActionRowBuilder<ButtonBuilder>) =>
+    linkRow(row, [[kind === 'sold-out' ? 'See the shop' : 'Get it', `${itemUrl(shop.artist.slug, item)}#${kind}`]]),
+  );
+  return { components: [container], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
+}
+
+// ─── the forum ──────────────────────────────────────────────────────────────
+
+export function merchForum(guild: Guild): ForumChannel | undefined {
+  const room = findRoom(guild, MERCH_ROOM);
+  return room?.type === ChannelType.GuildForum ? room : undefined;
+}
+
+export async function merchPosts(forum: ForumChannel): Promise<ThreadChannel[]> {
+  const [active, archived] = await Promise.all([forum.threads.fetchActive(), forum.threads.fetchArchived({ limit: 100 })]);
+  return [...active.threads.values(), ...archived.threads.values()].filter((t) => t.parentId === forum.id);
+}
+
+interface Post {
+  thread: ThreadChannel;
+  card: Message | null;
+  version?: string;
+  memberId?: string;
+}
+
+const componentsJson = (message: Message) => JSON.stringify(message.components.map((c) => c.toJSON()));
+
+/** Every artist post in the forum, by artist slug (read off its shop button). */
+async function postsBySlug(forum: ForumChannel): Promise<Map<string, Post>> {
+  const posts = new Map<string, Post>();
+  for (const thread of await merchPosts(forum)) {
+    if (thread.name === MERCH_INTRO_TITLE) continue;
+    const card = await thread.fetchStarterMessage().catch(() => null);
+    const json = card ? componentsJson(card) : '';
+    const slug = json.match(/merch\.pulsify\.world\/artists\/([a-z0-9-]+)\/shop"/)?.[1];
+    if (!slug) continue;
+    posts.set(slug, {
+      thread,
+      card,
+      version: json.match(/shop-([0-9a-f]{10})\.png/)?.[1],
+      memberId: json.match(/\*\*On Discord:\*\* <@(\d+)>/)?.[1],
+    });
+  }
+  return posts;
+}
+
+/** Artists approved through #role-request, by the page they gave: artist slug → member id. */
+async function approvedArtists(guild: Guild): Promise<Map<string, string>> {
+  const linked = new Map<string, string>();
+  const room = findRoom(guild, REVIEW_ROOM) as TextChannel | undefined;
+  const recent = await room?.messages.fetch({ limit: 100 }).catch(() => undefined);
+  for (const message of [...(recent?.values() ?? [])].reverse()) {
+    const json = componentsJson(message);
+    if (!json.includes('✅ Approved')) continue;
+    const memberId = json.match(/rolereq:approve:artist:(\d+)/)?.[1];
+    const slug = json.match(new RegExp(`${ARTIST_PAGE_LABEL.replace(/\*/g, '\\*')}\\\\n[^"]*?pulsify\\.world/artists/([a-z0-9-]+)`, 'i'))?.[1]?.toLowerCase();
+    if (memberId && slug) linked.set(slug, memberId);
+  }
+  return linked;
+}
+
+async function wake(thread: ThreadChannel): Promise<void> {
+  if (thread.archived) await thread.setArchived(false, 'Merch update');
+}
+
+/** Create or refresh one artist's post. Returns the post, or undefined when there is no shop to show. */
+async function syncShop(forum: ForumChannel, shop: Shop, existing: Post | undefined, memberId: string | undefined): Promise<Post | undefined> {
+  const shelf = shelfOf(shop);
+  // A shop gets a post once it has something on the shelf; after that the post stays, even between drops.
+  if (!existing && !(shop.open && shelf.length)) return undefined;
+  const version = versionOf(shop, memberId);
+  if (existing?.version === version) return existing;
+
+  const image = `shop-${version}.png`;
+  const png = await getImage(`${CARD_HOST}/artists/${shop.artist.slug}/shop.png?v=${version}`);
+  const container = shopCard(shop, memberId, png ? image : undefined);
+  const files = png ? [new AttachmentBuilder(png, { name: image })] : [];
+
+  if (existing?.card) {
+    await wake(existing.thread);
+    await existing.card.edit({ components: [container], files, attachments: [], allowedMentions: { parse: [] } });
+    if (existing.thread.name !== shop.artist.name.slice(0, 100)) await existing.thread.setName(shop.artist.name.slice(0, 100));
+    return { ...existing, version, memberId };
+  }
+  const thread = await forum.threads.create({
+    name: shop.artist.name.slice(0, 100),
+    autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
+    message: { components: [container], files, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } },
+  });
+  // A storefront, not a conversation: only the bot and staff write in it.
+  await thread.setLocked(true, 'Artist merch storefront').catch(() => {});
+  console.log(`[Pulsify] Opened ${shop.artist.name}'s merch post`);
+  return { thread, card: await thread.fetchStarterMessage().catch(() => null), version, memberId };
+}
+
+/** Last stock seen per item since start-up: a sell-out is only announced when the bot saw it in stock. */
+const lastStock = new Map<number, number | null>();
+
+/** Post what happened in a shop since last time: new items, sales on their last day, sell-outs. */
+async function announce(post: Post, shop: Shop): Promise<void> {
+  const now = Date.now();
+  const due: [Announcement, ShopItem][] = [];
+  for (const item of shelfOf(shop)) {
+    const before = lastStock.get(item.id);
+    lastStock.set(item.id, item.stock);
+    if (new Date(item.createdAt).getTime() > post.thread.createdTimestamp!) due.push(['new', item]);
+    const endsIn = item.saleEndsAt ? new Date(item.saleEndsAt).getTime() - now : Infinity;
+    if (!item.saleEnded && endsIn > 0 && endsIn < LAST_CALL_MS && item.stock !== 0) due.push(['last-call', item]);
+    if (item.stock === 0 && before !== undefined && before !== 0) due.push(['sold-out', item]);
+  }
+  if (!due.length) return;
+
+  // Announcements already posted carry their marker in their button link.
+  const recent = await post.thread.messages.fetch({ limit: 100 });
+  const posted = [...recent.values()].map(componentsJson).join('\n');
+  for (const [kind, item] of due) {
+    if (posted.includes(`${itemUrl(shop.artist.slug, item)}#${kind}`)) continue;
+    await wake(post.thread);
+    await post.thread.send(announcement(kind, shop, item));
+    console.log(`[Pulsify] Merch ${kind}: ${shop.artist.name} · ${item.name}`);
+  }
+}
+
+/** The pinned "About" post at the top of the forum. */
+export function merchIntroMessage(guild: Guild): MessageCreateOptions & { flags: MessageFlags.IsComponentsV2 } {
+  const request = findRoom(guild, 'role-request');
+  const container = new ContainerBuilder()
+    .setAccentColor(brand.color)
+    .addSectionComponents((s) =>
+      s
+        .addTextDisplayComponents((t) =>
+          t.setContent(
+            '-# 🛍️ Artist merch\n### Every artist, their own shop\n' +
+              `Artists on ${brand.name} sell their own custom merch on [merch.pulsify.world](${brand.links.merch}): hats, shirts, hoodies and limited editions, ` +
+              'paid in $ through Fleeca. Every shop has a post here with what is on the shelf, kept up to date by Pulsify.\n\n' +
+              '**Follow an artist\'s post** to hear first when they drop something new, when a sale is on its last day, and when an item sells out.\n\n' +
+              `Artists: request the Artist role in ${request ?? '#role-request'} to have your post tagged with you, then call **${brand.phone}** to get your shop set up.`,
+          ),
+        )
+        .setThumbnailAccessory((th) => th.setURL(ICON_URL).setDescription(brand.name)),
+    )
+    .addActionRowComponents((row: ActionRowBuilder<ButtonBuilder>) => linkRow(row, [['Browse every shop', brand.links.merch]]))
+    .addTextDisplayComponents((t) => t.setContent(`-# ${brand.footer}`));
+  return { components: [container], files: [iconFile()], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
+}
+
+// ─── sync ───────────────────────────────────────────────────────────────────
+
+let running: Promise<void> | undefined;
+
+/** Bring every artist's post in line with the site. One run at a time; a run asked for mid-run waits for it. */
+export async function syncMerch(guild: Guild, only?: string): Promise<void> {
+  while (running) await running;
+  running = (async () => {
+    const forum = merchForum(guild);
+    if (!forum) return;
+    const [posts, linked, artists] = await Promise.all([postsBySlug(forum), approvedArtists(guild), only ? undefined : allArtists()]);
+    const slugs = only ? [only] : artists!.map((a) => a.slug);
+    let failed = 0;
+    for (const slug of slugs) {
+      try {
+        const shop = await getJson<Shop>(`/api/artists/${slug}/shop`);
+        const existing = posts.get(slug);
+        if (!shop) continue; // artist gone from the site: leave their post for staff to decide
+        // A linked member who has left the server isn't tagged.
+        const candidate = linked.get(slug) ?? existing?.memberId;
+        const memberId = candidate && (await guild.members.fetch(candidate).catch(() => undefined)) ? candidate : undefined;
+        const post = await syncShop(forum, shop, existing, memberId);
+        if (post) await announce(post, shop);
+      } catch (err) {
+        failed++;
+        console.warn(`[Discord Bot] Merch sync for ${slug} failed: ${(err as Error).message}`);
+      }
+    }
+    if (failed) console.warn(`[Discord Bot] Merch sync: ${failed} of ${slugs.length} shop(s) failed; they are retried next run`);
+  })().finally(() => (running = undefined));
+  await running;
+}
+
+/** Sync now and then every 20 minutes for as long as the bot runs. */
+export function startMerchSync(client: Client<true>): void {
+  const run = () => {
+    const guild = client.guilds.cache.get(config.guildId);
+    if (guild) syncMerch(guild).catch((err) => console.error('[Discord Bot] Merch sync failed:', err));
+  };
+  run();
+  setInterval(run, SYNC_EVERY_MS).unref();
+}
+
+/** The artist slug in a Pulsify artist page or shop link. */
+export const artistSlugFrom = (text: string) => text.match(/pulsify\.world\/artists\/([a-z0-9-]+)/i)?.[1]?.toLowerCase();

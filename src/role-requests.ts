@@ -27,6 +27,7 @@ import { ICON_URL, iconFile } from './assets.js';
 import { buildCard } from './cards.js';
 import { findRoom } from './rooms.js';
 import { LOGO_NAME, PARTNER_ROLE, findPartner, joinPartner, listPartners, logoFromComponents, openPartnerRoom, showcasePartner, type Partner } from './partners.js';
+import { artistSlugFrom, syncMerch } from './merch.js';
 
 export const ROLE_ROOM = 'role-request';
 export const REVIEW_ROOM = 'role-requests';
@@ -325,9 +326,13 @@ export async function handleRequestSubmit(interaction: ModalSubmitInteraction): 
   }
 }
 
+// By role, not Administrator: GTA:W Staff are admins too, but these requests stay with the CEO and COO.
+const LEADERSHIP_ROLES = ['CEO', 'COO'];
+
 function canDecide(reviewer: GuildMember, approver: Approver): boolean {
-  if (reviewer.permissions.has(PermissionFlagsBits.Administrator)) return true;
-  return approver === 'moderators' && reviewer.roles.cache.some((r) => r.name === 'Moderator');
+  const has = (names: string[]) => reviewer.roles.cache.some((r) => names.includes(r.name));
+  if (has(LEADERSHIP_ROLES)) return true;
+  return approver === 'moderators' && (has(['Moderator']) || reviewer.permissions.has(PermissionFlagsBits.Administrator));
 }
 
 export async function handleReviewButton(interaction: ButtonInteraction): Promise<void> {
@@ -370,6 +375,11 @@ export async function handleReviewButton(interaction: ButtonInteraction): Promis
       console.error('[Discord Bot] Role grant failed:', err);
       return failed(`Couldn't give **${req.role}**. Is the bot's role above it?`);
     }
+  }
+  // Artists: their merch post (if they have a shop) is tagged with them right away.
+  if (approved && json && req.role === 'Artist') {
+    const slug = artistSlugFrom(answerOnCard(json, req.question) ?? '');
+    if (slug) syncMerch(interaction.guild, slug).catch((err) => console.error('[Discord Bot] Merch post update failed:', err));
   }
   // Partners: a new business gets its own private room with the CEO and COO plus a gallery card;
   // someone from a business that is already a partner joins its room and its card.
