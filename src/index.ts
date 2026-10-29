@@ -19,7 +19,7 @@ import {
   handleReviewButton,
 } from './role-requests.js';
 import { onPartnerRolesChanged } from './partners.js';
-import { startMerchSync } from './merch.js';
+import { onArtistRoleChanged, startMerchSync } from './merch.js';
 
 const client = new Client({
   intents: [
@@ -69,6 +69,8 @@ client.on(Events.GuildMemberUpdate, (before, after) => {
   syncDividers(after).catch((err) => console.error('[Discord Bot] Role section sync failed:', err));
   // Business roles, the partner tag and the gallery cards stay in step.
   if (!before.partial) onPartnerRolesChanged(before, after).catch((err: unknown) => console.error('[Discord Bot] Partner role sync failed:', err));
+  // Merch posts are tagged only while the artist holds the Artist role.
+  if (!before.partial) onArtistRoleChanged(before, after).catch((err: unknown) => console.error('[Discord Bot] Merch tag sync failed:', err));
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

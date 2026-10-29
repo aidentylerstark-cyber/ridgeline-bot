@@ -15,6 +15,7 @@ import {
   type Client,
   type ForumChannel,
   type Guild,
+  type GuildMember,
   type MediaGalleryItemBuilder,
   type Message,
   type MessageCreateOptions,
@@ -235,19 +236,94 @@ async function postsBySlug(forum: ForumChannel): Promise<Map<string, Post>> {
   return posts;
 }
 
-/** Artists approved through #role-request, by the page they gave: artist slug → member id. */
-async function approvedArtists(guild: Guild): Promise<Map<string, string>> {
-  const linked = new Map<string, string>();
+// ─── who's who ──────────────────────────────────────────────────────────────
+
+const ARTIST_ROLE = 'Artist';
+const LINKED_LINE = '-# 🔗 Artist linked';
+const UNLINKED_LINE = '-# ✂️ Artist unlinked';
+const LINK_SCAN = 1000;
+
+/**
+ * Which member is which artist: artist slug → member id, or null when staff unlinked it. Read once from
+ * #role-requests (approved Artist requests, and the link records /merch posts there), then kept up to date.
+ */
+let links: Map<string, string | null> | undefined;
+/** Who each post was last tagged with, so a role change knows which posts to refresh. */
+const tagged = new Map<string, string>();
+
+async function artistLinks(guild: Guild): Promise<Map<string, string | null>> {
+  if (links) return links;
+  const found = new Map<string, string | null>();
   const room = findRoom(guild, REVIEW_ROOM) as TextChannel | undefined;
-  const recent = await room?.messages.fetch({ limit: 100 }).catch(() => undefined);
-  for (const message of [...(recent?.values() ?? [])].reverse()) {
+  const messages: Message[] = [];
+  let before: string | undefined;
+  while (room && messages.length < LINK_SCAN) {
+    const batch = await room.messages.fetch({ limit: 100, before }).catch(() => undefined);
+    if (!batch?.size) break;
+    messages.push(...batch.values());
+    before = batch.lastKey();
+    if (batch.size < 100) break;
+  }
+  // Oldest first, so a later approval, link or unlink wins.
+  for (const message of messages.reverse()) {
+    if (message.author.id !== guild.client.user.id) continue;
     const json = componentsJson(message);
+    if (json.includes(LINKED_LINE) || json.includes(UNLINKED_LINE)) {
+      const slug = artistSlugFrom(json);
+      if (slug) found.set(slug, json.includes(LINKED_LINE) ? (json.match(/<@(\d+)>/)?.[1] ?? null) : null);
+      continue;
+    }
     if (!json.includes('✅ Approved')) continue;
     const memberId = json.match(/rolereq:approve:artist:(\d+)/)?.[1];
     const slug = json.match(new RegExp(`${ARTIST_PAGE_LABEL.replace(/\*/g, '\\*')}\\\\n[^"]*?pulsify\\.world/artists/([a-z0-9-]+)`, 'i'))?.[1]?.toLowerCase();
-    if (memberId && slug) linked.set(slug, memberId);
+    if (memberId && slug) found.set(slug, memberId);
   }
-  return linked;
+  links = found;
+  return found;
+}
+
+/** An Artist request was approved: tag their shop post now. */
+export async function artistApproved(guild: Guild, slug: string, memberId: string): Promise<void> {
+  (await artistLinks(guild)).set(slug, memberId);
+  await syncMerch(guild, slug);
+}
+
+/** Staff link (or, with no member, unlink) an artist page to a member. Recorded in #role-requests so it outlasts restarts. */
+export async function setArtistLink(guild: Guild, slug: string, memberId: string | null, by: string): Promise<void> {
+  const room = findRoom(guild, REVIEW_ROOM) as TextChannel | undefined;
+  if (!room) throw new Error(`#${REVIEW_ROOM} is missing; run setup:back-office`);
+  const page = `${brand.links.website}/artists/${slug}`;
+  const container = new ContainerBuilder()
+    .setAccentColor(memberId ? brand.color : 0x8a8f98)
+    .addTextDisplayComponents((t) =>
+      t.setContent(
+        memberId
+          ? `${LINKED_LINE} · merch\n<@${memberId}> is the artist behind ${page}. Their #${MERCH_ROOM} post is tagged with them.\n-# Linked by ${by} · <t:${Math.floor(Date.now() / 1000)}:f>`
+          : `${UNLINKED_LINE} · merch\n${page} is no longer tagged with anyone.\n-# Unlinked by ${by} · <t:${Math.floor(Date.now() / 1000)}:f>`,
+      ),
+    );
+  await room.send({ components: [container], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
+  (await artistLinks(guild)).set(slug, memberId);
+  await syncMerch(guild, slug);
+}
+
+/** A member gained or lost the Artist role: their posts gain or lose the tag. */
+export async function onArtistRoleChanged(before: GuildMember, after: GuildMember): Promise<void> {
+  const isArtist = (m: GuildMember) => m.roles.cache.some((r) => r.name === ARTIST_ROLE);
+  if (isArtist(before) === isArtist(after)) return;
+  const map = await artistLinks(after.guild);
+  const slugs = new Set([...map].filter(([, id]) => id === after.id).map(([slug]) => slug));
+  for (const [slug, id] of tagged) if (id === after.id) slugs.add(slug);
+  for (const slug of slugs) await syncMerch(after.guild, slug);
+}
+
+/** The member to tag on a post: linked, still here, and still an Artist. */
+async function artistMember(guild: Guild, slug: string, onCard: string | undefined): Promise<string | undefined> {
+  const map = await artistLinks(guild);
+  const id = map.has(slug) ? map.get(slug) : onCard;
+  if (!id) return undefined;
+  const member = await guild.members.fetch(id).catch(() => undefined);
+  return member?.roles.cache.some((r) => r.name === ARTIST_ROLE) ? id : undefined;
 }
 
 async function wake(thread: ThreadChannel): Promise<void> {
@@ -419,7 +495,7 @@ export async function syncMerch(guild: Guild, only?: string): Promise<void> {
   running = (async () => {
     const forum = merchForum(guild);
     if (!forum) return;
-    const [posts, linked, artists] = await Promise.all([postsBySlug(forum), approvedArtists(guild), only ? undefined : allArtists()]);
+    const [posts, artists] = await Promise.all([postsBySlug(forum), only ? undefined : allArtists()]);
     const slugs = only ? [only] : artists!.map((a) => a.slug);
     let failed = 0;
     for (const slug of slugs) {
@@ -427,10 +503,10 @@ export async function syncMerch(guild: Guild, only?: string): Promise<void> {
         const shop = await getJson<Shop>(`/api/artists/${slug}/shop`);
         const existing = posts.get(slug);
         if (!shop) continue; // artist gone from the site: leave their post for staff to decide
-        // A linked member who has left the server isn't tagged.
-        const candidate = linked.get(slug) ?? existing?.memberId;
-        const memberId = candidate && (await guild.members.fetch(candidate).catch(() => undefined)) ? candidate : undefined;
+        const memberId = await artistMember(guild, slug, existing?.memberId);
         const post = await syncShop(forum, shop, existing, memberId);
+        if (memberId && post) tagged.set(slug, memberId);
+        else tagged.delete(slug);
         if (post) await announce(post, shop);
       } catch (err) {
         failed++;
@@ -459,6 +535,11 @@ export async function startMerchSync(client: Client<true>): Promise<void> {
   }
   run();
   setInterval(run, SYNC_EVERY_MS).unref();
+}
+
+/** The artist's name on the site, or undefined when there is no such artist. */
+export async function artistName(slug: string): Promise<string | undefined> {
+  return (await getJson<{ artist: Artist }>(`/api/artists/${slug}`))?.artist.name;
 }
 
 /** The artist slug in a Pulsify artist page or shop link. */

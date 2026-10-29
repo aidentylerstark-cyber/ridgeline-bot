@@ -27,7 +27,7 @@ import { ICON_URL, iconFile } from './assets.js';
 import { buildCard } from './cards.js';
 import { findRoom } from './rooms.js';
 import { LOGO_NAME, PARTNER_ROLE, findPartner, joinPartner, listPartners, logoFromComponents, openPartnerRoom, showcasePartner, type Partner } from './partners.js';
-import { artistSlugFrom, syncMerch } from './merch.js';
+import { artistApproved, artistSlugFrom } from './merch.js';
 
 export const ROLE_ROOM = 'role-request';
 export const REVIEW_ROOM = 'role-requests';
@@ -377,9 +377,9 @@ export async function handleReviewButton(interaction: ButtonInteraction): Promis
     }
   }
   // Artists: their merch post (if they have a shop) is tagged with them right away.
-  if (approved && json && req.role === 'Artist') {
+  if (approved && member && json && req.role === 'Artist') {
     const slug = artistSlugFrom(answerOnCard(json, req.question) ?? '');
-    if (slug) syncMerch(interaction.guild, slug).catch((err) => console.error('[Discord Bot] Merch post update failed:', err));
+    if (slug) artistApproved(interaction.guild, slug, member.id).catch((err) => console.error('[Discord Bot] Merch post update failed:', err));
   }
   // Partners: a new business gets its own private room with the CEO and COO plus a gallery card;
   // someone from a business that is already a partner joins its room and its card.
