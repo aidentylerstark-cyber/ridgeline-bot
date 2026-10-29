@@ -98,9 +98,33 @@ function texts(message: Message): string {
 
 const MARKER = (userId: string) => `<@${userId}>`;
 
+const CARD_SCAN = 2000;
+const CARD_CACHE_MS = 10 * 60_000;
+let cardCache: { channelId: string; at: number; cards: Message[] } | undefined;
+
+/**
+ * Every record card in the room (the bot's posts, up to the last 2000 messages), read in pages and kept for a few
+ * minutes: the form button has 3 seconds to open its form, and with more than 100 messages the newest page alone
+ * would miss older employees' paperwork.
+ */
+async function recordCards(channel: TextChannel): Promise<Message[]> {
+  if (cardCache?.channelId === channel.id && Date.now() - cardCache.at < CARD_CACHE_MS) return cardCache.cards;
+  const cards: Message[] = [];
+  let before: string | undefined;
+  for (let scanned = 0; scanned < CARD_SCAN; ) {
+    const page = await channel.messages.fetch({ limit: 100, before });
+    if (!page.size) break;
+    scanned += page.size;
+    cards.push(...page.filter((m) => m.author.id === channel.client.user.id).values());
+    before = page.lastKey();
+    if (page.size < 100) break;
+  }
+  cardCache = { channelId: channel.id, at: Date.now(), cards };
+  return cards;
+}
+
 async function previousCard(channel: TextChannel, userId: string): Promise<Message | undefined> {
-  const recent = await channel.messages.fetch({ limit: 100 });
-  return recent.find((m) => m.author.id === channel.client.user.id && texts(m).includes(`Employee of record: ${MARKER(userId)}`));
+  return (await recordCards(channel)).find((m) => texts(m).includes(`Employee of record: ${MARKER(userId)}`));
 }
 
 /** Read the paperwork back out of an existing record card, to pre-fill the form. */
@@ -118,8 +142,7 @@ function parseCard(message: Message): Partial<EmployeeSheet> & { employeeNo?: nu
 }
 
 async function nextEmployeeNo(channel: TextChannel): Promise<number> {
-  const recent = await channel.messages.fetch({ limit: 100 });
-  const numbers = recent.map((m) => Number(texts(m).match(/Employee No\. (\d+)/)?.[1] ?? 0));
+  const numbers = (await recordCards(channel)).map((m) => Number(texts(m).match(/Employee No\. (\d+)/)?.[1] ?? 0));
   return Math.max(0, ...numbers) + 1;
 }
 
@@ -229,6 +252,8 @@ export async function handleSheetSubmit(interaction: ModalSubmitInteraction): Pr
   }
 
   try {
+    // Read the room fresh for a filing: the number and the card being replaced must be current.
+    cardCache = undefined;
     const previous = await previousCard(channel, member.id);
     const keptPhoto = previous ? storedPhotoUrl(previous) : undefined;
     const photoSource = upload?.url ?? keptPhoto;
@@ -248,6 +273,7 @@ export async function handleSheetSubmit(interaction: ModalSubmitInteraction): Pr
       allowedMentions: { parse: [] },
     });
     await previous?.delete().catch(() => {});
+    cardCache = undefined;
     console.log(`[Pulsify] Employee paperwork ${previous ? 'updated' : 'filed'}: ${sheet.name} (${member.user.username})`);
     await interaction.editReply({
       content: `Your paperwork is filed with the CEO and COO${previous ? ' and replaces your old paperwork' : '. Welcome to the team'}. Here is your badge:`,

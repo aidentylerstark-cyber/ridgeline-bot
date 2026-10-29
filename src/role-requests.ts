@@ -346,6 +346,25 @@ export async function handleReviewButton(interaction: ButtonInteraction): Promis
     return void (await interaction.reply({ content: `Only ${APPROVER_LABEL[req.approver]} can decide **${req.role}** requests.`, flags: MessageFlags.Ephemeral }));
   }
 
+  // One decision per card: a double click, or the CEO and COO pressing at once, arrives as separate clicks.
+  // The card must still be waiting, and nobody else may be deciding it right now.
+  const cardId = interaction.message.id;
+  if (deciding.has(cardId) || !JSON.stringify(interaction.message.components.map((c) => c.toJSON())).includes(PENDING_LINE)) {
+    return void (await interaction.reply({ content: 'This request has already been decided.', flags: MessageFlags.Ephemeral }).catch(() => {}));
+  }
+  deciding.add(cardId);
+  try {
+    await decide(interaction, req, reviewer, action, userId);
+  } finally {
+    deciding.delete(cardId);
+  }
+}
+
+/** Cards being decided right now (see above). */
+const deciding = new Set<string>();
+
+async function decide(interaction: ButtonInteraction, req: Requestable, reviewer: GuildMember, action: string, userId: string): Promise<void> {
+  if (!interaction.guild) return;
   // Claim the click first. Discord accepts one acknowledgement per click, so if two copies of the bot are ever
   // online at once, only one gets past here: no second partner room, gallery card or DM.
   try {

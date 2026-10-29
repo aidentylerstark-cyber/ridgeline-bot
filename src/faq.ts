@@ -116,13 +116,21 @@ export function findFaq(id: string): FaqEntry | undefined {
   return FAQ.find((e) => e.id === id);
 }
 
+const patterns = new Map<string, RegExp>();
+const wordPattern = (keyword: string) => {
+  let re = patterns.get(keyword);
+  if (!re) patterns.set(keyword, (re = new RegExp(`(^|[^a-z0-9])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`)));
+  return re;
+};
+
 /** Best keyword match for free-text questions; longer keyword hits win ties. */
 export function matchFaq(text: string): FaqEntry | undefined {
   const normalized = text.toLowerCase();
   let best: FaqEntry | undefined;
   let bestScore = 0;
   for (const entry of FAQ) {
-    const score = entry.keywords.reduce((sum, k) => (normalized.includes(k) ? sum + k.length : sum), 0);
+    // Whole words only: "ep" shouldn't fire on "help", nor "buy" on "anybody".
+    const score = entry.keywords.reduce((sum, k) => (wordPattern(k).test(normalized) ? sum + k.length : sum), 0);
     if (score > bestScore) {
       best = entry;
       bestScore = score;

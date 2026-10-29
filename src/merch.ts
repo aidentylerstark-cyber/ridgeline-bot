@@ -41,6 +41,7 @@ const CARD_HOST = 'https://pulsify.world/api/cards/page';
 const SYNC_EVERY_MS = 20 * 60_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const LAST_CALL_MS = 24 * 3_600_000;
+const NEW_FOR_MS = 3 * 24 * 3_600_000;
 const MAX_ITEMS_ON_CARD = 15;
 // Where Artist requests are reviewed, and the question their page link is asked under (see role-requests.ts).
 const REVIEW_ROOM = 'role-requests';
@@ -133,7 +134,7 @@ const linkRow = (row: ActionRowBuilder<ButtonBuilder>, buttons: [string, string]
   row.addComponents(buttons.map(([label, url]) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(url)));
 
 /** The post's starter card: the shop itself. */
-function shopCard(shop: Shop, memberId: string | undefined, image: string | undefined): ContainerBuilder {
+function shopCard(shop: Shop, memberId: string | undefined, image: string | undefined, version: string): ContainerBuilder {
   const { artist } = shop;
   const shelf = shelfOf(shop);
   const container = new ContainerBuilder().setAccentColor(brand.color);
@@ -145,7 +146,7 @@ function shopCard(shop: Shop, memberId: string | undefined, image: string | unde
   container.addTextDisplayComponents((t) =>
     t.setContent(
       `-# 🛍️ Artist merch\n### Merch by ${artist.name}\n` +
-        (shop.note || `Custom ${artist.name} merch, made for ${brand.name}. Paid in $ through Fleeca.`) +
+        (shop.note ? (shop.note.length > 600 ? `${shop.note.slice(0, 599)}…` : shop.note) : `Custom ${artist.name} merch, made for ${brand.name}. Paid in $ through Fleeca.`) +
         (about.length ? `\n\n${about.join('\n')}` : ''),
     ),
   );
@@ -157,7 +158,8 @@ function shopCard(shop: Shop, memberId: string | undefined, image: string | unde
   );
   container.addActionRowComponents((row: ActionRowBuilder<ButtonBuilder>) =>
     linkRow(row, [
-      ['Open the shop', shopUrl(artist.slug)],
+      // The card's version rides along in the link, so an unchanged shop is never re-sent.
+      ['Open the shop', `${shopUrl(artist.slug)}#v-${version}`],
       ['Artist page', `${brand.links.website}/artists/${artist.slug}`],
     ]),
   );
@@ -203,9 +205,18 @@ export function merchForum(guild: Guild): ForumChannel | undefined {
   return room?.type === ChannelType.GuildForum ? room : undefined;
 }
 
+/** Every post in the forum, open or archived (quiet posts archive themselves after a week, so the archive is paged). */
 export async function merchPosts(forum: ForumChannel): Promise<ThreadChannel[]> {
-  const [active, archived] = await Promise.all([forum.threads.fetchActive(), forum.threads.fetchArchived({ limit: 100 })]);
-  return [...active.threads.values(), ...archived.threads.values()].filter((t) => t.parentId === forum.id);
+  const threads = [...(await forum.threads.fetchActive()).threads.values()];
+  let before: string | undefined;
+  for (;;) {
+    const page = await forum.threads.fetchArchived({ limit: 100, before });
+    threads.push(...page.threads.values());
+    const last = page.threads.last();
+    if (!page.hasMore || !last) break;
+    before = last.id;
+  }
+  return threads.filter((t) => t.parentId === forum.id);
 }
 
 interface Post {
@@ -217,22 +228,33 @@ interface Post {
 
 const componentsJson = (message: Message) => JSON.stringify(message.components.map((c) => c.toJSON()));
 
-/** Every artist post in the forum, by artist slug (read off its shop button). */
-async function postsBySlug(forum: ForumChannel): Promise<Map<string, Post>> {
+/**
+ * Every artist post in the forum, by artist slug (read off its shop button), cached between runs: the full sync
+ * re-reads the forum, a one-artist sync (an approval, /merch, a role change) reuses it.
+ * A starter message that can't be fetched fails the read, rather than looking like a missing post and getting a twin.
+ */
+let postCache: Map<string, Post> | undefined;
+
+async function postsBySlug(forum: ForumChannel, fresh: boolean): Promise<Map<string, Post>> {
+  if (postCache && !fresh) return postCache;
   const posts = new Map<string, Post>();
   for (const thread of await merchPosts(forum)) {
     if (thread.name === MERCH_INTRO_TITLE) continue;
-    const card = await thread.fetchStarterMessage().catch(() => null);
+    const card = await thread.fetchStarterMessage().catch((err: { code?: number }) => {
+      if (err.code === 10008) return null; // starter deleted by hand: not a shop post any more
+      throw err;
+    });
     const json = card ? componentsJson(card) : '';
-    const slug = json.match(/merch\.pulsify\.world\/artists\/([a-z0-9-]+)\/shop"/)?.[1];
+    const slug = json.match(/merch\.pulsify\.world\/artists\/([a-z0-9-]+)\/shop(?:#v-[0-9a-f]+)?"/)?.[1];
     if (!slug) continue;
     posts.set(slug, {
       thread,
       card,
-      version: json.match(/shop-([0-9a-f]{10})\.png/)?.[1],
+      version: json.match(/\/shop#v-([0-9a-f]{10})"/)?.[1],
       memberId: json.match(/\*\*On Discord:\*\* <@(\d+)>/)?.[1],
     });
   }
+  postCache = posts;
   return posts;
 }
 
@@ -247,12 +269,20 @@ const LINK_SCAN = 1000;
  * Which member is which artist: artist slug → member id, or null when staff unlinked it. Read once from
  * #role-requests (approved Artist requests, and the link records /merch posts there), then kept up to date.
  */
-let links: Map<string, string | null> | undefined;
+let links: Promise<Map<string, string | null>> | undefined;
 /** Who each post was last tagged with, so a role change knows which posts to refresh. */
 const tagged = new Map<string, string>();
 
-async function artistLinks(guild: Guild): Promise<Map<string, string | null>> {
-  if (links) return links;
+/** The links, read once; callers that arrive mid-read share it, so no update lands in a map that's thrown away. */
+function artistLinks(guild: Guild): Promise<Map<string, string | null>> {
+  links ??= readLinks(guild).catch((err) => {
+    links = undefined;
+    throw err;
+  });
+  return links;
+}
+
+async function readLinks(guild: Guild): Promise<Map<string, string | null>> {
   const found = new Map<string, string | null>();
   const room = findRoom(guild, REVIEW_ROOM) as TextChannel | undefined;
   const messages: Message[] = [];
@@ -278,7 +308,6 @@ async function artistLinks(guild: Guild): Promise<Map<string, string | null>> {
     const slug = json.match(new RegExp(`${ARTIST_PAGE_LABEL.replace(/\*/g, '\\*')}\\\\n[^"]*?pulsify\\.world/artists/([a-z0-9-]+)`, 'i'))?.[1]?.toLowerCase();
     if (memberId && slug) found.set(slug, memberId);
   }
-  links = found;
   return found;
 }
 
@@ -340,14 +369,14 @@ async function syncShop(forum: ForumChannel, shop: Shop, existing: Post | undefi
 
   const image = `shop-${version}.png`;
   const png = await getImage(`${CARD_HOST}/artists/${shop.artist.slug}/shop.png?v=${version}`);
-  const container = shopCard(shop, memberId, png ? image : undefined);
+  const container = shopCard(shop, memberId, png ? image : undefined, version);
   const files = png ? [new AttachmentBuilder(png, { name: image })] : [];
 
   if (existing?.card) {
     await wake(existing.thread);
-    await existing.card.edit({ components: [container], files, attachments: [], allowedMentions: { parse: [] } });
+    const card = await existing.card.edit({ components: [container], files, attachments: [], allowedMentions: { parse: [] } });
     if (existing.thread.name !== shop.artist.name.slice(0, 100)) await existing.thread.setName(shop.artist.name.slice(0, 100));
-    return { ...existing, version, memberId };
+    return { ...existing, card, version, memberId };
   }
   const thread = await forum.threads.create({
     name: shop.artist.name.slice(0, 100),
@@ -370,7 +399,9 @@ async function announce(post: Post, shop: Shop): Promise<void> {
   for (const item of shelfOf(shop)) {
     const before = lastStock.get(item.id);
     lastStock.set(item.id, item.stock);
-    if (new Date(item.createdAt).getTime() > post.thread.createdTimestamp!) due.push(['new', item]);
+    // New: listed after the post opened, and recently (older ones were announced, or missed for good).
+    const listed = new Date(item.createdAt).getTime();
+    if (listed > post.thread.createdTimestamp! && now - listed < NEW_FOR_MS) due.push(['new', item]);
     const endsIn = item.saleEndsAt ? new Date(item.saleEndsAt).getTime() - now : Infinity;
     if (!item.saleEnded && endsIn > 0 && endsIn < LAST_CALL_MS && item.stock !== 0) due.push(['last-call', item]);
     if (item.stock === 0 && before !== undefined && before !== 0) due.push(['sold-out', item]);
@@ -491,11 +522,12 @@ let running: Promise<void> | undefined;
 
 /** Bring every artist's post in line with the site. One run at a time; a run asked for mid-run waits for it. */
 export async function syncMerch(guild: Guild, only?: string): Promise<void> {
-  while (running) await running;
+  // A failed earlier run is its own problem; it mustn't fail whoever was waiting on it.
+  while (running) await running.catch(() => {});
   running = (async () => {
     const forum = merchForum(guild);
     if (!forum) return;
-    const [posts, artists] = await Promise.all([postsBySlug(forum), only ? undefined : allArtists()]);
+    const [posts, artists] = await Promise.all([postsBySlug(forum, !only), only ? undefined : allArtists()]);
     const slugs = only ? [only] : artists!.map((a) => a.slug);
     let failed = 0;
     for (const slug of slugs) {
@@ -505,6 +537,7 @@ export async function syncMerch(guild: Guild, only?: string): Promise<void> {
         if (!shop) continue; // artist gone from the site: leave their post for staff to decide
         const memberId = await artistMember(guild, slug, existing?.memberId);
         const post = await syncShop(forum, shop, existing, memberId);
+        if (post) posts.set(slug, post);
         if (memberId && post) tagged.set(slug, memberId);
         else tagged.delete(slug);
         if (post) await announce(post, shop);

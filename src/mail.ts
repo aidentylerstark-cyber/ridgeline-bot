@@ -108,7 +108,8 @@ const pad = (n: number) => String(n).padStart(4, '0');
 const META = (t: Ticket) => `[mail:${pad(t.number)}:${t.dept}:${t.openerId}]`;
 
 function readTicket(channel: TextChannel): Ticket | null {
-  const m = channel.topic?.match(/\[mail:(\d+):(\w+):(\d+)\]/);
+  // The tag is always last in the topic; anchoring it means a subject typed to look like one is never read.
+  const m = channel.topic?.match(/\[mail:(\d+):(\w+):(\d+)\]$/);
   if (!m || !DEPARTMENTS[m[2]]) return null;
   const subject = channel.topic?.match(/Subject: (.+?) · /)?.[1] ?? '(no subject)';
   return { number: Number(m[1]), dept: m[2], openerId: m[3], subject };
@@ -125,8 +126,17 @@ const mailCategory = (guild: Guild) => findCategory(guild, MAIL_CATEGORY);
 const openTickets = (guild: Guild) =>
   guild.channels.cache.filter((c): c is TextChannel => c.type === ChannelType.GuildText && c.parentId === mailCategory(guild)?.id && Boolean(readTicket(c)));
 
-/** Next number after every open conversation and the recent archive, so numbers are never reused. */
-async function nextNumber(guild: Guild): Promise<number> {
+let lastNumber = 0;
+let numbering: Promise<unknown> = Promise.resolve();
+
+/** Next number after every open conversation, the recent archive and the last one handed out; one at a time, so two letters never share one. */
+function nextNumber(guild: Guild): Promise<number> {
+  const next = numbering.then(async () => (lastNumber = Math.max(lastNumber, await highestNumber(guild)) + 1));
+  numbering = next.catch(() => {});
+  return next;
+}
+
+async function highestNumber(guild: Guild): Promise<number> {
   const numbers = openTickets(guild).map((c) => readTicket(c)!.number);
   const archive = findRoom(guild, ARCHIVE_ROOM) as TextChannel | undefined;
   const recent = await archive?.messages.fetch({ limit: 100 }).catch(() => undefined);
@@ -135,7 +145,7 @@ async function nextNumber(guild: Guild): Promise<number> {
     const n = text.match(/Pulsify Mail #(\d+)/)?.[1] ?? text.match(/#(\d+)/)?.[1];
     if (n) numbers.push(Number(n));
   });
-  return Math.max(0, ...numbers) + 1;
+  return Math.max(0, ...numbers);
 }
 
 const slug = (text: string) =>
@@ -340,6 +350,8 @@ export async function openConversation(member: GuildMember, deptKey: string, sub
   const dept = DEPARTMENTS[deptKey];
   const category = mailCategory(guild);
   if (!dept || !category) throw new Error('Pulsify Mail is not set up');
+  // Square brackets are the ticket tag's; keep them out of the subject.
+  subject = subject.replace(/[[\]]/g, '');
   const ticket: Ticket = { number: await nextNumber(guild), dept: deptKey, openerId: member.id, subject };
   const V = PermissionFlagsBits;
   const participant = [V.ViewChannel, V.SendMessages, V.ReadMessageHistory, V.AttachFiles, V.EmbedLinks];
@@ -398,6 +410,12 @@ async function compose(interaction: ModalSubmitInteraction): Promise<void> {
   }
   const subject = interaction.fields.getTextInputValue('subject').trim();
   const body = interaction.fields.getTextInputValue('body').trim();
+  // Checked again here: a form opened earlier, or on another device, gets past the button's check.
+  const mine = openTickets(guild).filter((c) => readTicket(c)?.openerId === member.id);
+  if (mine.size >= MAX_OPEN_PER_MEMBER) {
+    await interaction.editReply(`You already have ${mine.size} open conversations: ${mine.map((c) => `${c}`).join(', ')}. Close one before starting another.`);
+    return;
+  }
 
   try {
     const files = await carryFiles(interaction.fields.getUploadedFiles('files', false));
@@ -413,7 +431,7 @@ async function reply(interaction: ModalSubmitInteraction): Promise<void> {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const member = interaction.member as GuildMember;
   const channel = interaction.channel as TextChannel;
-  const ticket = readTicket(channel);
+  const ticket = closingRooms.has(channel.id) ? null : readTicket(channel);
   if (!ticket) {
     await interaction.editReply('This conversation is no longer open.');
     return;
@@ -497,11 +515,15 @@ async function transcript(channel: TextChannel, ticket: Ticket): Promise<string>
   return lines.join('\n');
 }
 
+/** Conversations being closed: the room lingers a few seconds after, and nothing more happens in it. */
+const closingRooms = new Set<string>();
+
 async function close(interaction: ModalSubmitInteraction): Promise<void> {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const member = interaction.member as GuildMember;
   const channel = interaction.channel as TextChannel;
-  const ticket = readTicket(channel);
+  const ticket = closingRooms.has(channel.id) ? null : readTicket(channel);
+  if (ticket) closingRooms.add(channel.id);
   if (!ticket) {
     await interaction.editReply('This conversation is already closed.');
     return;
@@ -558,8 +580,16 @@ async function close(interaction: ModalSubmitInteraction): Promise<void> {
       flags: MessageFlags.IsComponentsV2,
     });
     console.log(`[Pulsify] Mail #${pad(ticket.number)} closed by ${member.user.username}`);
-    setTimeout(() => channel.delete(`Pulsify Mail #${pad(ticket.number)} closed`).catch((err) => console.error('[Discord Bot] Could not remove mail room:', err)), 6_000);
+    setTimeout(
+      () =>
+        channel
+          .delete(`Pulsify Mail #${pad(ticket.number)} closed`)
+          .catch((err) => console.error('[Discord Bot] Could not remove mail room:', err))
+          .finally(() => closingRooms.delete(channel.id)),
+      6_000,
+    );
   } catch (err) {
+    closingRooms.delete(channel.id);
     console.error('[Discord Bot] Pulsify Mail close failed:', err);
     await interaction.editReply("Couldn't close this conversation just now. Try again in a moment.");
   }

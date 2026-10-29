@@ -128,6 +128,12 @@ async function post(guild: Guild, room: LogRoom, embed: EmbedBuilder, files: Att
   }
 }
 
+/**
+ * Discord folds repeats of some actions (message deletes, voice disconnects and moves) into one audit entry with a
+ * `count`, keeping the first one's time. The last count seen per entry tells a new repeat from an old entry.
+ */
+const auditCounts = new Map<string, number>();
+
 /** The audit-log entry for an action that just happened (to `targetId`, if given), if Discord recorded one in the last few seconds. */
 async function recentAudit(
   guild: Guild,
@@ -137,12 +143,20 @@ async function recentAudit(
 ): Promise<GuildAuditLogsEntry | undefined> {
   try {
     const logs = await guild.fetchAuditLogs({ type, limit: 6 });
-    return logs.entries.find(
-      (e) =>
-        Date.now() - e.createdTimestamp < 15_000 &&
-        (!targetId || e.targetId === targetId) &&
-        (!match || match(e as GuildAuditLogsEntry)),
-    ) as GuildAuditLogsEntry | undefined;
+    let found: GuildAuditLogsEntry | undefined;
+    for (const e of logs.entries.values() as IterableIterator<GuildAuditLogsEntry>) {
+      const count = (e.extra as { count?: number } | null)?.count;
+      const seen = auditCounts.get(e.id);
+      if (count !== undefined) auditCounts.set(e.id, count);
+      const fresh = count !== undefined && seen !== undefined ? count > seen : Date.now() - e.createdTimestamp < 15_000;
+      if (!found && fresh && (!targetId || e.targetId === targetId) && (!match || match(e))) found = e;
+    }
+    // Keep the newest few hundred.
+    for (const id of auditCounts.keys()) {
+      if (auditCounts.size <= 500) break;
+      auditCounts.delete(id);
+    }
+    return found;
   } catch {
     return undefined;
   }
@@ -177,7 +191,7 @@ async function inviteUsed(guild: Guild): Promise<string> {
   const before = inviteUses.get(guild.id) ?? new Map();
   try {
     const now = await guild.invites.fetch();
-    await snapshotInvites(guild);
+    inviteUses.set(guild.id, new Map(now.map((i) => [i.code, { uses: i.uses ?? 0, inviter: i.inviter }])));
     const used = now.find((i) => (i.uses ?? 0) > (before.get(i.code)?.uses ?? 0));
     if (used) return `\`${used.code}\` by ${short(used.inviter)} · ${used.uses} uses${used.channel ? ` · to #${used.channel.name}` : ''}`;
     // A one-use invite that just ran out disappears instead of counting up.
@@ -302,7 +316,10 @@ export function registerLogging(client: Client): void {
       const added = after.roles.cache.filter((r) => !before.roles.cache.has(r.id) && !isDivider(r));
       const removed = before.roles.cache.filter((r) => !after.roles.cache.has(r.id) && !isDivider(r));
       if (added.size || removed.size) {
-        const entry = await recentAudit(after.guild, AuditLogEvent.MemberRoleUpdate, after.id);
+        // The entry that moved these roles, not the bot's own divider change that usually lands alongside it.
+        const entry = await recentAudit(after.guild, AuditLogEvent.MemberRoleUpdate, after.id, (e) =>
+          e.changes.some((c) => (c.key === '$add' || c.key === '$remove') && (c.new as { id: string }[] | undefined)?.some((r) => added.has(r.id) || removed.has(r.id))),
+        );
         const lines = [...added.map((r) => `+ ${r.name}`), ...removed.map((r) => `- ${r.name}`)];
         await post(after.guild, LOG_ROOMS.mod, base('Roles changed', COLORS.info).addFields(
           { name: 'Changes', value: `\`\`\`diff\n${clip(lines.join('\n'), 950)}\n\`\`\`` },
@@ -353,11 +370,15 @@ export function registerLogging(client: Client): void {
     if (!inGuild(message.guild) || message.author?.bot || message.webhookId) return;
     if ('name' in message.channel && isLogRoom(message.channel.name)) return;
     // Discord only records deletions made by someone other than the author.
-    const entry = await recentAudit(message.guild, AuditLogEvent.MessageDelete, message.author?.id, (e) => (e.extra as { channel?: { id: string } } | null)?.channel?.id === message.channelId);
+    // Without the author there's nothing to match the entry against, so any delete in the room would do: don't guess.
+    const entry = message.author
+      ? await recentAudit(message.guild, AuditLogEvent.MessageDelete, message.author.id, (e) => (e.extra as { channel?: { id: string } } | null)?.channel?.id === message.channelId)
+      : undefined;
     await post(message.guild, LOG_ROOMS.message, new EmbedBuilder()
       .setColor(COLORS.leave)
       .setAuthor({ name: `Message deleted · ${message.author?.username ?? 'unknown'}`, iconURL: message.author?.displayAvatarURL() })
-      .setDescription(message.partial ? '*Sent before the bot was watching; its text was not kept.*' : block(message.content ?? '', 3500))
+      // A card holds 4000 characters of text in all; the rest goes to the author, room and attachment lines.
+      .setDescription(message.partial ? '*Sent before the bot was watching; its text was not kept.*' : block(message.content ?? '', 1800))
       .addFields(
         { name: 'Author', value: who(message.author), inline: true },
         { name: 'Room', value: roomRef('name' in message.channel ? message.channel : null), inline: true },
@@ -390,6 +411,8 @@ export function registerLogging(client: Client): void {
 
   client.on(Events.MessageUpdate, async (before, after) => {
     if (!inGuild(after.guild) || after.author?.bot || after.webhookId || before.content === after.content) return;
+    // An old message's update (a pin, an embed unfurling) looks like a change when its text wasn't kept: only log real, fresh edits.
+    if (before.partial && !(after.editedTimestamp && Date.now() - after.editedTimestamp < 60_000)) return;
     if ('name' in after.channel && isLogRoom(after.channel.name)) return;
     await post(after.guild, LOG_ROOMS.message, new EmbedBuilder()
       .setColor(COLORS.edit)
@@ -490,6 +513,9 @@ export function registerLogging(client: Client): void {
     if (before.locked !== after.locked) changes.push({ name: 'Locked', value: `${yesNo(Boolean(before.locked))} → ${yesNo(Boolean(after.locked))}`, inline: true });
     if (!changes.length) return;
     const entry = await recentAudit(after.guild, AuditLogEvent.ThreadUpdate, after.id);
+    // Threads archive themselves all day, and the bot locks and wakes its own forum posts: neither is news.
+    if (entry?.executorId === client.user?.id) return;
+    if (!entry && changes.every((c) => c.name === 'Archived')) return;
     await serverPost(after.guild, `Thread changed · ${after.name}`, COLORS.edit, [{ name: 'Thread', value: `${after}` }, ...changes], entry, `Thread ID ${after.id}`);
   });
 
@@ -597,12 +623,15 @@ export function registerLogging(client: Client): void {
   client.on(Events.InviteCreate, async (invite) => {
     const guild = invite.guild ? client.guilds.cache.get(invite.guild.id) : undefined;
     if (!inGuild(guild)) return;
-    await snapshotInvites(guild);
+    if (!inviteUses.has(guild.id)) await snapshotInvites(guild);
+    else inviteUses.get(guild.id)!.set(invite.code, { uses: invite.uses ?? 0, inviter: invite.inviter });
     await post(guild, LOG_ROOMS.server, new EmbedBuilder().setColor(COLORS.join).setAuthor({ name: 'Invite created' }).addFields(...inviteFields(invite)));
   });
   client.on(Events.InviteDelete, async (invite) => {
     const guild = invite.guild ? client.guilds.cache.get(invite.guild.id) : undefined;
     if (!inGuild(guild)) return;
+    // Forget it, or the next join through the vanity link or Discovery reads as this invite being used up.
+    inviteUses.get(guild.id)?.delete(invite.code);
     const entry = await recentAudit(guild, AuditLogEvent.InviteDelete);
     await post(guild, LOG_ROOMS.server, new EmbedBuilder()
       .setColor(COLORS.leave)
@@ -647,7 +676,7 @@ export function registerLogging(client: Client): void {
         ...(disconnect ? byFields(disconnect) : []),
       ));
     } else if (before.channelId !== after.channelId) {
-      const moved = await recentAudit(guild, AuditLogEvent.MemberMove);
+      const moved = await recentAudit(guild, AuditLogEvent.MemberMove, undefined, (e) => (e.extra as { channel?: { id: string } } | null)?.channel?.id === after.channelId);
       await post(guild, LOG_ROOMS.voice, embed('Moved voice rooms', COLORS.voice).addFields(
         { name: 'From', value: `<#${before.channelId}>`, inline: true },
         { name: 'To', value: `<#${after.channelId}>`, inline: true },
@@ -656,7 +685,7 @@ export function registerLogging(client: Client): void {
     }
 
     if (before.channelId && after.channelId && (before.serverMute !== after.serverMute || before.serverDeaf !== after.serverDeaf)) {
-      const entry = await recentAudit(guild, AuditLogEvent.MemberUpdate, member.id);
+      const entry = await recentAudit(guild, AuditLogEvent.MemberUpdate, member.id, (e) => e.changes.some((c) => c.key === 'mute' || c.key === 'deaf'));
       const what = before.serverMute !== after.serverMute ? (after.serverMute ? 'Server-muted' : 'Server-unmuted') : after.serverDeaf ? 'Server-deafened' : 'Server-undeafened';
       await post(guild, LOG_ROOMS.mod, embed(what, COLORS.mod).addFields({ name: 'Room', value: `<#${after.channelId}>`, inline: true }, ...byFields(entry)));
     }

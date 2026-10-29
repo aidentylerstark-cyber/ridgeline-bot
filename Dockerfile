@@ -20,4 +20,4 @@ COPY assets ./assets
 # Compile, then drop the build-only packages from the final image.
 RUN npm run build && npm prune --omit=dev --no-audit --no-fund
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "--enable-source-maps", "dist/index.js"]

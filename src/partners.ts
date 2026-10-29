@@ -286,8 +286,16 @@ export const GALLERY_INTRO_TITLE = 'About our verified partners';
 
 /** Every post in the gallery forum, open or archived (quiet posts archive themselves but stay listed). */
 export async function galleryPosts(gallery: ForumChannel): Promise<ThreadChannel[]> {
-  const [active, archived] = await Promise.all([gallery.threads.fetchActive(), gallery.threads.fetchArchived({ limit: 100 })]);
-  return [...active.threads.values(), ...archived.threads.values()].filter((t) => t.parentId === gallery.id);
+  const threads = [...(await gallery.threads.fetchActive()).threads.values()];
+  let before: string | undefined;
+  for (;;) {
+    const page = await gallery.threads.fetchArchived({ limit: 100, before });
+    threads.push(...page.threads.values());
+    const last = page.threads.last();
+    if (!page.hasMore || !last) break;
+    before = last.id;
+  }
+  return threads.filter((t) => t.parentId === gallery.id);
 }
 
 /** The business's post in the gallery forum and its card (the post's first message). */

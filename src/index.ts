@@ -47,6 +47,8 @@ client.once(Events.ClientReady, async (c) => {
     console.warn(`[Discord Bot] Not in guild ${config.guildId} — invite the bot first, or check GUILD_ID. ${c.user.tag} is in: ${servers}`);
     return;
   }
+  // The whole member list, once: partner cards, role sections and merch tags read roles from the cache.
+  await guild.members.fetch().catch((err) => console.error('[Discord Bot] Could not load the member list:', err));
   try {
     await guild.commands.set(commandDefinitions);
     console.log(`[Discord Bot] Registered ${commandDefinitions.length} slash commands in ${guild.name}`);
