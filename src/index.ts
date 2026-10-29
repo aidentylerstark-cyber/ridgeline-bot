@@ -18,7 +18,7 @@ import {
   handleRequestSubmit,
   handleReviewButton,
 } from './role-requests.js';
-import { PARTNER_ROLE, leavePartner } from './partners.js';
+import { onPartnerRolesChanged } from './partners.js';
 
 const client = new Client({
   intents: [
@@ -61,11 +61,8 @@ client.on(Events.GuildMemberAdd, (member) => {
 client.on(Events.GuildMemberUpdate, (before, after) => {
   if (after.guild.id !== config.guildId || before.roles.cache.equals(after.roles.cache)) return;
   syncDividers(after).catch((err) => console.error('[Discord Bot] Role section sync failed:', err));
-  // A partner who loses the role leaves their business's room and gallery card.
-  const wasPartner = before.roles.cache.some((r) => r.name === PARTNER_ROLE);
-  if (wasPartner && !after.roles.cache.some((r) => r.name === PARTNER_ROLE)) {
-    leavePartner(after.guild, after.id).catch((err: unknown) => console.error('[Discord Bot] Partner gallery removal failed:', err));
-  }
+  // Business roles, the partner tag and the gallery cards stay in step.
+  if (!before.partial) onPartnerRolesChanged(before, after).catch((err: unknown) => console.error('[Discord Bot] Partner role sync failed:', err));
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

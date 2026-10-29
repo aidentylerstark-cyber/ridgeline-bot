@@ -26,7 +26,7 @@ import { brand } from './config.js';
 import { ICON_URL, iconFile } from './assets.js';
 import { buildCard } from './cards.js';
 import { findRoom } from './rooms.js';
-import { PARTNER_ROLE, findPartner, joinPartner, listPartners, openPartnerRoom, showcasePartner, type Logo, type Partner } from './partners.js';
+import { LOGO_NAME, PARTNER_ROLE, findPartner, joinPartner, listPartners, logoFromComponents, openPartnerRoom, showcasePartner, type Partner } from './partners.js';
 
 export const ROLE_ROOM = 'role-request';
 export const REVIEW_ROOM = 'role-requests';
@@ -36,7 +36,6 @@ export const REQUEST_MODAL_PREFIX = 'roles:modal:';
 export const REVIEW_PREFIX = 'rolereq:';
 const PENDING_COLOR = 0x5b8def;
 const PENDING_LINE = '-# ⏳ Waiting for a decision';
-const LOGO_NAME = 'partner-logo';
 
 // Named exactly as the site's shelves; must match the roles built by setup:onboarding.
 export const GENRES = [
@@ -383,9 +382,10 @@ export async function handleReviewButton(interaction: ButtonInteraction): Promis
         partnerRoom = picked.room;
       } else if (req.lead) {
         const business = answerOnCard(json, req.lead.label) ?? member.displayName;
-        const { partner, created } = await openPartnerRoom(member, business, details, reviewer);
+        const logo = await logoFromComponents(json);
+        const { partner, created } = await openPartnerRoom(member, business, details, reviewer, logo);
         partnerRoom = partner.room;
-        if (created) await showcasePartner(partner, details, await logoOnCard(interaction));
+        if (created) await showcasePartner(partner, details, logo);
       }
     } catch (err) {
       console.error('[Discord Bot] Partner room failed:', err);
@@ -434,12 +434,4 @@ function answerOnCard(node: Record<string, unknown>, label: string): string | un
     if (found) return found;
   }
   return undefined;
-}
-
-/** The logo attached to a review card, downloaded fresh from the interaction's copy of the message. */
-async function logoOnCard(interaction: ButtonInteraction): Promise<Logo | undefined> {
-  const file = interaction.message.attachments.find((a) => a.name.startsWith(LOGO_NAME));
-  if (!file) return undefined;
-  const res = await fetch(file.url).catch(() => undefined);
-  return res?.ok ? { data: Buffer.from(await res.arrayBuffer()), name: file.name } : undefined;
 }

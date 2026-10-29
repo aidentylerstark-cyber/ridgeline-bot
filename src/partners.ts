@@ -7,6 +7,8 @@ import {
   PermissionFlagsBits,
   type Guild,
   type GuildMember,
+  type OverwriteResolvable,
+  type Role,
   type TextChannel,
 } from 'discord.js';
 import { brand } from './config.js';
@@ -15,11 +17,12 @@ import { cardMessage } from './cards.js';
 import { ARROW, categoryLabel, findCategory, findRoom } from './rooms.js';
 
 /**
- * Verified Business Partners: businesses that work with Pulsify. Each business gets one private room under
- * PARTNERS, shared with its people and the CEO and COO. The room is the record of the partnership:
- *  - its topic names the business and carries `[partner:<userId>]` for whoever first verified it;
- *  - its people are the members with their own access to it, so more of a business's employees can be added later;
- *  - the business's card in #verified-partners lists those people.
+ * Verified Business Partners: businesses that work with Pulsify. Each business has:
+ *  - a role named after it (e.g. "Skybound Aviation"), listed in the PARTNERS role section;
+ *  - one private room under PARTNERS that only that role, the CEO and the COO can see;
+ *  - one card in #verified-partners (with its logo when one was sent) listing the people who hold its role.
+ * Everyone from a business also holds the Verified Business Partner tag. The room's topic names the business;
+ * the business role is found by that name. Giving someone a business role by hand works too: the bot adds the tag.
  */
 export const PARTNER_ROLE = 'Verified Business Partner';
 export const PARTNER_CATEGORY = 'PARTNERS';
@@ -29,6 +32,7 @@ const ROOM_EMOJI = '🏢';
 const LEADERSHIP = ['CEO', 'COO'];
 
 const tagOf = (userId: string) => `[partner:${userId}]`;
+const TOPIC_BUSINESS = /^Private line between (.+?) and Pulsify leadership/;
 
 /** `vanilla-unicorn` from "Vanilla Unicorn, LLC". */
 export function businessSlug(business: string): string {
@@ -36,22 +40,12 @@ export function businessSlug(business: string): string {
   return slug || 'partner';
 }
 
-const TOPIC_BUSINESS = /^Private line between (.+?) and Pulsify leadership/;
-const MEMBER_ACCESS = [
-  PermissionFlagsBits.ViewChannel,
-  PermissionFlagsBits.ReadMessageHistory,
-  PermissionFlagsBits.SendMessages,
-  PermissionFlagsBits.AttachFiles,
-  PermissionFlagsBits.EmbedLinks,
-  PermissionFlagsBits.AddReactions,
-];
-
 export interface Partner {
   room: TextChannel;
   business: string;
 }
 
-/** Every verified business, one per partner room. */
+/** Every verified business, one per partner room, A to Z. */
 export function listPartners(guild: Guild): Partner[] {
   return guild.channels.cache
     .filter((c): c is TextChannel => c.type === ChannelType.GuildText && Boolean(c.topic?.includes('[partner:')))
@@ -64,17 +58,67 @@ export function findPartner(guild: Guild, business: string): Partner | undefined
   return listPartners(guild).find((p) => businessSlug(p.business) === businessSlug(business));
 }
 
-/** The partner this member represents, if any. */
-export function partnerOfMember(guild: Guild, userId: string): Partner | undefined {
-  return listPartners(guild).find((p) => p.room.topic?.includes(tagOf(userId)) || p.room.permissionOverwrites.cache.has(userId));
+export const businessRoleOf = (partner: Partner): Role | undefined => partner.room.guild.roles.cache.find((r) => r.name === partner.business);
+
+/** The partners a member belongs to, by business role. */
+export function partnersOfMember(member: GuildMember): Partner[] {
+  return listPartners(member.guild).filter((p) => {
+    const role = businessRoleOf(p);
+    return role && member.roles.cache.has(role.id);
+  });
 }
 
-/** The people representing a partner: everyone with their own access to its room. */
+/** The people representing a partner: everyone holding its business role. */
 export function representatives(partner: Partner): string[] {
-  const bot = partner.room.client.user.id;
-  return partner.room.permissionOverwrites.cache
-    .filter((o) => o.type === OverwriteType.Member && o.id !== bot && o.allow.has(PermissionFlagsBits.ViewChannel))
-    .map((o) => o.id);
+  return [...(businessRoleOf(partner)?.members.keys() ?? [])];
+}
+
+const leadersOf = (guild: Guild) => LEADERSHIP.map((name) => guild.roles.cache.find((r) => r.name === name)).filter((r) => r !== undefined);
+
+/** Who sees a partner room: the business role, the CEO and COO, and the bot. Nobody else. */
+function roomOverwrites(guild: Guild, role: Role): OverwriteResolvable[] {
+  const V = PermissionFlagsBits;
+  const staff = [V.ViewChannel, V.ReadMessageHistory, V.SendMessages, V.AttachFiles, V.EmbedLinks, V.ManageMessages];
+  return [
+    { id: guild.id, deny: [V.ViewChannel] },
+    { id: role.id, allow: [V.ViewChannel, V.ReadMessageHistory, V.SendMessages, V.AttachFiles, V.EmbedLinks, V.AddReactions] },
+    ...leadersOf(guild).map((r) => ({ id: r.id, allow: staff })),
+    { id: guild.client.user.id, allow: staff },
+  ];
+}
+
+async function ensureBusinessRole(guild: Guild, business: string): Promise<Role> {
+  const existing = guild.roles.cache.find((r) => r.name === business);
+  if (existing) return existing;
+  const role = await guild.roles.create({ name: business, permissions: [], hoist: false, mentionable: false, reason: `${PARTNER_ROLE}: ${business}` });
+  console.log(`[Pulsify] Created business role ${business}`);
+  return role;
+}
+
+/**
+ * Bring a partner in line: its business role exists, anyone given access to the room one by one (the older way)
+ * holds the role instead, and the room is shared with the role, the CEO and the COO only.
+ */
+export async function syncPartner(partner: Partner): Promise<Role> {
+  const guild = partner.room.guild;
+  const role = await ensureBusinessRole(guild, partner.business);
+  const bot = guild.client.user.id;
+  for (const o of partner.room.permissionOverwrites.cache.values()) {
+    if (o.type !== OverwriteType.Member || o.id === bot) continue;
+    const member = await guild.members.fetch(o.id).catch(() => undefined);
+    if (member && !member.roles.cache.has(role.id)) await member.roles.add(role, `Partner room access → ${partner.business} role`);
+  }
+  await partner.room.permissionOverwrites.set(roomOverwrites(guild, role), `${partner.business}: access by business role`);
+  return role;
+}
+
+/** Put the business roles in the PARTNERS role section and the partner rooms A to Z. */
+export async function organizePartners(guild: Guild): Promise<void> {
+  // Loaded when needed: role-sections reads the partner list, so a static import would be circular.
+  const { arrangeRoles } = await import('./role-sections.js');
+  await arrangeRoles(guild).catch((err: Error) => console.error('[Discord Bot] Could not arrange roles:', err.message));
+  const rooms = listPartners(guild).map((p) => p.room);
+  if (rooms.length) await guild.channels.setPositions(rooms.map((room, i) => ({ channel: room.id, position: i })));
 }
 
 /** The PARTNERS category: hidden from everyone, placed just above BACK OFFICE. */
@@ -95,17 +139,16 @@ export async function ensurePartnerCategory(guild: Guild) {
   return category;
 }
 
-const leadersOf = (guild: Guild) => LEADERSHIP.map((name) => guild.roles.cache.find((r) => r.name === name)).filter((r) => r !== undefined);
-
 /**
- * Open the partner's private room with the CEO and COO and post the welcome card.
- * If the business is already a partner, the member joins its room instead (`created` is false).
+ * Verify a new business: its role, its private room with the CEO and COO, and the welcome card there.
+ * If the business is already a partner, the member joins it instead (`created` is false).
  */
 export async function openPartnerRoom(
   member: GuildMember,
   business: string,
   details: string,
   approvedBy: GuildMember,
+  logo?: Logo,
 ): Promise<{ partner: Partner; created: boolean }> {
   const guild = member.guild;
   const existing = findPartner(guild, business);
@@ -113,27 +156,22 @@ export async function openPartnerRoom(
     await joinPartner(existing, member, approvedBy, details);
     return { partner: existing, created: false };
   }
-  const V = PermissionFlagsBits;
-  const leaders = leadersOf(guild);
-  const overwrites = [
-    { id: guild.id, deny: [V.ViewChannel] },
-    { id: member.id, allow: MEMBER_ACCESS },
-    ...leaders.map((r) => ({ id: r.id, allow: [V.ViewChannel, V.ReadMessageHistory, V.SendMessages, V.AttachFiles, V.EmbedLinks, V.ManageMessages] })),
-    { id: guild.client.user.id, allow: [V.ViewChannel, V.ReadMessageHistory, V.SendMessages, V.AttachFiles, V.EmbedLinks, V.ManageMessages] },
-  ];
-  const topic = `Private line between ${business} and Pulsify leadership (CEO and COO): deals, ad spots, placements, merch and events. ${tagOf(member.id)}`;
 
+  const role = await ensureBusinessRole(guild, business);
+  await member.roles.add(role, `${PARTNER_ROLE} approved by ${approvedBy.user.username}`);
   const category = await ensurePartnerCategory(guild);
   const room = await guild.channels.create({
     name: `${ROOM_EMOJI}${ARROW}${businessSlug(business)}`,
     type: ChannelType.GuildText,
     parent: category.id,
-    topic: topic.slice(0, 1024),
-    permissionOverwrites: overwrites,
+    topic: `Private line between ${business} and Pulsify leadership (CEO and COO): deals, ad spots, placements, merch and events. ${tagOf(member.id)}`.slice(0, 1024),
+    permissionOverwrites: roomOverwrites(guild, role),
     reason: `${PARTNER_ROLE} approved by ${approvedBy.user.username}`,
   });
   console.log(`[Pulsify] Opened partner room #${room.name} for ${member.user.username}`);
+  await organizePartners(guild);
 
+  const leaders = leadersOf(guild);
   await room.send({
     ...cardMessage(
       {
@@ -142,12 +180,14 @@ export async function openPartnerRoom(
         title: `Welcome, ${business}`,
         description:
           `${member}, ${business} is now a **Verified Business Partner** of ${brand.name}. ` +
-          `This room is private: only you, ${leaders.map((r) => `<@&${r.id}>`).join(' and ') || 'the CEO and COO'} can see it.\n\n` +
+          `This room is private: only ${role} and ${leaders.map((r) => `<@&${r.id}>`).join(' and ') || 'the CEO and COO'} can see it.\n\n` +
           'Use it for anything between your business and Pulsify: ads on the Pulsify stream, front-page placements, artist bookings, merch and events. ' +
-          `Your business is now on show in ${findRoom(guild, GALLERY_ROOM) ?? `#${GALLERY_ROOM}`}.`,
-        thumbnail: ICON_URL,
+          `Your business is now on show in ${findRoom(guild, GALLERY_ROOM) ?? `#${GALLERY_ROOM}`}. ` +
+          `More of your people can request **Partner Employee** in ${findRoom(guild, 'role-request') ?? '#role-request'} to join this room.`,
+        thumbnail: logo ? `attachment://${logo.name}` : ICON_URL,
         fields: [
           { name: 'Business', value: business, inline: true },
+          { name: 'Role', value: `${role}`, inline: true },
           { name: 'Approved by', value: approvedBy.displayName, inline: true },
           { name: 'About the business', value: details },
           { name: 'Call Pulsify', value: `**${brand.phone}**`, inline: true },
@@ -155,20 +195,17 @@ export async function openPartnerRoom(
         footer: brand.footer,
         timestamp: true,
       },
-      [iconFile()],
+      [logo ? new AttachmentBuilder(logo.data, { name: logo.name }) : iconFile()],
     ),
     allowedMentions: { users: [member.id], roles: leaders.map((r) => r.id) },
   });
   return { partner: { room, business }, created: true };
 }
 
-/** Add another of a partner's people to its room, announce them there, and add them to the gallery card. */
+/** Add another of a partner's people: give them its role, announce them in its room, and add them to its card. */
 export async function joinPartner(partner: Partner, member: GuildMember, approvedBy: GuildMember, position: string): Promise<void> {
-  const access = { ViewChannel: true, ReadMessageHistory: true, SendMessages: true, AttachFiles: true, EmbedLinks: true, AddReactions: true };
-  await partner.room.permissionOverwrites.edit(member.id, access, {
-    type: OverwriteType.Member,
-    reason: `${PARTNER_ROLE} (${partner.business}) approved by ${approvedBy.user.username}`,
-  });
+  const role = await syncPartner(partner);
+  await member.roles.add(role, `${PARTNER_ROLE} (${partner.business}) approved by ${approvedBy.user.username}`);
   await partner.room.send({
     ...cardMessage({
       color: PARTNER_COLOR,
@@ -188,17 +225,34 @@ export async function joinPartner(partner: Partner, member: GuildMember, approve
   console.log(`[Pulsify] ${member.user.username} joined partner ${partner.business}`);
 }
 
-/** A member lost the partner role: take them out of their business's room and its gallery card. */
-export async function leavePartner(guild: Guild, userId: string): Promise<void> {
-  const partner = partnerOfMember(guild, userId);
-  if (!partner || !partner.room.permissionOverwrites.cache.has(userId)) return;
-  await partner.room.permissionOverwrites.delete(userId, `No longer a ${PARTNER_ROLE}`);
-  await partner.room.send({
-    ...cardMessage({ color: 0x8a8f98, description: `<@${userId}> no longer represents **${partner.business}** and has left this room.`, timestamp: true }),
-    allowedMentions: { parse: [] },
-  });
-  await refreshShowcase(partner);
-  console.log(`[Pulsify] ${userId} left partner ${partner.business}`);
+/** A member lost the partner tag: take their business roles, which closes the rooms to them. */
+export async function leavePartner(member: GuildMember): Promise<void> {
+  for (const partner of partnersOfMember(member)) {
+    await member.roles.remove(businessRoleOf(partner)!, `No longer a ${PARTNER_ROLE}`);
+    await partner.room.send({
+      ...cardMessage({ color: 0x8a8f98, description: `${member} no longer represents **${partner.business}** and has left this room.`, timestamp: true }),
+      allowedMentions: { parse: [] },
+    });
+    console.log(`[Pulsify] ${member.user.username} left partner ${partner.business}`);
+  }
+}
+
+/**
+ * Keep roles and cards in step after a member's roles change: losing the tag takes the business roles with it,
+ * being given a business role by hand adds the tag, and any business whose people changed gets its card refreshed.
+ */
+export async function onPartnerRolesChanged(before: GuildMember, after: GuildMember): Promise<void> {
+  const guild = after.guild;
+  const tag = guild.roles.cache.find((r) => r.name === PARTNER_ROLE);
+  const hadTag = Boolean(tag && before.roles.cache.has(tag.id));
+  const hasTag = Boolean(tag && after.roles.cache.has(tag.id));
+  if (hadTag && !hasTag) await leavePartner(after);
+  if (tag && !hasTag && !hadTag && partnersOfMember(after).length) await after.roles.add(tag, 'Holds a partner business role');
+
+  for (const partner of listPartners(guild)) {
+    const role = businessRoleOf(partner);
+    if (role && before.roles.cache.has(role.id) !== after.roles.cache.has(role.id)) await refreshShowcase(partner);
+  }
 }
 
 export interface Logo {
@@ -206,19 +260,32 @@ export interface Logo {
   name: string;
 }
 
+export const LOGO_NAME = 'partner-logo';
+
+/**
+ * The logo attached to a card, downloaded fresh. Components V2 messages list no attachments,
+ * so the logo is found by its file name among the card's media links.
+ */
+export async function logoFromComponents(components: unknown): Promise<Logo | undefined> {
+  const url = JSON.stringify(components).match(new RegExp(`"url":"([^"]*/(${LOGO_NAME}\\.[a-z0-9]+)\\?[^"]*)"`, 'i'));
+  if (!url) return undefined;
+  const res = await fetch(url[1]).catch(() => undefined);
+  return res?.ok ? { data: Buffer.from(await res.arrayBuffer()), name: url[2] } : undefined;
+}
+
 const galleryOf = (guild: Guild) => findRoom(guild, GALLERY_ROOM) as TextChannel | undefined;
 const REPS_LABEL = '**Represented by:** ';
 const repsLine = (ids: string[]) => `${REPS_LABEL}${ids.map((id) => `<@${id}>`).join(', ')}`;
 
 /** The business's card in the gallery, found by its title. */
-async function findShowcase(gallery: TextChannel, business: string) {
+export async function findShowcase(gallery: TextChannel, business: string) {
   const title = JSON.stringify(`### ${business}`).slice(1, -1);
   const recent = await gallery.messages.fetch({ limit: 100 }).catch(() => undefined);
   return recent?.find((m) => m.author.id === gallery.client.user.id && JSON.stringify(m.components.map((c) => c.toJSON())).includes(title));
 }
 
 /** Post (or replace) the business's card in #verified-partners. */
-export async function showcasePartner(partner: Partner, details: string, logo?: Logo): Promise<void> {
+export async function showcasePartner(partner: Partner, details: string, logo?: Logo, since = new Date()): Promise<void> {
   const gallery = galleryOf(partner.room.guild);
   if (!gallery) return console.warn('[Pulsify] No #verified-partners room; run setup:partners');
   const business = partner.business;
@@ -235,7 +302,7 @@ export async function showcasePartner(partner: Partner, details: string, logo?: 
         image: logo ? `attachment://${logo.name}` : undefined,
         fields: [
           { name: 'Represented by', value: representatives(partner).map((id) => `<@${id}>`).join(', '), inline: true },
-          { name: 'Partner since', value: `<t:${Math.floor(Date.now() / 1000)}:D>`, inline: true },
+          { name: 'Partner since', value: `<t:${Math.floor(since.getTime() / 1000)}:D>`, inline: true },
         ],
         footer: `${brand.name} · Verified Business Partner`,
       },
@@ -244,7 +311,7 @@ export async function showcasePartner(partner: Partner, details: string, logo?: 
   );
 }
 
-/** Bring the card's "Represented by" line in line with the room; with nobody left, the card comes down. */
+/** Bring the card's "Represented by" line in line with the business role; with nobody left, the card comes down. */
 export async function refreshShowcase(partner: Partner): Promise<void> {
   const gallery = galleryOf(partner.room.guild);
   const card = gallery && (await findShowcase(gallery, partner.business));
@@ -257,15 +324,18 @@ export async function refreshShowcase(partner: Partner): Promise<void> {
   }
   const json = card.components[0]?.toJSON() as unknown as Record<string, unknown> | undefined;
   if (!json) return;
+  let changed = false;
   const walk = (node: Record<string, unknown>) => {
     if (node.type === ComponentType.TextDisplay && typeof node.content === 'string' && node.content.includes(REPS_LABEL)) {
-      node.content = node.content.replace(/\*\*Represented by:\*\* [^\n]*/, repsLine(reps));
+      const next = node.content.replace(/\*\*Represented by:\*\* [^\n]*/, repsLine(reps));
+      changed ||= next !== node.content;
+      node.content = next;
     }
     (node.components as Record<string, unknown>[] | undefined)?.forEach(walk);
     if (node.accessory) walk(node.accessory as Record<string, unknown>);
   };
   walk(json);
-  await card.edit({ components: [new ContainerBuilder(json as never)], allowedMentions: { parse: [] } });
+  if (changed) await card.edit({ components: [new ContainerBuilder(json as never)], allowedMentions: { parse: [] } });
 }
 
 /** The pinned intro at the top of the gallery. */

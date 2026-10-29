@@ -1,20 +1,31 @@
 import type { Guild, GuildMember, Role } from 'discord.js';
 import { GENRES } from './role-requests.js';
+import { PARTNER_ROLE, listPartners } from './partners.js';
 
 /**
  * The role list, top to bottom, split into sections by divider roles.
  * Dividers carry no permissions and no colour; a member holds a section's divider exactly when they hold
  * one of its roles, so their profile shows their roles grouped under clean headings.
  */
-export const ROLE_SECTIONS = [
+interface RoleSection {
+  divider: string;
+  roles: string[];
+  /** Roles that come and go with the server, e.g. one per partner business, listed after `roles`. */
+  dynamic?: (guild: Guild) => string[];
+}
+
+export const ROLE_SECTIONS: RoleSection[] = [
   { divider: '━━━━━ LEADERSHIP ━━━━━', roles: ['CEO', 'COO'] },
   { divider: '━━━━━━━ TEAM ━━━━━━━', roles: ['GTA:W Staff', 'Pulsify Employee', 'Moderator'] },
-  { divider: '━━━━ COMMUNITY ━━━━', roles: ['Verified Business Partner', 'Artist', 'Listener'] },
+  // The tag, then each partner business's own role, A to Z.
+  { divider: '━━━━━ PARTNERS ━━━━━', roles: [PARTNER_ROLE], dynamic: (guild) => listPartners(guild).map((p) => p.business) },
+  { divider: '━━━━ COMMUNITY ━━━━', roles: ['Artist', 'Listener'] },
   { divider: '━━━━━━ GENRES ━━━━━━', roles: GENRES },
 ];
 
 export const DIVIDER_NAMES = new Set(ROLE_SECTIONS.map((s) => s.divider));
 export const isDivider = (role: Role) => DIVIDER_NAMES.has(role.name);
+const sectionRoles = (section: RoleSection, guild: Guild) => [...section.roles, ...(section.dynamic?.(guild) ?? [])];
 
 /** Give or take a member's divider roles so they match the sections they have roles in. */
 export async function syncDividers(member: GuildMember): Promise<void> {
@@ -24,7 +35,8 @@ export async function syncDividers(member: GuildMember): Promise<void> {
   for (const section of ROLE_SECTIONS) {
     const divider = member.guild.roles.cache.find((r) => r.name === section.divider);
     if (!divider) continue;
-    const inSection = member.roles.cache.some((r) => section.roles.includes(r.name));
+    const names = sectionRoles(section, member.guild);
+    const inSection = member.roles.cache.some((r) => names.includes(r.name));
     const has = member.roles.cache.has(divider.id);
     if (inSection && !has) toAdd.push(divider);
     if (!inSection && has) toRemove.push(divider);
@@ -46,7 +58,7 @@ export async function arrangeRoles(guild: Guild): Promise<void> {
     let divider = guild.roles.cache.find((r) => r.name === section.divider);
     divider ??= await guild.roles.create({ name: section.divider, permissions: [], hoist: false, mentionable: false, reason: 'Role section divider' });
     ordered.push(divider);
-    for (const name of section.roles) {
+    for (const name of sectionRoles(section, guild)) {
       const role = guild.roles.cache.find((r) => r.name === name);
       if (role) ordered.push(role);
     }
