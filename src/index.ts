@@ -43,7 +43,8 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`[Discord Bot] Logged in as ${c.user.tag}`);
   const guild = c.guilds.cache.get(config.guildId);
   if (!guild) {
-    console.warn(`[Discord Bot] Not in guild ${config.guildId} — invite the bot first`);
+    const servers = c.guilds.cache.map((g) => `${g.name} (${g.id})`).join(', ') || 'none';
+    console.warn(`[Discord Bot] Not in guild ${config.guildId} — invite the bot first, or check GUILD_ID. ${c.user.tag} is in: ${servers}`);
     return;
   }
   try {

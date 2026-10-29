@@ -9,11 +9,24 @@ function required(...names: string[]): string {
   process.exit(1);
 }
 
+/** A Discord ID from the environment, without the stray spaces, quotes or punctuation a dashboard paste can add. */
+function snowflake(name: string, fallback?: string): string | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const id = raw.replace(/\D/g, '');
+  if (!/^\d{17,20}$/.test(id)) {
+    console.error(`[Discord Bot] ${name} should be a Discord ID (17-20 digits), got "${raw}"`);
+    process.exit(1);
+  }
+  if (id !== raw) console.warn(`[Discord Bot] ${name} had extra characters ("${raw}"); using ${id}`);
+  return id;
+}
+
 export const config = {
   token: required('DISCORD_TOKEN', 'DISCORD_BOT_TOKEN'),
-  guildId: process.env.GUILD_ID || '1548799697781792900',
-  welcomeChannelId: process.env.WELCOME_CHANNEL_ID || undefined,
-  supportChannelId: process.env.SUPPORT_CHANNEL_ID || undefined,
+  guildId: snowflake('GUILD_ID', '1548799697781792900')!,
+  welcomeChannelId: snowflake('WELCOME_CHANNEL_ID'),
+  supportChannelId: snowflake('SUPPORT_CHANNEL_ID'),
   port: Number(process.env.PORT ?? 5000),
 };
 
