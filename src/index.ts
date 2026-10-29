@@ -54,7 +54,7 @@ client.once(Events.ClientReady, async (c) => {
     console.error('[Discord Bot] Failed to register commands:', err);
   }
   // Artist shops on merch.pulsify.world, mirrored into #merch-shops.
-  startMerchSync(c);
+  startMerchSync(c).catch((err) => console.error('[Discord Bot] Merch sync failed to start:', err));
   // Greet anyone who joined while the bot was offline.
   await catchUpWelcomes(guild).catch((err) => console.error('[Discord Bot] Welcome catch-up failed:', err));
 });

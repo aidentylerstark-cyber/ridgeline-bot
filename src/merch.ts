@@ -5,8 +5,11 @@ import {
   ButtonStyle,
   ChannelType,
   ContainerBuilder,
+  ForumLayoutType,
   MessageFlags,
+  PermissionFlagsBits,
   SeparatorSpacingSize,
+  SortOrderType,
   ThreadAutoArchiveDuration,
   type ActionRowBuilder,
   type Client,
@@ -20,7 +23,7 @@ import {
 } from 'discord.js';
 import { brand, config } from './config.js';
 import { ICON_URL, iconFile } from './assets.js';
-import { findRoom } from './rooms.js';
+import { findCategory, findRoom, roomLabel } from './rooms.js';
 
 /**
  * #merch-shops: a read-only forum in gallery layout, one locked post per artist with a shop on merch.pulsify.world.
@@ -332,6 +335,80 @@ export function merchIntroMessage(guild: Guild): MessageCreateOptions & { flags:
   return { components: [container], files: [iconFile()], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
 }
 
+const GUIDELINES =
+  'Every artist on Pulsify can open their own custom merch shop on merch.pulsify.world. One post per shop, kept up to date by Pulsify: ' +
+  `what is on the shelf, prices in $, stock and sale dates. Follow a post to hear about new drops. Read-only; artists, call ${brand.phone} to open a shop.`;
+
+/** The forum, created (or its permissions and topic restored) as needed. */
+export async function ensureMerchForum(guild: Guild): Promise<ForumChannel> {
+  const V = PermissionFlagsBits;
+  const overwrites = [
+    {
+      id: guild.id,
+      allow: [V.ViewChannel, V.ReadMessageHistory, V.AddReactions],
+      deny: [V.SendMessages, V.SendMessagesInThreads, V.CreatePublicThreads, V.CreatePrivateThreads],
+    },
+    {
+      id: guild.client.user.id,
+      allow: [V.ViewChannel, V.ReadMessageHistory, V.SendMessages, V.SendMessagesInThreads, V.ManageThreads, V.ManageMessages, V.EmbedLinks, V.AttachFiles],
+    },
+  ];
+  const floor = findCategory(guild, 'THE FLOOR');
+  if (!floor) throw new Error('THE FLOOR is missing; run setup:onboarding first');
+
+  const existing = findRoom(guild, MERCH_ROOM);
+  if (existing?.type === ChannelType.GuildForum) {
+    await existing.permissionOverwrites.set(overwrites);
+    if (existing.topic !== GUIDELINES) await existing.setTopic(GUIDELINES);
+    return existing;
+  }
+
+  const old = existing?.type === ChannelType.GuildText ? existing : undefined;
+  if (old) await old.setName('old-merch-shops', 'Replaced by the merch-shops forum');
+  const forum = await guild.channels.create({
+    name: roomLabel(MERCH_ROOM),
+    type: ChannelType.GuildForum,
+    parent: floor.id,
+    topic: GUIDELINES,
+    defaultForumLayout: ForumLayoutType.GalleryView,
+    // Shops with something new rise to the top.
+    defaultSortOrder: SortOrderType.LatestActivity,
+    defaultReactionEmoji: { id: null, name: '🛍️' },
+    defaultAutoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
+    permissionOverwrites: overwrites,
+    position: old?.position,
+    reason: 'Artist merch storefronts',
+  });
+  console.log(`[Pulsify] Created the #${forum.name} forum`);
+
+  if (old) {
+    const posts = await old.messages.fetch({ limit: 100 });
+    if (posts.some((m) => !m.author.bot)) {
+      await old.permissionOverwrites.edit(guild.id, { SendMessages: false });
+      console.warn('[Pulsify] Members had posted in the old #merch-shops; it is kept, read-only, as #old-merch-shops. Delete it when you are done with it.');
+    } else {
+      await old.delete('Replaced by the merch-shops forum');
+      console.log('[Pulsify] Removed the old #merch-shops');
+    }
+  }
+  return forum;
+}
+
+/** The pinned "About" post at the top of the forum. */
+export async function ensureMerchIntro(guild: Guild, forum: ForumChannel): Promise<void> {
+  const post = (await merchPosts(forum)).find((t) => t.name === MERCH_INTRO_TITLE);
+  const message = merchIntroMessage(guild);
+  if (post) {
+    if (post.archived) await post.setArchived(false);
+    await (await post.fetchStarterMessage())?.edit({ components: message.components, files: message.files, attachments: [] });
+    return;
+  }
+  const created = await forum.threads.create({ name: MERCH_INTRO_TITLE, message });
+  await created.setLocked(true);
+  await created.pin().catch(() => {});
+  console.log('[Pulsify] Posted the pinned About post');
+}
+
 // ─── sync ───────────────────────────────────────────────────────────────────
 
 let running: Promise<void> | undefined;
@@ -365,12 +442,21 @@ export async function syncMerch(guild: Guild, only?: string): Promise<void> {
   await running;
 }
 
-/** Sync now and then every 20 minutes for as long as the bot runs. */
-export function startMerchSync(client: Client<true>): void {
+/** Build the forum if it isn't there yet, sync now, then every 20 minutes for as long as the bot runs. */
+export async function startMerchSync(client: Client<true>): Promise<void> {
+  const guild = () => client.guilds.cache.get(config.guildId);
   const run = () => {
-    const guild = client.guilds.cache.get(config.guildId);
-    if (guild) syncMerch(guild).catch((err) => console.error('[Discord Bot] Merch sync failed:', err));
+    const g = guild();
+    if (g) syncMerch(g).catch((err) => console.error('[Discord Bot] Merch sync failed:', err));
   };
+  const g = guild();
+  if (g) {
+    try {
+      await ensureMerchIntro(g, await ensureMerchForum(g));
+    } catch (err) {
+      console.error('[Discord Bot] Could not build #merch-shops:', err);
+    }
+  }
   run();
   setInterval(run, SYNC_EVERY_MS).unref();
 }
