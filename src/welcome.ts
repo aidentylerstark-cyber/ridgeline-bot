@@ -38,9 +38,10 @@ export function welcomePanelMessage(guild?: Guild | null): V2Message {
   const line = (name: string, text: string) => (findRoom(guild, name) ? `${room(guild, name)} · ${text}` : null);
   const rooms = [
     line('house-rules', 'the rules of the house. Read them once.'),
-    line('role-request', 'pick your genres, and request Artist, Pulsify Employee or GTA:W Staff.'),
+    line('role-request', 'pick your genres, and request Artist, Verified Business Partner, Pulsify Employee or GTA:W Staff.'),
     line('the-lobby', 'the main hangout: general chat about anything, plus Los Santos talking music.'),
     line('merch-shops', "every artist's custom merch shop and their newest drops."),
+    line('verified-partners', 'the businesses Pulsify works with, verified by leadership.'),
     line('pulsify-mail', 'write to a Pulsify desk: support, artists, merch, business or management.'),
     line('facebrowser', "every post from Pulsify's Facebrowser page."),
     line('out-now', 'every record as it lands, every drop as it is announced.'),

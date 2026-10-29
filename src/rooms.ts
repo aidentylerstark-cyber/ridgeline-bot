@@ -18,6 +18,7 @@ const ROOM_EMOJI: Record<string, string> = {
   // THE FLOOR
   'the-lobby': '💬',
   'merch-shops': '🛍️',
+  'verified-partners': '🤝',
   // BUSINESS
   'employee-paperwork': '📝',
   'employee-records': '🗂️',
@@ -40,6 +41,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   'FRONT DESK': '🛎️',
   'THE FLOOR': '🎶',
   BUSINESS: '💼',
+  PARTNERS: '🤝',
   'PULSIFY MAIL': '📬',
   'BACK OFFICE': '🔒',
 };

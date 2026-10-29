@@ -16,7 +16,8 @@
     "setup:back-office": "tsx src/setup/build-back-office.ts",
     "setup:business": "tsx src/setup/build-business.ts",
     "setup:roles": "tsx src/setup/build-role-sections.ts",
-    "setup:mail": "tsx src/setup/build-mail.ts"
+    "setup:mail": "tsx src/setup/build-mail.ts",
+    "setup:partners": "tsx src/setup/build-partners.ts"
   },
   "engines": {
     "node": ">=20"

@@ -9,7 +9,7 @@ import { GENRES } from './role-requests.js';
 export const ROLE_SECTIONS = [
   { divider: '━━━━━ LEADERSHIP ━━━━━', roles: ['CEO', 'COO'] },
   { divider: '━━━━━━━ TEAM ━━━━━━━', roles: ['GTA:W Staff', 'Pulsify Employee', 'Moderator'] },
-  { divider: '━━━━ COMMUNITY ━━━━', roles: ['Artist', 'Listener'] },
+  { divider: '━━━━ COMMUNITY ━━━━', roles: ['Verified Business Partner', 'Artist', 'Listener'] },
   { divider: '━━━━━━ GENRES ━━━━━━', roles: GENRES },
 ];
 

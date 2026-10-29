@@ -1,10 +1,12 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
   ComponentType,
   ContainerBuilder,
+  FileUploadBuilder,
   LabelBuilder,
   MessageFlags,
   ModalBuilder,
@@ -24,6 +26,7 @@ import { brand } from './config.js';
 import { ICON_URL, iconFile } from './assets.js';
 import { buildCard } from './cards.js';
 import { findRoom } from './rooms.js';
+import { PARTNER_ROLE, openPartnerRoom, showcasePartner, type Logo } from './partners.js';
 
 export const ROLE_ROOM = 'role-request';
 export const REVIEW_ROOM = 'role-requests';
@@ -33,6 +36,7 @@ export const REQUEST_MODAL_PREFIX = 'roles:modal:';
 export const REVIEW_PREFIX = 'rolereq:';
 const PENDING_COLOR = 0x5b8def;
 const PENDING_LINE = '-# ⏳ Waiting for a decision';
+const LOGO_NAME = 'partner-logo';
 
 // Named exactly as the site's shelves; must match the roles built by setup:onboarding.
 export const GENRES = [
@@ -48,6 +52,10 @@ interface Requestable {
   approver: Approver;
   question: string;
   placeholder: string;
+  /** A short first question asked before the main one (e.g. the business name). */
+  lead?: { label: string; placeholder: string };
+  /** Ask for an optional logo, shown on the review card and in the partner gallery. */
+  logo?: boolean;
 }
 
 /** Roles members can ask for. Approval rules: moderators (or leadership) for Artist; CEO/COO only for the rest. */
@@ -67,6 +75,16 @@ const REQUESTABLE: Record<string, Requestable> = {
     approver: 'leadership',
     question: 'Your position at Pulsify, and who brought you on',
     placeholder: 'e.g. Merch coordinator, brought on by Chaylen Young',
+  },
+  partner: {
+    role: PARTNER_ROLE,
+    emoji: '🤝',
+    blurb: 'You represent a business that works with Pulsify',
+    approver: 'leadership',
+    lead: { label: 'The business you represent', placeholder: 'e.g. Vanilla Unicorn' },
+    logo: true,
+    question: 'What the business does, and your position there',
+    placeholder: 'e.g. Strip club on Strawberry Ave. I am the owner and want to run ads on the Pulsify stream.',
   },
   gtaw: {
     role: 'GTA:W Staff',
@@ -169,11 +187,28 @@ export async function handleRequestSelect(interaction: StringSelectMenuInteracti
       .setCustomId(`${REQUEST_MODAL_PREFIX}${key}`)
       .setTitle(`Request ${req.role}`)
       .addLabelComponents(
+        ...(req.lead
+          ? [
+              new LabelBuilder()
+                .setLabel(req.lead.label)
+                .setTextInputComponent(
+                  new TextInputBuilder().setCustomId('lead').setStyle(TextInputStyle.Short).setPlaceholder(req.lead.placeholder).setMaxLength(60).setRequired(true),
+                ),
+            ]
+          : []),
         new LabelBuilder()
           .setLabel(req.question)
           .setTextInputComponent(
             new TextInputBuilder().setCustomId('answer').setStyle(TextInputStyle.Paragraph).setPlaceholder(req.placeholder).setMaxLength(300).setRequired(true),
           ),
+        ...(req.logo
+          ? [
+              new LabelBuilder()
+                .setLabel('Business logo')
+                .setDescription('Optional. Shown in the verified partners gallery (PNG or JPG)')
+                .setFileUploadComponent(new FileUploadBuilder().setCustomId('logo').setMinValues(0).setMaxValues(1).setRequired(false)),
+            ]
+          : []),
       ),
   );
 }
@@ -207,6 +242,20 @@ export async function handleRequestSubmit(interaction: ModalSubmitInteraction): 
   if (!room) return void (await interaction.editReply('Role requests are not set up yet. Ask a moderator.'));
 
   const answer = interaction.fields.getTextInputValue('answer').trim();
+  const lead = req.lead ? interaction.fields.getTextInputValue('lead').trim() : undefined;
+  // The upload link expires, so the logo is re-attached to the review card where approval can pick it up.
+  const upload = req.logo ? interaction.fields.getUploadedFiles('logo', false)?.first() : undefined;
+  let logo: AttachmentBuilder | undefined;
+  if (upload) {
+    if (!upload.contentType?.startsWith('image/') || upload.size > 8 * 1024 * 1024) {
+      return void (await interaction.editReply('The logo needs to be an image (PNG or JPG) under 8 MB. Pick the role again to retry.'));
+    }
+    const res = await fetch(upload.url).catch(() => undefined);
+    if (res?.ok) {
+      const ext = upload.name.split('.').pop()?.toLowerCase().replace(/[^a-z]/g, '') || 'png';
+      logo = new AttachmentBuilder(Buffer.from(await res.arrayBuffer()), { name: `${LOGO_NAME}.${ext}` });
+    }
+  }
   const card = buildCard({
     color: PENDING_COLOR,
     eyebrow: `${req.emoji} Role request · ${req.role}`,
@@ -214,16 +263,18 @@ export async function handleRequestSubmit(interaction: ModalSubmitInteraction): 
     description: `${member} (${member.user.username}) asks for **${req.role}**.`,
     thumbnail: member.displayAvatarURL({ size: 256 }),
     fields: [
+      ...(req.lead && lead ? [{ name: req.lead.label, value: lead }] : []),
       { name: req.question, value: answer },
       { name: 'Who can approve', value: req.approver === 'leadership' ? 'CEO or COO' : 'Moderators, CEO or COO', inline: true },
       { name: 'In the server since', value: member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:D>` : 'unknown', inline: true },
       { name: 'Account created', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:D>`, inline: true },
     ],
+    image: logo ? `attachment://${logo.name}` : undefined,
   })
     .addActionRowComponents(reviewButtons(key, member.id))
     .addTextDisplayComponents((t) => t.setContent(`${PENDING_LINE} · requested <t:${Math.floor(Date.now() / 1000)}:f>`));
   try {
-    await room.send({ components: [card], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
+    await room.send({ components: [card], files: logo ? [logo] : [], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
     await interaction.editReply(`Your **${req.role}** request is with ${APPROVER_LABEL[req.approver]}. You will get a DM with the answer.`);
   } catch (err) {
     console.error('[Discord Bot] Role request failed:', err);
@@ -262,12 +313,30 @@ export async function handleReviewButton(interaction: ButtonInteraction): Promis
     }
   }
 
-  // Re-colour the card, lock its buttons and replace the waiting line with the decision.
   const json = interaction.message.components[0]?.toJSON() as unknown as Record<string, unknown> | undefined;
+
+  // Approved partners get their own private room with the CEO and COO; the business name is read back off the card.
+  let partnerRoom: TextChannel | undefined;
+  if (approved && member && req.lead && json) {
+    const business = answerOnCard(json, req.lead.label) ?? member.displayName;
+    const details = answerOnCard(json, req.question) ?? '';
+    try {
+      partnerRoom = await openPartnerRoom(member, business, details, reviewer);
+    } catch (err) {
+      console.error('[Discord Bot] Partner room failed:', err);
+    }
+    try {
+      await showcasePartner(member, business, details, await logoOnCard(interaction));
+    } catch (err) {
+      console.error('[Discord Bot] Partner gallery post failed:', err);
+    }
+  }
+
+  // Re-colour the card, lock its buttons and replace the waiting line with the decision.
   const walk = (node: Record<string, unknown>) => {
     if (node.type === ComponentType.Button) node.disabled = true;
     if (node.type === ComponentType.TextDisplay && typeof node.content === 'string' && node.content.startsWith(PENDING_LINE)) {
-      node.content = `-# ${approved ? '✅ Approved' : '✖️ Denied'} by ${reviewer.displayName} · <t:${Math.floor(Date.now() / 1000)}:f>`;
+      node.content = `-# ${approved ? '✅ Approved' : '✖️ Denied'} by ${reviewer.displayName} · <t:${Math.floor(Date.now() / 1000)}:f>${partnerRoom ? ` · room ${partnerRoom}` : ''}`;
     }
     (node.components as Record<string, unknown>[] | undefined)?.forEach(walk);
     if (node.accessory) walk(node.accessory as Record<string, unknown>);
@@ -286,9 +355,30 @@ export async function handleReviewButton(interaction: ButtonInteraction): Promis
   await member
     ?.send(
       approved
-        ? `Your **${req.role}** request in the ${brand.name} server was approved. Welcome aboard.`
+        ? `Your **${req.role}** request in the ${brand.name} server was approved. Welcome aboard.` +
+            (partnerRoom ? ` Your private room with the CEO and COO is open: ${partnerRoom}` : '')
         : `Your **${req.role}** request in the ${brand.name} server wasn't approved this time. Questions? Ask a moderator.`,
     )
     .catch(() => {}); // DMs closed; the decision still stands
   console.log(`[Pulsify] ${req.role} request for ${member?.user.username ?? userId} ${approved ? 'approved' : 'denied'} by ${reviewer.user.username}`);
+}
+
+/** The answer under a `**label**` heading on a review card, if the card has one. */
+function answerOnCard(node: Record<string, unknown>, label: string): string | undefined {
+  if (node.type === ComponentType.TextDisplay && typeof node.content === 'string' && node.content.startsWith(`**${label}**\n`)) {
+    return node.content.slice(label.length + 5).trim();
+  }
+  for (const child of [...((node.components as Record<string, unknown>[] | undefined) ?? []), ...(node.accessory ? [node.accessory as Record<string, unknown>] : [])]) {
+    const found = answerOnCard(child, label);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/** The logo attached to a review card, downloaded fresh from the interaction's copy of the message. */
+async function logoOnCard(interaction: ButtonInteraction): Promise<Logo | undefined> {
+  const file = interaction.message.attachments.find((a) => a.name.startsWith(LOGO_NAME));
+  if (!file) return undefined;
+  const res = await fetch(file.url).catch(() => undefined);
+  return res?.ok ? { data: Buffer.from(await res.arrayBuffer()), name: file.name } : undefined;
 }
